@@ -3,7 +3,6 @@ import re
 from typing import List, Optional
 
 import numexpr
-from langchain.chains.openai_functions import create_structured_output_runnable
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.pydantic_v1 import BaseModel, Field
@@ -114,7 +113,7 @@ def get_math_tool(llm: ChatOpenAI):
             MessagesPlaceholder(variable_name="context", optional=True),
         ]
     )
-    extractor = create_structured_output_runnable(ExecuteCode, llm, prompt)
+    extractor = prompt | llm.with_structured_output(ExecuteCode)
 
     def calculate_expression(
         problem: str,
