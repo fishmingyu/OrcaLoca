@@ -1,3 +1,9 @@
 *.txt
 *.json
 *.png
+*egg-info/
+dist/
+build/
+
+# unignore a file
+!requirements.txt

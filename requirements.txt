@@ -1,0 +1,7 @@
+pydantic    
+langchain
+langchain_openai
+langsmith
+langgraph
+langchainhub
+numexpr
