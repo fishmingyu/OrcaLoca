@@ -90,6 +90,9 @@ class Planner:
             | llm
             | LLMCompilerPlanParser(tools=tools)
         )
+    
+    def stream(self, messages: List[BaseMessage]) -> List[BaseMessage]:
+        return self.planner.stream(messages)
 
     def __call__(self, messages: List[BaseMessage], config):
         tasks = self.planner.stream(messages, config)
@@ -107,3 +110,4 @@ class Planner:
             config,
         )
         return scheduled_tasks
+    

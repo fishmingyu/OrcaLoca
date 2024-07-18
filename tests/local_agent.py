@@ -62,6 +62,8 @@ from Orcar import OrcarAgent
 
 agent = OrcarAgent(tools)
 
-for step in agent.stream([HumanMessage(content="What's the GDP of New York?")]):
-    print(step)
-    print("---")
+# for step in agent.stream([HumanMessage(content="What is the sum of New York's GDP in 2022 and 2023?")]):
+#     print(step)
+#     print("---")
+
+agent.debug_task([HumanMessage(content="Zachary sold books at a yard sale for 15$ each and toys for $1.00 each. If he sells 6 books and 3 toys, how much money does Zachary make altogether?" )])

@@ -66,3 +66,12 @@ class OrcarAgent:
     
     def stream(self, messages: List[BaseMessage]) -> Iterator[BaseMessage]:
         return self.chain.stream(messages)
+    
+    def debug_task(self, messages: List[BaseMessage]):
+        planner = self.planner
+        for task in planner.stream(messages):
+            if task["tool"] == "join":
+                print(task["tool"], task["args"])
+            else:
+                print(task["tool"].name, task["args"])
+            print("---")
