@@ -1,8 +1,6 @@
 pydantic    
-langchain
-langchain_openai
-langsmith
-langgraph
-langchainhub
+llama-index-core
+llama-index-embeddings-openai 
+llama-index-agent-llm-compiler
+llama-index-llms-openai
 numexpr
-langchain-experimental

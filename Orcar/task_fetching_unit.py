@@ -1,170 +1,169 @@
-import re
-import time
-from concurrent.futures import ThreadPoolExecutor, wait
-from typing import Any, Dict, Iterable, List, Union
+"""Task fetching unit.
 
-from langchain_core.runnables import (
-    chain as as_runnable,
-)
-from typing_extensions import TypedDict
-import itertools
-from langchain_core.messages import (
-    BaseMessage,
-    FunctionMessage,
-    HumanMessage,
-    SystemMessage,
-)
-from .output_parser import LLMCompilerPlanParser, Task
+Taken from
+https://github.com/SqueezeAILab/LLMCompiler/blob/main/src/llm_compiler/task_fetching_unit.py
 
-def _get_observations(messages: List[BaseMessage]) -> Dict[int, Any]:
-    # Get all previous tool responses
-    results = {}
-    for message in messages[::-1]:
-        if isinstance(message, FunctionMessage):
-            results[int(message.additional_kwargs["idx"])] = message.content
-    return results
+"""
+
+import asyncio
+from typing import Any, Collection, Dict, List, Set, Tuple, Union
+
+from llama_index.core.utils import print_text
+from pydantic import BaseModel
+
+from .schema import LLMCompilerTask
+from .utils import parse_llm_compiler_action_args
+
+SCHEDULING_INTERVAL = 0.01  # seconds
 
 
-class SchedulerInput(TypedDict):
-    messages: List[BaseMessage]
-    tasks: Iterable[Task]
-
-
-def _execute_task(task, observations, config):
-    tool_to_use = task["tool"]
-    if isinstance(tool_to_use, str):
-        return tool_to_use
-    args = task["args"]
-    try:
-        if isinstance(args, str):
-            resolved_args = _resolve_arg(args, observations)
-        elif isinstance(args, dict):
-            resolved_args = {
-                key: _resolve_arg(val, observations) for key, val in args.items()
-            }
-        else:
-            # This will likely fail
-            resolved_args = args
-    except Exception as e:
-        return (
-            f"ERROR(Failed to call {tool_to_use.name} with args {args}.)"
-            f" Args could not be resolved. Error: {repr(e)}"
-        )
-    try:
-        return tool_to_use.invoke(resolved_args, config)
-    except Exception as e:
-        return (
-            f"ERROR(Failed to call {tool_to_use.name} with args {args}."
-            + f" Args resolved to {resolved_args}. Error: {repr(e)})"
-        )
-
-
-def _resolve_arg(arg: Union[str, Any], observations: Dict[int, Any]):
-    # $1 or ${1} -> 1
-    ID_PATTERN = r"\$\{?(\d+)\}?"
-
-    def replace_match(match):
-        # If the string is ${123}, match.group(0) is ${123}, and match.group(1) is 123.
-
-        # Return the match group, in this case the index, from the string. This is the index
-        # number we get back.
-        idx = int(match.group(1))
-        return str(observations.get(idx, match.group(0)))
-
-    # For dependencies on other tasks
-    if isinstance(arg, str):
-        return re.sub(ID_PATTERN, replace_match, arg)
-    elif isinstance(arg, list):
-        return [_resolve_arg(a, observations) for a in arg]
-    else:
-        return str(arg)
-
-
-@as_runnable
-def schedule_task(task_inputs, config):
-    task: Task = task_inputs["task"]
-    observations: Dict[int, Any] = task_inputs["observations"]
-    try:
-        observation = _execute_task(task, observations, config)
-    except Exception:
-        import traceback
-
-        observation = traceback.format_exception()  # repr(e) +
-    observations[task["idx"]] = observation
-
-
-def schedule_pending_task(
-    task: Task, observations: Dict[int, Any], retry_after: float = 0.2
-):
-    while True:
-        deps = task["dependencies"]
-        if deps and (any([dep not in observations for dep in deps])):
-            # Dependencies not yet satisfied
-            time.sleep(retry_after)
-            continue
-        schedule_task.invoke({"task": task, "observations": observations})
-        break
-
-
-@as_runnable
-def schedule_tasks(scheduler_input: SchedulerInput) -> List[FunctionMessage]:
-    """Group the tasks into a DAG schedule."""
-    # For streaming, we are making a few simplifying assumption:
-    # 1. The LLM does not create cyclic dependencies
-    # 2. That the LLM will not generate tasks with future deps
-    # If this ceases to be a good assumption, you can either
-    # adjust to do a proper topological sort (not-stream)
-    # or use a more complicated data structure
-    tasks = scheduler_input["tasks"]
-    args_for_tasks = {}
-    messages = scheduler_input["messages"]
-    # If we are re-planning, we may have calls that depend on previous
-    # plans. Start with those.
-    observations = _get_observations(messages)
-    task_names = {}
-    originals = set(observations)
-    # ^^ We assume each task inserts a different key above to
-    # avoid race conditions...
-    futures = []
-    retry_after = 0.25  # Retry every quarter second
-    with ThreadPoolExecutor() as executor:
-        for task in tasks:
-            deps = task["dependencies"]
-            task_names[task["idx"]] = (
-                task["tool"] if isinstance(task["tool"], str) else task["tool"].name
-            )
-            args_for_tasks[task["idx"]] = task["args"]
-            if (
-                # Depends on other tasks
-                deps
-                and (any([dep not in observations for dep in deps]))
-            ):
-                futures.append(
-                    executor.submit(
-                        schedule_pending_task, task, observations, retry_after
-                    )
-                )
+def _replace_arg_mask_with_real_value(
+    args: Union[List, Tuple, str],
+    dependencies: Collection[int],
+    tasks: Dict[int, LLMCompilerTask],
+) -> Union[List, Tuple]:
+    if isinstance(args, (list, tuple)):
+        new_list: List[Any] = []
+        for item in args:
+            new_item = _replace_arg_mask_with_real_value(item, dependencies, tasks)
+            # if the original item was string but the new item is not, then treat it as expanded
+            # arguments.
+            # hack to get around ast.literal_eval not being able to parse strings with template variables
+            # e.g. "$1, 2" -> ("$1, 2", )
+            if isinstance(item, str) and not isinstance(new_item, str):
+                new_list.extend(new_item)
             else:
-                # No deps or all deps satisfied
-                # can schedule now
-                schedule_task.invoke(dict(task=task, observations=observations))
-                # futures.append(executor.submit(schedule_task.invoke dict(task=task, observations=observations)))
+                new_list.append(new_item)
+        return type(args)(new_list)
+    elif isinstance(args, str):
+        for dependency in sorted(dependencies, reverse=True):
+            # consider both ${1} and $1 (in case planner makes a mistake)
+            for arg_mask in ["${" + str(dependency) + "}", "$" + str(dependency)]:
+                if arg_mask in args:
+                    if tasks[dependency].observation is not None:
+                        args = args.replace(
+                            arg_mask, str(tasks[dependency].observation)
+                        )
 
-        # All tasks have been submitted or enqueued
-        # Wait for them to complete
-        wait(futures)
-    # Convert observations to new tool messages to add to the state
-    new_observations = {
-        k: (task_names[k], args_for_tasks[k], observations[k])
-        for k in sorted(observations.keys() - originals)
-    }
-    tool_messages = [
-        FunctionMessage(
-            name=name, content=str(obs), additional_kwargs={"idx": k, "args": task_args}
+        # need to re-call parse_llm_compiler_action_args after replacement,
+        # this is because arg strings with template variables get formatted
+        # into lists (ast.literal_eval fails):
+        # e.g. "$1, 2" -> ("$1, 2", )
+        # so after replacement need to rerun this
+        return parse_llm_compiler_action_args(args)
+    else:
+        return args
+
+
+class TaskFetchingUnit(BaseModel):
+    """Task fetching unit.
+
+    Detailed in LLMCompiler Paper.
+    Code taken from https://github.com/SqueezeAILab/LLMCompiler/blob/main/src/llm_compiler/task_fetching_unit.py.
+
+    """
+
+    tasks: Dict[int, LLMCompilerTask]
+    tasks_done: Dict[int, asyncio.Event]
+    remaining_tasks: Set[int]
+    verbose: bool = False
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @classmethod
+    def from_tasks(
+        cls,
+        tasks: Dict[int, LLMCompilerTask],
+        verbose: bool = False,
+    ) -> "TaskFetchingUnit":
+        """Create a TaskFetchingUnit from a list of tasks."""
+        tasks_done = {task_idx: asyncio.Event() for task_idx in tasks}
+        remaining_tasks = set(tasks.keys())
+        return cls(
+            tasks=tasks,
+            tasks_done=tasks_done,
+            remaining_tasks=remaining_tasks,
+            verbose=verbose,
         )
-        for k, (name, task_args, obs) in new_observations.items()
-    ]
-    return tool_messages
 
+    def set_tasks(self, tasks: Dict[int, Any]) -> None:
+        self.tasks.update(tasks)
+        self.tasks_done.update({task_idx: asyncio.Event() for task_idx in tasks})
+        self.remaining_tasks.update(set(tasks.keys()))
 
+    def _all_tasks_done(self) -> bool:
+        return all(self.tasks_done[d].is_set() for d in self.tasks_done)
 
+    def _get_all_executable_tasks(self) -> List[int]:
+        return [
+            task_id
+            for task_id in self.remaining_tasks
+            if all(
+                self.tasks_done[d].is_set() for d in self.tasks[task_id].dependencies
+            )
+        ]
+
+    def _preprocess_args(self, task: LLMCompilerTask) -> None:
+        """Replace dependency placeholders, i.e. ${1}, in task.args with the actual observation."""
+        args = _replace_arg_mask_with_real_value(
+            task.args, task.dependencies, self.tasks
+        )
+        task.args = args
+
+    async def _run_task(self, task: LLMCompilerTask) -> None:
+        self._preprocess_args(task)
+        if not task.is_join:
+            observation = await task()
+            task.observation = observation
+        if self.verbose:
+            print_text(
+                f"Ran task: {task.name}. Observation: {task.observation}\n",
+                color="blue",
+            )
+        self.tasks_done[task.idx].set()
+
+    async def schedule(self) -> None:
+        """Run all tasks in self.tasks in parallel, respecting dependencies."""
+        # run until all tasks are done
+        while not self._all_tasks_done():
+            # Find tasks with no dependencies or with all dependencies met
+            executable_tasks = self._get_all_executable_tasks()
+
+            async_tasks = []
+            for task_id in executable_tasks:
+                async_tasks.append(self._run_task(self.tasks[task_id]))
+                self.remaining_tasks.remove(task_id)
+            await asyncio.gather(*async_tasks)
+
+            await asyncio.sleep(SCHEDULING_INTERVAL)
+
+    async def aschedule(self, task_queue: asyncio.Queue) -> None:
+        """Asynchronously listen to task_queue and schedule tasks as they arrive."""
+        no_more_tasks = False  # Flag to check if all tasks are received
+
+        while True:
+            if not no_more_tasks:
+                # Wait for a new task to be added to the queue
+                task = await task_queue.get()
+
+                # Check for sentinel value indicating end of tasks
+                if task is None:
+                    no_more_tasks = True
+                else:
+                    # Parse and set the new tasks
+                    self.set_tasks({task.idx: task})
+
+            # Schedule and run executable tasks
+            executable_tasks = self._get_all_executable_tasks()
+
+            if executable_tasks:
+                for task_id in executable_tasks:
+                    asyncio.create_task(self._run_task(self.tasks[task_id]))
+                    self.remaining_tasks.remove(task_id)
+            elif no_more_tasks and self._all_tasks_done():
+                # Exit the loop if no more tasks are expected and all tasks are done
+                break
+            else:
+                # If no executable tasks are found, sleep for the SCHEDULING_INTERVAL
+                await asyncio.sleep(SCHEDULING_INTERVAL)
