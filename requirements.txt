@@ -5,3 +5,4 @@ langsmith
 langgraph
 langchainhub
 numexpr
+langchain-experimental

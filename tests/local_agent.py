@@ -39,7 +39,8 @@ _get_pass("OPENAI_API_KEY")
 
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_openai import ChatOpenAI
-
+from langchain_core.tools import tool
+import subprocess
 from Orcar import get_math_tool
 
 calculate = get_math_tool(ChatOpenAI(model="gpt-4-turbo-preview"))
@@ -48,7 +49,20 @@ search = DuckDuckGoSearchResults(
     description='duckduckgo_results_json(query="the search query") - a search engine.',
 )
 
-tools = [search, calculate]
+@tool
+def shell_tool(shell_command: str) -> str:
+    """Execute a shell command and return"""
+    process = subprocess.Popen(
+        shell_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    output, _ = process.communicate()
+    exit_code = process.returncode
+
+    return f"Exit code: {exit_code}, Output:\n{output.decode()}"
+
+
+
+tools = [search, calculate, shell_tool]
 llm = ChatOpenAI(model="gpt-4-turbo-preview")
 
 calculate.invoke(
@@ -62,8 +76,10 @@ from Orcar import OrcarAgent
 
 agent = OrcarAgent(tools)
 
-# for step in agent.stream([HumanMessage(content="What is the sum of New York's GDP in 2022 and 2023?")]):
-#     print(step)
-#     print("---")
+for step in agent.stream([HumanMessage(content="What is 20+(2*4)? Calculate step by step. Make a new directory named tests, and then write the calculated result into a new file named 'result.txt' in this directory.")]):
+    print(step)
+    print("---")
 
-agent.debug_task([HumanMessage(content="Zachary sold books at a yard sale for 15$ each and toys for $1.00 each. If he sells 6 books and 3 toys, how much money does Zachary make altogether?" )])
+
+# agent.stream([HumanMessage(content="What is the sum of New York's GDP in 2022 and 2023?")])
+# agent.invoke([HumanMessage(content="What is 20+(2*4)? Calculate step by step. Make a new directory named tests, and then write the calculated result into a new file named 'result.txt' in this directory." )])
