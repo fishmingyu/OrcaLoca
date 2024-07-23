@@ -11,7 +11,8 @@ sudo PLATFORM=x86_64 OPENAI_API_KEY="your_key" TAG=latest bash ./build.sh
 sudo docker run \
 --rm --gpus all \
 -it \
---mount type=bind,source=$(pwd)/..,target=/orcar \
+--user user \
+-v $PWD/../:/home/user/orcar \
 orcar/x86_64:latest \
 /bin/bash
 ```
