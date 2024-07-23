@@ -26,7 +26,7 @@ tools = [multiply_tool, add_tool]
 
 from llama_index.core.agent import AgentRunner
 
-llm = OpenAI(model="gpt-4")
+llm = OpenAI(model="gpt-4o")
 
 
 callback_manager = llm.callback_manager

@@ -53,7 +53,7 @@ from .utils import (
     generate_context_for_replanner,
 )
 
-DEFAULT_MODEL_NAME = "gpt-4-turbo"
+DEFAULT_MODEL_NAME = "gpt-4o"
 
 JOIN_DESCRIPTION = (
     "join():\n"

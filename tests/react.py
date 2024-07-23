@@ -27,7 +27,7 @@ def execute(shell_command: str) -> str:
 
 shell_tool = FunctionTool.from_defaults(fn=execute)
 
-llm = OpenAI(model="gpt-4-turbo")
+llm = OpenAI(model="gpt-4o")
 agent = ReActAgent.from_tools(llm=llm, tools=[multiply_tool, add_tool, shell_tool], verbose=True)
 
 
