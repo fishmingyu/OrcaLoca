@@ -3,4 +3,4 @@ llama-index-core
 llama-index-embeddings-openai 
 llama-index-agent-llm-compiler
 llama-index-llms-openai
-numexpr
+httpx

@@ -31,5 +31,9 @@ llm = OpenAI(model="gpt-4o")
 agent = ReActAgent.from_tools(llm=llm, tools=[multiply_tool, add_tool, shell_tool], verbose=True)
 
 
-response = agent.chat("What is 20+(2*4)? Calculate step by step. Make a new directory named tests, and then write the calculated result into a new file named 'result.txt' in this directory.")
+json_text = """
+I want to set my current time zone to UTC+0. Can you help me?
+"""
+
+response = agent.chat(json_text)
 print(response)
