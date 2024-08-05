@@ -1,3 +1,3 @@
-from .agent import OrcarAgentWorker
+from .agent import OrcarAgent
 
-__all__ = ["OrcarAgentWorker"]
+__all__ = ["OrcarAgent"]
