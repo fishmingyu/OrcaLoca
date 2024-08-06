@@ -10,11 +10,15 @@ setup(
     author="Zhongming Yu",
     author_email="zhy025@ucsd.edu",
     url="https://github.com/ShishirPatil/gorilla/",
+    include_package_data=True,
     description="AI copilot with efficient runtime planning",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     # py_modules=["cli"],
     packages=find_packages(),
+    package_data={
+        '': ['templates/*'],
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
