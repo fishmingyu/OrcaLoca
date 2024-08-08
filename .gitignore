@@ -3,6 +3,6 @@
 *egg-info/
 dist/
 build/
-
+key.cfg
 # unignore a file
 !requirements.txt
