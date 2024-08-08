@@ -8,7 +8,7 @@ class EnvironmentSetup:
         self.setup()
 
     def setup(self):
-        container = get_container(ctr_name="orcar-agent", image_name=self.image_name)[0]
+        container = get_container(ctr_name="orcar-agent", image_name='sweagent/swe-agent:latest')[0]
         command = "echo 'Hello, World!'"
         run_command_in_container(container, command)
         setup_key_command = f"echo 'export OPENAI_API_KEY={self.config['OPENAI_API_KEY']}' >> ~/.bashrc"

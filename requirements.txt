@@ -8,3 +8,4 @@ termcolor
 config
 docker
 rich
+datasets

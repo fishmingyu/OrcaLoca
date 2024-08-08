@@ -7,6 +7,8 @@ from subprocess import PIPE, STDOUT
 import logging
 import os
 import platform
+import datetime
+import hashlib
 from rich.logging import RichHandler
 from typing import Any, Callable
 
@@ -273,6 +275,11 @@ def get_background_pids(container_obj: Container):
     other_pids = [x for x in pids if x[1] not in {"bash"}]
     return bash_pids, other_pids
 
+def get_children_pids(container_obj: Container, parent_pid: int):
+    pids = container_obj.exec_run(f"ps -o pid --no-headers --ppid {parent_pid}").output.decode().split("\n")
+    pids = [int(x) for x in pids if x]
+    return pids
+
 
 def run_command_in_container(container: subprocess.Popen, command: str, timeout: int = 5) -> str:
     """
@@ -297,4 +304,69 @@ def run_command_in_container(container: subprocess.Popen, command: str, timeout:
     if output:
         logger.info(f"Command output: {output}")
     return output
+
+def get_ctr_from_name(ctr_name: str) -> Container:
+    client = docker.from_env()
+    containers = client.containers.list(all=True, filters={"name": ctr_name})
+    if ctr_name in [c.name for c in containers]:
+        return client.containers.get(ctr_name)
+    else:
+        raise ValueError(f"get_ctr_from_name(): Cannot find container {ctr_name}")
     
+
+def run_bash_in_ctr(ctr: Container, command: str) -> str:
+    """
+    Run a command with a new process in started container and return the output.
+
+    Args:
+        ctr: The container object.
+        command: The command to run.
+
+    Returns:
+        output: The output of the command.
+    """
+    ctr_name: str = ctr.name
+    startup_cmd = [
+        "docker",
+        "exec",
+        "-i",
+        ctr_name,
+        "/bin/bash",
+        "-l"
+    ]
+    #logger.debug(f"Starting process in container {ctr_name}")
+    ctr_subprocess = subprocess.Popen(
+        startup_cmd,
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=STDOUT,
+        text=True,
+        bufsize=1,  # line buffered
+    )
+    ctr_subprocess.stdin.write(f"echo $$\n")
+    ctr_subprocess.stdin.flush()
+    output = ""
+    while (output == ""):
+        output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
+        time.sleep(0.05)
+    ctr_bash_pid = output.split('\n')[0]
+    logger.debug(f"Started bash process {ctr_bash_pid} in container {ctr_name}")
+
+    ctr_subprocess.stdin.write(f"{command}\n")
+    ctr_subprocess.stdin.flush()
+    output = read_with_timeout(ctr_subprocess, lambda: get_children_pids(ctr, ctr_bash_pid), 1)
+    #if output:
+    #    logger.info(f"Command output: {output}")
+    exit_code = ctr_subprocess.returncode
+    ctr_subprocess.stdin.close()
+    return f"Exit code: {exit_code}, Output:\n{output}"
+
+def generate_container_name(image_name: str) -> str:
+    """Return name of container"""
+    process_id = str(os.getpid())
+    current_time = str(datetime.datetime.now())
+    unique_string = current_time + process_id
+    hash_object = hashlib.sha256(unique_string.encode())
+    image_name_sanitized = image_name.replace("/", "-")
+    image_name_sanitized = image_name_sanitized.replace(":", "-")
+    return f"{image_name_sanitized}-{hash_object.hexdigest()[:10]}"

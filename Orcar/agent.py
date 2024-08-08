@@ -1,48 +1,24 @@
 from .instructor import ReActAgent
 from typing import Any, Dict, List, Sequence, Tuple
 
-from llama_index.core.agent import AgentRunner
+
 from llama_index.llms.openai import OpenAI
-from llama_index.core.tools import BaseTool, FunctionTool
+
 import subprocess
 
-from .executor import LLMCompilerAgentWorker
 
-def multiply(a: int, b: int) -> int:
-    """Multiple two integers and returns the result integer"""
-    return a * b
-multiply_tool = FunctionTool.from_defaults(fn=multiply)
-
-
-def add(a: int, b: int) -> int:
-    """Add two integers and returns the result integer"""
-    return a + b
-
-add_tool = FunctionTool.from_defaults(fn=add)
-
-def shell(shell_command: str) -> str:
-    """
-    Executes a shell command and returns the output (result).
-    """
-    process = subprocess.Popen(
-        shell_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    output, _ = process.communicate()
-    exit_code = process.returncode
-    return f"Exit code: {exit_code}, Output:\n{output.decode()}"
-
-shell_tool = FunctionTool.from_defaults(fn=shell)
-
-tools = [multiply_tool, add_tool, shell_tool]
+from .tools import get_llm_compiler_executer
 
 # construct the Orcar agent
 
 class OrcarAgent:
     """Orcar agent worker."""
-    def __init__(self, args, cfg):
+    def __init__(self, args, cfg, ctr_name = ""):
         super().__init__()
+        self.ctr_name = ctr_name
         self.llm = OpenAI(model=args.model, api_key=cfg['OPENAI_API_KEY'], api_base=cfg['OPENAI_API_BASE_URL'])
         self.instructor = self.create_instructor(self.llm)
+        
 
     def chat(self, text: str) -> str:
         """Chat with the agent."""
@@ -59,18 +35,5 @@ class OrcarAgent:
         return self.run(text)
     
     def create_instructor(self, llm: OpenAI) -> ReActAgent:
-        callback_manager = llm.callback_manager
-        executor = LLMCompilerAgentWorker.from_tools(tools, llm=llm, verbose=True, callback_manager=callback_manager)
-
-        # wrap llm compiler as a tool
-        def llm_compiler_tool(input_text: str) -> str:
-            """
-            This is a tool that wraps the LLM compiler.
-            It will analyze the input prompt and plan the actions to take.
-            Itself will execute the actions and return the result.
-            """
-            agent = AgentRunner(executor, callback_manager=callback_manager)
-            return agent.chat(input_text)
-
-        llm_compiler_tool = FunctionTool.from_defaults(fn=llm_compiler_tool)
+        llm_compiler_tool = get_llm_compiler_executer(llm, self.ctr_name)
         return ReActAgent.from_tools(llm=llm, tools=[llm_compiler_tool], verbose=True)
