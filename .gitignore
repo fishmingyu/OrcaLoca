@@ -3,6 +3,7 @@
 *egg-info/
 dist/
 build/
+__pycache__/
 key.cfg
 # unignore a file
 !requirements.txt

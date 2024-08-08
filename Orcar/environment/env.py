@@ -2,9 +2,9 @@ from .utils import *
 import os
 
 class EnvironmentSetup:
-    def __init__(self, image_name: str, config_path: str = "key.cfg"):
+    def __init__(self, image_name: str, config):
         self.image_name = image_name
-        self.config = read_cfg_to_dict(config_path)
+        self.config = config
         self.setup()
 
     def setup(self):

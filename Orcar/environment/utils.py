@@ -297,21 +297,4 @@ def run_command_in_container(container: subprocess.Popen, command: str, timeout:
     if output:
         logger.info(f"Command output: {output}")
     return output
-
-
-def read_cfg_to_dict(file_path):
-    config_dict = {}
-    # Create a ConfigParser object
-    with open(file_path, 'r') as file:
-        for line in file:
-            # Skip empty lines and lines starting with comments (if any)
-            if line.strip() and not line.strip().startswith('#'):
-                # Split the line into key and value
-                key, value = line.strip().split(':', 1)
-                # Remove quotes from the value and strip any extra whitespace
-                value = value.strip().strip('"')
-                # Add to the dictionary
-                config_dict[key.strip()] = value
-    
-    return config_dict
     
