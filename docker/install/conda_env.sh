@@ -11,6 +11,6 @@ function pkg_requirements {
 }
 
 
-conda create -n "llama_index" python=3.10 -y
-source activate "llama_index"
+conda create -n "test" python=3.10 -y
+source activate "test"
 pkg_requirements

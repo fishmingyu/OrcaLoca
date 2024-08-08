@@ -19,6 +19,7 @@ setup(
     package_data={
         '': ['templates/*'],
     },
+    py_modules=["cli"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
@@ -26,9 +27,9 @@ setup(
     ],
     python_requires='>=3.7',
     install_requires=requirements,
-    # entry_points={
-    #     'console_scripts': [
-    #         'orcar=cli:main',
-    #     ],
-    # },
+    entry_points={
+        'console_scripts': [
+            'orcar=cli:main',
+        ],
+    },
 )

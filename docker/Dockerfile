@@ -2,11 +2,9 @@
 ARG BASEIMAGE=ubuntu:22.04
 FROM ${BASEIMAGE} as base
 ARG PLATFORM
-ARG OPENAI_API_KEY
 
-RUN useradd -ms /bin/bash user
-RUN echo 'user:123456' | chpasswd
-RUN usermod -aG sudo user
+# Use bash for RUN commands
+SHELL ["/bin/bash", "-c"]
 
 ENV BUILD_PLATFORM=${PLATFORM}
 
@@ -16,11 +14,7 @@ RUN apt-get update && apt-get install -y \
     curl wget file sudo\
     && rm -rf /var/lib/apt/lists/*
 
-# OpenAI API Key
-ENV OPENAI_API_KEY=${OPENAI_API_KEY}
-
-USER user
-WORKDIR /home/user
+WORKDIR /
 
 COPY install/entry.sh /install/entry.sh
 RUN bash /install/entry.sh
@@ -28,3 +22,7 @@ RUN bash /install/entry.sh
 COPY install/conda_env.sh /install/conda_env.sh
 RUN bash /install/conda_env.sh
 
+RUN source ~/.bashrc \
+    && conda --version \
+    && conda init bash \
+    && conda config --append channels conda-forge

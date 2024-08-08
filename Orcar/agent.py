@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 from llama_index.core.agent import AgentRunner
 from llama_index.llms.openai import OpenAI
 from llama_index.core.tools import BaseTool, FunctionTool
+import subprocess
 
 llm = OpenAI(model="gpt-4")
 
@@ -23,7 +24,20 @@ def add(a: int, b: int) -> int:
 
 add_tool = FunctionTool.from_defaults(fn=add)
 
-executor = LLMCompilerAgentWorker.from_tools([multiply_tool, add_tool], llm=llm, verbose=True, callback_manager=callback_manager)
+def shell(shell_command: str) -> str:
+    """
+    Executes a shell command and returns the output (result).
+    """
+    process = subprocess.Popen(
+        shell_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    output, _ = process.communicate()
+    exit_code = process.returncode
+    return f"Exit code: {exit_code}, Output:\n{output.decode()}"
+
+shell_tool = FunctionTool.from_defaults(fn=shell)
+
+executor = LLMCompilerAgentWorker.from_tools([multiply_tool, add_tool, shell_tool], llm=llm, verbose=True, callback_manager=callback_manager)
 
 # wrap llm compiler as a tool
 def llm_compiler_tool(input_text: str) -> str:
@@ -51,8 +65,6 @@ class OrcarAgent:
     def chat(self, text: str) -> str:
         """Chat with the agent."""
         response = self.instructor.chat(text)
-        if self.verbose:
-            print(f"LLM response: {response}")
         return response
 
     def run(self, text: str) -> str:
