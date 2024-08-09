@@ -350,15 +350,16 @@ def run_bash_in_ctr(ctr: Container, command: str) -> str:
         output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
         time.sleep(0.05)
     ctr_bash_pid = output.split('\n')[0]
-    logger.debug(f"Started bash process {ctr_bash_pid} in container {ctr_name}")
-
+    logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started bash process {ctr_bash_pid} in container {ctr_name}")
+    #start = time.time()
     ctr_subprocess.stdin.write(f"{command}\n")
     ctr_subprocess.stdin.flush()
-    output = read_with_timeout(ctr_subprocess, lambda: get_children_pids(ctr, ctr_bash_pid), 1)
+    output = read_with_timeout(ctr_subprocess, lambda: get_children_pids(ctr, ctr_bash_pid), 10)
     #if output:
     #    logger.info(f"Command output: {output}")
     exit_code = ctr_subprocess.returncode
     ctr_subprocess.stdin.close()
+    #logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Finished bash process {ctr_bash_pid} in container {ctr_name} after {time.time()-start} s")
     return f"Exit code: {exit_code}, Output:\n{output}"
 
 def generate_container_name(image_name: str) -> str:
@@ -370,3 +371,17 @@ def generate_container_name(image_name: str) -> str:
     image_name_sanitized = image_name.replace("/", "-")
     image_name_sanitized = image_name_sanitized.replace(":", "-")
     return f"{image_name_sanitized}-{hash_object.hexdigest()[:10]}"
+
+def pause_persistent_container(ctr_name: str):
+    ctr = get_ctr_from_name(ctr_name)
+    if ctr.status not in {"paused", "exited", "dead", "stopping"}:
+        try:
+            ctr.pause()
+        except Exception:
+            logger.warning("Failed to pause container.", exc_info=True)
+        except KeyboardInterrupt:
+            raise
+        else:
+            logger.info("Agent container paused")
+    else:
+        logger.info(f"Agent container status: {ctr.status}")

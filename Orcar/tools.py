@@ -2,6 +2,9 @@ from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import AgentRunner
 import subprocess
+from typing import List
+import datetime
+import time
 
 from .executor import LLMCompilerAgentWorker
 from .environment.utils import run_bash_in_ctr, get_ctr_from_name
@@ -22,19 +25,22 @@ def shell(shell_command: str) -> str:
     """
     Executes a shell command and returns the output (result).
     """
+    #print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started a bash process")
+    #start = time.time()
     process = subprocess.Popen(
         shell_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
     output, _ = process.communicate()
     exit_code = process.returncode
+    #print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Finished a bash process after {time.time()-start} s")
     return f"Exit code: {exit_code}, Output:\n{output.decode()}"
 
 shell_tool = FunctionTool.from_defaults(fn=shell)
 
-
-def get_llm_compiler_executer(llm: OpenAI, ctr_name: str) -> FunctionTool:
+def create_tool_list(ctr_name: str) -> List[FunctionTool]:
+    tools = [multiply_tool, add_tool]
     if (ctr_name == ""):
-        tools = [multiply_tool, add_tool, shell_tool]
+        tools.append(shell_tool)
     else:
         ctr = get_ctr_from_name(ctr_name)
         def docker_shell(shell_command: str) -> str:
@@ -42,7 +48,12 @@ def get_llm_compiler_executer(llm: OpenAI, ctr_name: str) -> FunctionTool:
             return output
         docker_shell.__doc__ = shell.__doc__ # Map with same function prompt
         docker_shell_tool = FunctionTool.from_defaults(fn=docker_shell)
-        tools = [multiply_tool, add_tool, docker_shell_tool]
+        tools.append(docker_shell_tool)
+    return tools
+
+
+def get_llm_compiler_executer(llm: OpenAI, tools: List[FunctionTool]) -> FunctionTool:
+    
     callback_manager = llm.callback_manager
     executor = LLMCompilerAgentWorker.from_tools(tools, llm=llm, verbose=True, callback_manager=callback_manager)
 

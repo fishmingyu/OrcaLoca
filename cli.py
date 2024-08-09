@@ -1,10 +1,9 @@
 from Orcar import OrcarAgent
-import subprocess
 import argparse
 
 from termcolor import colored
 from Orcar.key_config import Config
-from Orcar.environment.utils import get_container, generate_container_name
+from Orcar.environment.utils import get_container, generate_container_name, pause_persistent_container
 
 
 def green(text, attrs=None):
@@ -54,44 +53,52 @@ def main():
     default_docker_image = "sweagent/swe-agent:latest"
     parser_execute.add_argument(
         "--model",
-        dest="model",
         default=default_model,
-        type=str,
         help=f"The LLM model (only support OpenAI now) (default: {default_model})",
     )
-    parser_execute.add_argument("prompt", type=str, help="The prompt to execute")
-
-    parser_docker = subparsers.add_parser(
-        "docker", help="Execute a prompt with a specified execution type in a docker image"
+    parser_execute.add_argument(
+        "--enable_jit",
+        action='store_true',
+        help=f"Should JIT be used to parallelly call function tools",
     )
-    parser_docker.add_argument(
-        "--model",
-        dest="model",
-        default=default_model,
-        type=str,
-        help=f"The LLM model (only support OpenAI now) (default: {default_model})",
+    parser_execute.add_argument(
+        "-d", "--docker",
+        action='store_true',
+        help=f"Is the prompt executed in local env or docker",
     )
-    parser_docker.add_argument(
+    parser_execute.add_argument(
         "--image",
-        dest="image",
         default=default_docker_image,
-        type=str,
         help=f"The base docker image (default: {default_docker_image})",
     )
-    parser_docker.add_argument("prompt", type=str, help="The prompt to execute")
+    parser_execute.add_argument(
+        "-p", "--persistent",
+        action='store_true',
+        help=f"Is the prompt executed in local env or docker",
+    )
+    parser_execute.add_argument(
+        "--container_name",
+        help=f"The name of container, will be generated from image name if not given",
+    )
+    parser_execute.add_argument("prompt", type=str, help="The prompt to execute")
 
     
     args = parser.parse_args()
     if args.command == "execute":
-        orcar_agent = OrcarAgent(args, Config('./key.cfg'))
-        response = orcar_agent.chat(args.prompt)
-        print(response)
-    elif args.command == "docker":
-        ctr_name = generate_container_name(args.image)
-        docker_ctr_subprocess = get_container(ctr_name=ctr_name, image_name=args.image)[0]
-        orcar_agent = OrcarAgent(args, Config('./key.cfg'), ctr_name)
-        response = orcar_agent.chat(args.prompt)
-        print(response)
-        docker_ctr_subprocess.stdin.close()
+        if (args.docker):
+            ctr_name = args.container_name
+            if ctr_name is None:
+                ctr_name = generate_container_name(args.image)
+            docker_ctr_subprocess = get_container(ctr_name=ctr_name, image_name=args.image, persistent=args.persistent)[0]
+            orcar_agent = OrcarAgent(args, Config('./key.cfg'), args.enable_jit, ctr_name)
+            response = orcar_agent.chat(args.prompt)
+            print(response)
+            docker_ctr_subprocess.stdin.close()
+            if (args.persistent):
+                pause_persistent_container(ctr_name)
+        else:
+            orcar_agent = OrcarAgent(args, Config('./key.cfg'), args.enable_jit)
+            response = orcar_agent.chat(args.prompt)
+            print(response)
     else:
         exit_with_help_message(parser)

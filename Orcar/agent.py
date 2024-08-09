@@ -4,20 +4,19 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 from llama_index.llms.openai import OpenAI
 
-import subprocess
+import time
 
-
-from .tools import get_llm_compiler_executer
+from .tools import get_llm_compiler_executer, create_tool_list
 
 # construct the Orcar agent
 
 class OrcarAgent:
     """Orcar agent worker."""
-    def __init__(self, args, cfg, ctr_name = ""):
+    def __init__(self, args, cfg, enable_jit: bool = True, ctr_name = ""):
         super().__init__()
         self.ctr_name = ctr_name
         self.llm = OpenAI(model=args.model, api_key=cfg['OPENAI_API_KEY'], api_base=cfg['OPENAI_API_BASE_URL'])
-        self.instructor = self.create_instructor(self.llm)
+        self.instructor = self.create_instructor(self.llm, enable_jit)
         
 
     def chat(self, text: str) -> str:
@@ -34,6 +33,10 @@ class OrcarAgent:
         """Call the agent."""
         return self.run(text)
     
-    def create_instructor(self, llm: OpenAI) -> ReActAgent:
-        llm_compiler_tool = get_llm_compiler_executer(llm, self.ctr_name)
-        return ReActAgent.from_tools(llm=llm, tools=[llm_compiler_tool], verbose=True)
+    def create_instructor(self, llm: OpenAI, enable_jit) -> ReActAgent:
+        tool_list = create_tool_list(self.ctr_name)
+        if enable_jit:
+            llm_compiler_tool = get_llm_compiler_executer(llm, tool_list)
+            return ReActAgent.from_tools(llm=llm, tools=[llm_compiler_tool], verbose=True)
+        else:
+            return ReActAgent.from_tools(llm=llm, tools=tool_list, verbose=True)
