@@ -3,7 +3,14 @@ import argparse
 
 from termcolor import colored
 from Orcar.key_config import Config
-from Orcar.environment.utils import get_container, generate_container_name, pause_persistent_container
+from Orcar.environment.utils import (
+    get_container,
+    generate_container_name,
+    pause_persistent_container,
+    ContainerBash
+)
+from Orcar.environment.benchmark import BenchMarkEnv
+from Orcar.environment.benchmark import load_filter_hf_dataset
 
 
 def green(text, attrs=None):
@@ -58,12 +65,13 @@ def main():
     )
     parser_execute.add_argument(
         "--enable_jit",
-        action='store_true',
+        action="store_true",
         help=f"Should JIT be used to parallelly call function tools",
     )
     parser_execute.add_argument(
-        "-d", "--docker",
-        action='store_true',
+        "-d",
+        "--docker",
+        action="store_true",
         help=f"Is the prompt executed in local env or docker",
     )
     parser_execute.add_argument(
@@ -72,33 +80,100 @@ def main():
         help=f"The base docker image (default: {default_docker_image})",
     )
     parser_execute.add_argument(
-        "-p", "--persistent",
-        action='store_true',
+        "-p",
+        "--persistent",
+        action="store_true",
         help=f"Is the prompt executed in local env or docker",
     )
     parser_execute.add_argument(
-        "--container_name",
+        "-c", "--container_name",
         help=f"The name of container, will be generated from image name if not given",
     )
     parser_execute.add_argument("prompt", type=str, help="The prompt to execute")
 
-    
+    parser_execute = subparsers.add_parser(
+        "benchmark", help="Run a given huggingface benchmark following swe-bench format"
+    )
+    default_dataset = "princeton-nlp/SWE-bench_Lite"
+    parser_execute.add_argument(
+        "--model",
+        default=default_model,
+        help=f"The LLM model (only support OpenAI now) (default: {default_model})",
+    )
+    parser_execute.add_argument(
+        "--image",
+        default=default_docker_image,
+        help=f"The base docker image (default: {default_docker_image})",
+    )
+    parser_execute.add_argument(
+        "--dataset",
+        default=default_dataset,
+        help=f"The target dataset (default: {default_dataset})",
+    )
+    parser_execute.add_argument(
+        "-p",
+        "--persistent",
+        action="store_true",
+        help=f"Is the prompt executed in local env or docker",
+    )
+    parser_execute.add_argument(
+        "-c", "--container_name",
+        help=f"The name of container, will be generated from image name if not given",
+    )
+    parser_execute.add_argument(
+        "-s",
+        "--split",
+        default="dev",
+        help=f"The split you care about, e.g. dev or test",
+    )
+    parser_execute.add_argument(
+        "-f",
+        "--filter_instance",
+        default=".*",
+        help=f"Filter the instances you care about with RegEx",
+    )
+
     args = parser.parse_args()
     if args.command == "execute":
-        if (args.docker):
+        if args.docker:
             ctr_name = args.container_name
             if ctr_name is None:
                 ctr_name = generate_container_name(args.image)
-            docker_ctr_subprocess = get_container(ctr_name=ctr_name, image_name=args.image, persistent=args.persistent)[0]
-            orcar_agent = OrcarAgent(args, Config('./key.cfg'), args.enable_jit, ctr_name)
+            docker_ctr_subprocess = get_container(
+                ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
+            )[0]
+            ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
+
+            orcar_agent = OrcarAgent(
+                args, Config("./key.cfg"), args.enable_jit, ctr_bash
+            )
             response = orcar_agent.chat(args.prompt)
             print(response)
-            docker_ctr_subprocess.stdin.close()
-            if (args.persistent):
-                pause_persistent_container(ctr_name)
+
+            ctr_bash.ctr_subprocess.stdin.close()
+            if args.persistent:
+                pause_persistent_container(ctr_bash)
         else:
-            orcar_agent = OrcarAgent(args, Config('./key.cfg'), args.enable_jit)
+            orcar_agent = OrcarAgent(args, Config("./key.cfg"), args.enable_jit)
             response = orcar_agent.chat(args.prompt)
             print(response)
+    elif args.command == "benchmark":
+        ctr_name = args.container_name
+        if ctr_name is None:
+            ctr_name = generate_container_name(args.image)
+        docker_ctr_subprocess = get_container(
+            ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
+        )[0]
+        ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
+
+        ds = load_filter_hf_dataset(args)
+        benchmark_env = BenchMarkEnv(args, ctr_bash, ds)
+
+        # Run Test on Benchmark
+        # TBD
+
+        ctr_bash.ctr_subprocess.stdin.close()
+        if args.persistent:
+            pause_persistent_container(ctr_bash)
     else:
         exit_with_help_message(parser)

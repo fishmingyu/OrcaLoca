@@ -9,6 +9,10 @@ import os
 import platform
 import datetime
 import hashlib
+import tempfile
+import tarfile
+import traceback
+from io import BytesIO
 from rich.logging import RichHandler
 from typing import Any, Callable
 
@@ -21,6 +25,22 @@ DOCKER_START_UP_DELAY = 1
 
 _STREAM_LEVEL = logging.DEBUG
 _FILE_LEVEL = logging.TRACE
+
+
+class ContainerBash:
+    def __init__(
+        self,
+        ctr_subprocess: subprocess.Popen,
+        ctr_name: str,
+        ctr: Container | None = None,
+        ctr_pid: int | None = None,
+    ):
+        self.ctr_subprocess = ctr_subprocess
+        self.ctr_name = ctr_name
+        self.ctr = ctr if (ctr is not None) else get_ctr_from_name(ctr_name)
+        self.ctr_pid = (
+            ctr_pid if (ctr_pid is not None) else get_bash_pid_in_docker(ctr_subprocess)
+        )
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -44,9 +64,13 @@ def get_logger(name: str) -> logging.Logger:
         logger.addHandler(handler)
     return logger
 
+
 logger = get_logger("env_utils")
 
-def get_container(ctr_name: str, image_name: str, persistent: bool = False) -> tuple[subprocess.Popen, set]:
+
+def get_container(
+    ctr_name: str, image_name: str, persistent: bool = False
+) -> tuple[subprocess.Popen, set]:
     """
     Get a container object for a given container name and image name
 
@@ -69,7 +93,7 @@ def get_container(ctr_name: str, image_name: str, persistent: bool = False) -> t
         return _get_persistent_container(ctr_name, image_name)
     else:
         return _get_non_persistent_container(ctr_name, image_name)
-    
+
 
 def image_exists(image_name: str) -> bool:
     """
@@ -113,7 +137,10 @@ def image_exists(image_name: str) -> bool:
         )
     return True
 
-def _get_non_persistent_container(ctr_name: str, image_name: str) -> tuple[subprocess.Popen, set[str]]:
+
+def _get_non_persistent_container(
+    ctr_name: str, image_name: str
+) -> tuple[subprocess.Popen, set[str]]:
     startup_cmd = [
         "docker",
         "run",
@@ -219,7 +246,10 @@ def _get_persistent_container(
         raise RuntimeError(msg)
     return container, {str(bash_pid), "1"}
 
-def read_with_timeout(container: subprocess.Popen, pid_func: Callable, timeout_duration: int | float) -> str:
+
+def read_with_timeout(
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: int | float
+) -> str:
     """
     Read data from a subprocess with a timeout.
     This function uses a file descriptor to read data from the subprocess in a non-blocking way.
@@ -267,21 +297,33 @@ def read_with_timeout(container: subprocess.Popen, pid_func: Callable, timeout_d
         raise TimeoutError(msg)
     return buffer.decode()
 
+
 def get_background_pids(container_obj: Container):
-    pids = container_obj.exec_run("ps -eo pid,comm --no-headers").output.decode().split("\n")
+    pids = (
+        container_obj.exec_run("ps -eo pid,comm --no-headers")
+        .output.decode()
+        .split("\n")
+    )
     pids = [x.split() for x in pids if x]
     pids = [x for x in pids if x[1] not in {"ps"} and x[0] != "1"]
     bash_pids = [x for x in pids if x[1] == "bash"]
     other_pids = [x for x in pids if x[1] not in {"bash"}]
     return bash_pids, other_pids
 
+
 def get_children_pids(container_obj: Container, parent_pid: int):
-    pids = container_obj.exec_run(f"ps -o pid --no-headers --ppid {parent_pid}").output.decode().split("\n")
+    pids = (
+        container_obj.exec_run(f"ps -o pid --no-headers --ppid {parent_pid}")
+        .output.decode()
+        .split("\n")
+    )
     pids = [int(x) for x in pids if x]
     return pids
 
 
-def run_command_in_container(container: subprocess.Popen, command: str, timeout: int = 5) -> str:
+def run_command_in_container(
+    ctr_bash: ContainerBash, command: str, timeout: int = 5
+) -> str:
     """
     Run a command in a container and return the output.
 
@@ -297,13 +339,30 @@ def run_command_in_container(container: subprocess.Popen, command: str, timeout:
         TimeoutError: If the command times out.
     """
 
-    container.stdin.write(f"{command}\n")
-    container.stdin.flush()
-    output = read_with_timeout(container, lambda: list(), timeout)
+    ctr_bash.ctr_subprocess.stdin.write(f"{command}\n")
+    ctr_bash.ctr_subprocess.stdin.flush()
+    output = read_with_timeout(
+        ctr_bash.ctr_subprocess,
+        lambda: get_children_pids(ctr_bash.ctr, ctr_bash.ctr_pid),
+        timeout,
+    )
     logger.debug(f"Run command in container: {command}")
     if output:
         logger.info(f"Command output: {output}")
     return output
+
+def get_exit_code(
+    ctr_bash: ContainerBash, timeout: int = 5
+) -> str:
+    ctr_bash.ctr_subprocess.stdin.write(f"echo $?\n")
+    ctr_bash.ctr_subprocess.stdin.flush()
+    output = read_with_timeout(
+        ctr_bash.ctr_subprocess,
+        lambda: get_children_pids(ctr_bash.ctr, ctr_bash.ctr_pid),
+        timeout,
+    )
+    return int(output.strip())
+
 
 def get_ctr_from_name(ctr_name: str) -> Container:
     client = docker.from_env()
@@ -312,9 +371,9 @@ def get_ctr_from_name(ctr_name: str) -> Container:
         return client.containers.get(ctr_name)
     else:
         raise ValueError(f"get_ctr_from_name(): Cannot find container {ctr_name}")
-    
 
-def run_bash_in_ctr(ctr: Container, command: str) -> str:
+
+def run_bash_in_ctr(ctr_bash: ContainerBash, command: str) -> str:
     """
     Run a command with a new process in started container and return the output.
 
@@ -325,17 +384,11 @@ def run_bash_in_ctr(ctr: Container, command: str) -> str:
     Returns:
         output: The output of the command.
     """
-    ctr_name: str = ctr.name
-    startup_cmd = [
-        "docker",
-        "exec",
-        "-i",
-        ctr_name,
-        "/bin/bash",
-        "-l"
-    ]
-    #logger.debug(f"Starting process in container {ctr_name}")
-    ctr_subprocess = subprocess.Popen(
+    ctr = ctr_bash.ctr
+    ctr_name = ctr_bash.ctr_name
+    startup_cmd = ["docker", "exec", "-i", ctr_name, "/bin/bash", "-l"]
+    # logger.debug(f"Starting process in container {ctr_name}")
+    ctr_new_subprocess = subprocess.Popen(
         startup_cmd,
         stdin=PIPE,
         stdout=PIPE,
@@ -343,24 +396,23 @@ def run_bash_in_ctr(ctr: Container, command: str) -> str:
         text=True,
         bufsize=1,  # line buffered
     )
-    ctr_subprocess.stdin.write(f"echo $$\n")
-    ctr_subprocess.stdin.flush()
-    output = ""
-    while (output == ""):
-        output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
-        time.sleep(0.05)
-    ctr_bash_pid = output.split('\n')[0]
-    logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started bash process {ctr_bash_pid} in container {ctr_name}")
-    #start = time.time()
-    ctr_subprocess.stdin.write(f"{command}\n")
-    ctr_subprocess.stdin.flush()
-    output = read_with_timeout(ctr_subprocess, lambda: get_children_pids(ctr, ctr_bash_pid), 10)
-    #if output:
+    ctr_new_bash_pid = get_bash_pid_in_docker(ctr_new_subprocess)
+    logger.debug(
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started bash process {ctr_new_bash_pid} in container {ctr_name}"
+    )
+    # start = time.time()
+    ctr_new_subprocess.stdin.write(f"{command}\n")
+    ctr_new_subprocess.stdin.flush()
+    output = read_with_timeout(
+        ctr_new_subprocess, lambda: get_children_pids(ctr, ctr_new_bash_pid), 10
+    )
+    # if output:
     #    logger.info(f"Command output: {output}")
-    exit_code = ctr_subprocess.returncode
-    ctr_subprocess.stdin.close()
-    #logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Finished bash process {ctr_bash_pid} in container {ctr_name} after {time.time()-start} s")
+    exit_code = ctr_new_subprocess.returncode
+    ctr_new_subprocess.stdin.close()
+    # logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Finished bash process {ctr_bash_pid} in container {ctr_name} after {time.time()-start} s")
     return f"Exit code: {exit_code}, Output:\n{output}"
+
 
 def generate_container_name(image_name: str) -> str:
     """Return name of container"""
@@ -372,8 +424,9 @@ def generate_container_name(image_name: str) -> str:
     image_name_sanitized = image_name_sanitized.replace(":", "-")
     return f"{image_name_sanitized}-{hash_object.hexdigest()[:10]}"
 
-def pause_persistent_container(ctr_name: str):
-    ctr = get_ctr_from_name(ctr_name)
+
+def pause_persistent_container(ctr_bash: ContainerBash):
+    ctr = ctr_bash.ctr
     if ctr.status not in {"paused", "exited", "dead", "stopping"}:
         try:
             ctr.pause()
@@ -385,3 +438,58 @@ def pause_persistent_container(ctr_name: str):
             logger.info("Agent container paused")
     else:
         logger.info(f"Agent container status: {ctr.status}")
+
+
+def get_bash_pid_in_docker(ctr_subprocess: subprocess.Popen) -> int:
+    ctr_subprocess.stdin.write(f"echo $$\n")
+    ctr_subprocess.stdin.flush()
+    output = ""
+    while output == "":
+        output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
+        time.sleep(0.05)
+    return output.split("\n")[0]
+
+
+def copy_file_to_container(container: Container, contents: str, container_path: str) -> None:
+    """
+    Copies a given string into a Docker container at a specified path.
+
+    Args:
+        container: Docker SDK container object.
+        contents: The string to copy into the container.
+        container_path: The path inside the container where the string should be copied to.
+
+    Returns:
+        None
+    """
+    temp_file_name = None
+
+    try:
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file_name = temp_file.name
+            # Write the string to the temporary file and ensure it's written to disk
+            temp_file.write(contents.encode("utf-8"))
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        # Create a TAR archive in memory containing the temporary file
+        with tempfile.NamedTemporaryFile():
+            with open(temp_file_name, "rb") as temp_file:
+                # Prepare the TAR archive
+                with BytesIO() as tar_stream:
+                    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+                        tar_info = tarfile.TarInfo(name=os.path.basename(container_path))
+                        tar_info.size = os.path.getsize(temp_file_name)
+                        tar.addfile(tarinfo=tar_info, fileobj=temp_file)
+                    tar_stream.seek(0)
+                    # Copy the TAR stream to the container
+                    container.put_archive(path=os.path.dirname(container_path), data=tar_stream.read())
+
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        logger.error(traceback.format_exc())
+    finally:
+        # Cleanup: Remove the temporary file if it was created
+        if temp_file_name and os.path.exists(temp_file_name):
+            os.remove(temp_file_name)

@@ -1,3 +1,4 @@
 ## Orca Runtime for LLM
 Installation: pip install -e .
-Running: orcar execute 'Your Prompt'
+Executing prompt: orcar execute --docker 'Run ls'
+Running benchmark: orcar benchmark --persistent --container_name test -filter_instance 'marsh'

@@ -8,6 +8,7 @@ import time
 
 from .executor import LLMCompilerAgentWorker
 from .environment.utils import run_bash_in_ctr, get_ctr_from_name
+from .environment.utils import ContainerBash
 
 def multiply(a: int, b: int) -> int:
     """Multiple two integers and returns the result integer"""
@@ -37,14 +38,13 @@ def shell(shell_command: str) -> str:
 
 shell_tool = FunctionTool.from_defaults(fn=shell)
 
-def create_tool_list(ctr_name: str) -> List[FunctionTool]:
+def create_tool_list(ctr_bash: ContainerBash | None) -> List[FunctionTool]:
     tools = [multiply_tool, add_tool]
-    if (ctr_name == ""):
+    if (ctr_bash is None):
         tools.append(shell_tool)
     else:
-        ctr = get_ctr_from_name(ctr_name)
         def docker_shell(shell_command: str) -> str:
-            output = run_bash_in_ctr(ctr, shell_command)
+            output = run_bash_in_ctr(ctr_bash, shell_command)
             return output
         docker_shell.__doc__ = shell.__doc__ # Map with same function prompt
         docker_shell_tool = FunctionTool.from_defaults(fn=docker_shell)
