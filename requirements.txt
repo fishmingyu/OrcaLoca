@@ -4,3 +4,9 @@ llama-index-embeddings-openai
 llama-index-agent-llm-compiler
 llama-index-llms-openai
 httpx
+termcolor
+config
+docker
+rich
+datasets
+swebench
