@@ -297,6 +297,39 @@ def read_with_timeout(
         raise TimeoutError(msg)
     return buffer.decode()
 
+def read_generator_with_timeout(
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: int | float
+):
+    fd = container.stdout.fileno()
+    end_time = time.time() + timeout_duration
+
+    import select
+
+    def ready_to_read(fd) -> bool:
+        return bool(select.select([fd], [], [], 0.01)[0])
+
+    execution_finished = False
+    pids = []
+    while time.time() < end_time:
+        
+        while ready_to_read(fd):
+            data = os.read(fd, 4096)
+            if data:
+                yield data.decode()
+        else:
+            time.sleep(0.05)  # Prevents CPU hogging
+        if execution_finished:
+            break
+        pids = pid_func()
+        execution_finished = (len(pids) == 0)
+
+    if container.poll() is not None:
+        msg = f"Subprocess exited unexpectedly.\n"
+        raise RuntimeError(msg)
+    if time.time() >= end_time:
+        msg = f"Timeout reached while reading from subprocess.\nRunning PIDs: {pids}"
+        raise TimeoutError(msg)
+
 
 def get_background_pids(container_obj: Container):
     pids = (
@@ -322,10 +355,11 @@ def get_children_pids(container_obj: Container, parent_pid: int):
 
 
 def run_command_in_container(
-    ctr_bash: ContainerBash, command: str, timeout: int = 5
+    ctr_bash: ContainerBash, command: str, timeout: int = 5, output_log: bool = False
 ) -> str:
     """
     Run a command in a container and return the output.
+    Output is streamed to stdout.
 
     Args:
         container: The container subprocess.
@@ -341,14 +375,17 @@ def run_command_in_container(
 
     ctr_bash.ctr_subprocess.stdin.write(f"{command}\n")
     ctr_bash.ctr_subprocess.stdin.flush()
-    output = read_with_timeout(
+    logger.debug(f"Run command in container: {command}")
+    output = ""
+    output_generator = read_generator_with_timeout(
         ctr_bash.ctr_subprocess,
         lambda: get_children_pids(ctr_bash.ctr, ctr_bash.ctr_pid),
         timeout,
     )
-    logger.debug(f"Run command in container: {command}")
-    if output:
-        logger.info(f"Command output: {output}")
+    for output_fraction in output_generator:
+        if output_log:
+            print(output_fraction, end="")
+        output += output_fraction
     return output
 
 def get_exit_code(

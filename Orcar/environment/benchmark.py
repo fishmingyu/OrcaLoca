@@ -31,12 +31,12 @@ class BenchMarkEnv:
         
         
 
-    def run(self, cmd: str, timeout: int=5) -> str:
-        return run_command_in_container(self.ctr_bash, cmd, timeout)
+    def run(self, cmd: str, timeout: int=5, output_log: bool = False) -> str:
+        return run_command_in_container(self.ctr_bash, cmd, timeout, output_log)
 
-    def run_with_handle(self, cmd: str, err_msg: str, timeout: int=5) -> str:
+    def run_with_handle(self, cmd: str, err_msg: str, timeout: int=5, output_log: bool = False) -> str:
         try:
-            output = self.run(cmd, timeout)
+            output = self.run(cmd, timeout, output_log)
         except:
             raise RuntimeError(err_msg)
         exit_code = get_exit_code(self.ctr_bash, timeout)
@@ -53,14 +53,14 @@ class BenchMarkEnv:
             repo_dir = get_repo_dir(repo)
             if repo_dir not in cur_folders:
                 logger.info(f"Repo {repo} not found, cloning to /{repo_dir}")
-                self.run_with_handle(cmd=f"git clone https://github.com/{repo}.git {repo_dir}", err_msg=f"Failed to clone repo to {repo_dir}", timeout=LONG_TIMEOUT)
+                self.run_with_handle(cmd=f"git clone https://github.com/{repo}.git {repo_dir}", err_msg=f"Failed to clone repo to {repo_dir}", timeout=LONG_TIMEOUT, output_log=True)
             for cmd in [
                 f"cd /{repo_dir}",
                 "git status",
                 f"git checkout {row['environment_setup_commit']}",
                 "cd /"
                 ]:
-                self.run_with_handle(cmd=cmd, err_msg=f"Git failed in {repo_dir}", timeout=LONG_TIMEOUT)
+                self.run_with_handle(cmd=cmd, err_msg=f"Git failed in {repo_dir}")
 
     def get_cur_conda_envs(self):
         output = self.run("conda env list")
@@ -96,7 +96,7 @@ class BenchMarkEnv:
                 self.run_with_handle(
                     f"conda create -n {env_name} python={install_configs['python']} -y",
                     err_msg="Failed to create conda environment",
-                    timeout=LONG_TIMEOUT,
+                    timeout=LONG_TIMEOUT, output_log=True
                 )
                 logger.debug("Created conda environment")
                 # Write reqs to requirements.txt in docker container
@@ -110,7 +110,7 @@ class BenchMarkEnv:
                 self.run_with_handle(
                     f"pip install -r {PATH_TO_REQS}",
                     err_msg="Failed to install requirements.txt",
-                    timeout=LONG_TIMEOUT,
+                    timeout=LONG_TIMEOUT, output_log=True
                 )
                 logger.debug("Installed requirements from requirements.txt")
                 self.run(f"rm {PATH_TO_REQS}")
@@ -126,14 +126,14 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         f"conda create -c conda-forge -n {env_name} python={install_configs['python']} -y",
                         err_msg="Failed to create conda environment",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                     logger.debug("Created conda environment")
                     # Install packages
                     self.run_with_handle(
                         f"conda env update -f {PATH_TO_ENV_YML}",
                         err_msg="Failed to install environment.yml",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                     logger.debug("Installed packages from environment.yml")
                 else:
@@ -141,7 +141,7 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         f"conda env create --file {PATH_TO_ENV_YML}",
                         err_msg="Failed to create conda environment with environment.yml",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                     logger.debug("Created conda environment with environment.yml")
                 self.run(f"rm {PATH_TO_ENV_YML}")
@@ -151,7 +151,7 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         f"conda create --name {env_name} --clone {python_env}",
                         err_msg="Failed to clone conda environment",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                     logger.debug("Cloned python conda environment")
                 else:
@@ -159,7 +159,7 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         f"conda create -n {env_name} python={install_configs['python']} -y",
                         err_msg="Failed to create conda environment",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                 self.run_with_handle(
                     f"conda activate {env_name}",
@@ -169,7 +169,7 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         f"conda install {packages} -y",
                         err_msg="Failed to install packages",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                     logger.debug("Installed conda packages")
             # Install extra pip packages if specified
@@ -177,7 +177,7 @@ class BenchMarkEnv:
                 self.run_with_handle(
                     f"source activate {env_name} && pip install {' '.join(install_configs['pip_packages'])}",
                     err_msg="Failed to install pip packages",
-                    timeout=LONG_TIMEOUT,
+                    timeout=LONG_TIMEOUT, output_log=True
                 )
                 logger.debug("Installed extra pip dependencies")
 
@@ -191,7 +191,7 @@ class BenchMarkEnv:
                     self.run_with_handle(
                         pre_install_cmd,
                         err_msg="Pre-install commands failed to execute successfully",
-                        timeout=LONG_TIMEOUT,
+                        timeout=LONG_TIMEOUT, output_log=True
                     )
                 logger.debug("Ran pre-install commands")
             logger.info(f"Installing {record['repo']} at base commit...")
@@ -200,7 +200,7 @@ class BenchMarkEnv:
                 self.run_with_handle(
                     install_cmd,
                     err_msg="Install command failed to execute successfully",
-                    timeout=LONG_TIMEOUT,
+                    timeout=LONG_TIMEOUT, output_log=True
                 )
                 logger.debug("Ran install command")
             if install_configs.get("post_install"):
