@@ -1,19 +1,34 @@
 import os
 import ast
 import networkx as nx
+from collections import namedtuple
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 
+Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
+
 # we use knowledge graph for faster retrieval of information
-class GraphBuilder:
-    def __init__(self, repo_path, save_jpg=False, out_file_name=None):
+class RepoGraph:
+    def __init__(self, repo_path, save_jpg=False, out_file_name=None, build_kg=True):
         self.graph = nx.DiGraph()
         self.save_jpg = save_jpg
-        self.repo_path = repo_path  # Path to the repository
+        self.repo_path = repo_path  # Path to the repository (absolute path)
         self.out_file_name = out_file_name # Name of the output file
         self.function_definitions = {}  # Map to store function definitions by their qualified name
+        if build_kg:
+            self.build_whole_graph(repo_path)
+
+    @staticmethod
+    def extract_prefix(func_name):
+        """
+        Given a function name, extract the prefix of the function name
+        """
+        parts = func_name.split("::")
+        if len(parts) == 1: # no prefix, meaning it's a file or directory (not a function)
+            return None
+        return "::".join(parts[:-1])
 
     def add_node(self, node_name, node_type, signature=None, docstring=None, loc=None):
         """Add a node to the graph with a type and its corresponding layer.
@@ -31,7 +46,33 @@ class GraphBuilder:
         """
         self.graph.add_edge(from_node, to_node, edge_type=edge_type)
 
-    def build_graph_from_repo(self, repo_path):
+    @property
+    def root_node(self):
+        # check node name with "."
+        for node in self.graph.nodes:
+            if node == ".":
+                return node
+            
+    # search for the function definition in the graph
+    def dfs_search_function_def(self, query):
+        root = self.root_node
+        stack = [root]
+        visited = set()
+        kg_query_name = query
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                current_prefix = self.extract_prefix(node)
+                if current_prefix is not None:
+                    kg_query_name = current_prefix + "::" + query
+                if node == kg_query_name:
+                    return self.graph.nodes[node]['loc']
+                stack.extend(self.graph.neighbors(node))
+        return None
+    
+    # build the graph from the repository
+    def build_attribute_from_repo(self, repo_path):
         """Build a graph from a repository."""
         for root, dirs, files in os.walk(repo_path):
             # Add a node for the directory
@@ -39,6 +80,7 @@ class GraphBuilder:
             self.add_node(dir_node_name, 'directory')
 
             for file in files:
+                # now only consider python files
                 if file.endswith(".py"):
                     file_path = os.path.join(root, file)
                     file_node_name = os.path.relpath(file_path, repo_path)
@@ -48,11 +90,11 @@ class GraphBuilder:
                     self.add_edge(dir_node_name, file_node_name, 'contains')
 
                     # Build the graph for the file's content
-                    self.build_graph_from_file(file_path, file_node_name)
+                    self.build_attribute_from_file(file_path, file_node_name)
 
         return self.graph
 
-    def build_graph_from_file(self, file_path, file_node_name):
+    def build_attribute_from_file(self, file_path, file_node_name):
         """Build a graph from a single file."""
         with open(file_path, "r") as file:
             tree = ast.parse(file.read())
@@ -64,12 +106,12 @@ class GraphBuilder:
     def build_references(self, repo_path):
         """Build reference edges between functions in the graph."""
         knowledge_graph = self.graph
-        self.reference_builder = ReferenceBuilder(knowledge_graph, graph_builder.function_definitions)
+        self.reference_builder = ReferenceBuilder(knowledge_graph, self.function_definitions)
         self.reference_builder.build_references(repo_path)
 
     def build_whole_graph(self, repo_path):
         """Build the whole graph from a repository."""
-        self.build_graph_from_repo(repo_path)
+        self.build_attribute_from_repo(repo_path)
         self.build_references(repo_path)
         if self.save_jpg:
             self.save_graph(self.out_file_name)
@@ -167,7 +209,11 @@ class FunctionClassVisitor(ast.NodeVisitor):
         node_name = f"{self.current_file}::{function_name}" if self.current_class is None else f"{self.current_class}::{function_name}"
         self.function_definitions[function_name] = node_name
         node_type = 'function' if self.current_class is None else 'method'
-        node_loc = (self.current_file, node.lineno, node.end_lineno)
+        node_loc = Loc(
+            file_name=self.current_file,
+            start_line=node.lineno,
+            end_line=node.end_lineno
+        )
         
         self.graph_builder.add_node(node_name, node_type, signature, docstring, node_loc)
         
@@ -182,7 +228,11 @@ class FunctionClassVisitor(ast.NodeVisitor):
         docstring = ast.get_docstring(node)
         
         node_name = f"{self.current_file}::{class_name}"
-        node_loc = (self.current_file, node.lineno, node.end_lineno)
+        node_loc = Loc(
+            file_name=self.current_file,
+            start_line=node.lineno,
+            end_line=node.end_lineno
+        )
         self.graph_builder.add_node(node_name, 'class', class_name, docstring, node_loc)
         
         # Link class to the file node
@@ -195,9 +245,10 @@ class FunctionClassVisitor(ast.NodeVisitor):
         # save the previous class
         self.current_class = previous_class
 
+# frist collect all the function definitions and then build the references
 class ReferenceBuilder:
     def __init__(self, graph, function_definitions):
-        self.graph = graph  # The graph produced by GraphBuilder
+        self.graph = graph  # The graph produced by RepoGraph
         self.function_definitions = function_definitions
     def build_references(self, repo_path):
         """Build reference edges between functions in the graph."""
@@ -251,5 +302,10 @@ class FunctionReferenceVisitor(ast.NodeVisitor):
 if __name__ == "__main__":
     # Example usage
     repo_path = "../../tests/test_repo"
-    graph_builder = GraphBuilder(repo_path, save_jpg=True, out_file_name="repo_graph.jpg")
-    graph_builder.build_whole_graph(repo_path)
+    graph_builder = RepoGraph(repo_path, save_jpg=True, out_file_name="repo_graph.jpg", build_kg=True)
+    # try to search function "add" in the graph
+    node = graph_builder.dfs_search_function_def("get_sum")
+    if node:
+        print(f"Found the function definition at {node}")
+    else:
+        print("Function definition not found")
