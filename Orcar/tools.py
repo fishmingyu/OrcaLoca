@@ -2,7 +2,7 @@ from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import AgentRunner
 import subprocess
-from typing import List
+from typing import List, Union
 import datetime
 import time
 
@@ -38,7 +38,7 @@ def shell(shell_command: str) -> str:
 
 shell_tool = FunctionTool.from_defaults(fn=shell)
 
-def create_tool_list(ctr_bash: ContainerBash | None) -> List[FunctionTool]:
+def create_tool_list(ctr_bash: Union[ContainerBash, None]) -> List[FunctionTool]:
     tools = [multiply_tool, add_tool]
     if (ctr_bash is None):
         tools.append(shell_tool)

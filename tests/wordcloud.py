@@ -2,6 +2,19 @@ from datasets import load_dataset
 import matplotlib.pyplot as plt
 import wordcloud
 
+class WordCloud:
+    def __init__(self, width=800, height=400, background_color="white"):
+        self.width = width
+        self.height = height
+        self.background_color = background_color
+        self.wc = wordcloud.WordCloud(width=self.width, height=self.height, background_color=self.background_color)
+
+    def generate(self, text):
+        self.wc.generate(text)
+
+    def to_file(self, filename):
+        self.wc.to_file(filename)
+
 if __name__ == "__main__":
     # Load the dataset
     ds = load_dataset("jiacheng-ye/nl2bash")

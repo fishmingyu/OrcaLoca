@@ -14,7 +14,7 @@ import tarfile
 import traceback
 from io import BytesIO
 from rich.logging import RichHandler
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 _SET_UP_LOGGERS = set()
 _ADDITIONAL_HANDLERS = []
@@ -32,8 +32,8 @@ class ContainerBash:
         self,
         ctr_subprocess: subprocess.Popen,
         ctr_name: str,
-        ctr: Container | None = None,
-        ctr_pid: int | None = None,
+        ctr: Union[Container, None] = None,
+        ctr_pid: Union[int, None] = None,
     ):
         self.ctr_subprocess = ctr_subprocess
         self.ctr_name = ctr_name
@@ -248,8 +248,7 @@ def _get_persistent_container(
 
 
 def read_with_timeout(
-    container: subprocess.Popen, pid_func: Callable, timeout_duration: int | float
-) -> str:
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]) -> str:
     """
     Read data from a subprocess with a timeout.
     This function uses a file descriptor to read data from the subprocess in a non-blocking way.
@@ -298,8 +297,7 @@ def read_with_timeout(
     return buffer.decode()
 
 def read_generator_with_timeout(
-    container: subprocess.Popen, pid_func: Callable, timeout_duration: int | float
-):
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]):
     fd = container.stdout.fileno()
     end_time = time.time() + timeout_duration
 
