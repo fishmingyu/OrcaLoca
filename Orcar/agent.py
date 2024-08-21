@@ -1,5 +1,5 @@
 from .instructor import ReActAgent
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 
 from llama_index.llms.openai import OpenAI
@@ -13,7 +13,7 @@ from .environment.utils import ContainerBash
 
 class OrcarAgent:
     """Orcar agent worker."""
-    def __init__(self, args, cfg, enable_jit: bool = True, ctr_bash: ContainerBash | None = None):
+    def __init__(self, args, cfg, enable_jit: bool = True, ctr_bash: Union[ContainerBash, None] = None):
         super().__init__()
         self.ctr_bash = ctr_bash
         self.llm = OpenAI(model=args.model, api_key=cfg['OPENAI_API_KEY'], api_base=cfg['OPENAI_API_BASE_URL'])
