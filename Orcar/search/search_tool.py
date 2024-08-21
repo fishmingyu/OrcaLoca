@@ -1,5 +1,6 @@
 import networkx as nx
-from build_graph import RepoGraph, Loc
+from .build_graph import RepoGraph, Loc
+from typing import Tuple
 from collections.abc import MutableMapping
 import os
 
@@ -46,16 +47,16 @@ class SearchManager:
     # Interface methods
     #################
 
-    def search_func(self, func_name: str) -> str:
+    def search_func(self, func_name: str) -> Tuple[str, str]:
         """Search the function in the knowledge graph.
 
         Args:
             func_name (str): The function name to search.
 
         Returns:
-            str: The code snippet of the function definition.
+            Tuple[str, str]: The file path and the code snippet of the function definition.
         """
         loc = self._search_func_kg(func_name)
         # loc.file_path is relative to the repo_path
-        joined_path = os.path.join(self.repo_path, loc.file_path)
-        return self.get_code_snippet(joined_path, loc.start, loc.end)
+        joined_path = os.path.join(self.repo_path, loc.file_name)
+        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
