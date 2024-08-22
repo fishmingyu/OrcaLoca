@@ -4,14 +4,16 @@ import argparse
 from termcolor import colored
 from Orcar.key_config import Config
 from Orcar.environment.utils import (
+    get_logger,
     get_container,
     generate_container_name,
     pause_persistent_container,
     ContainerBash
 )
-from Orcar.environment.benchmark import BenchMarkEnv
-from Orcar.environment.benchmark import load_filter_hf_dataset
+from Orcar.environment.benchmark import BenchMarkEnv, load_filter_hf_dataset
+from Orcar.extractor.agent import ExtractorAgent
 
+logger = get_logger('cli')
 
 def green(text, attrs=None):
     return colored(text, "green", attrs=attrs)
@@ -123,7 +125,7 @@ def main():
     parser_execute.add_argument(
         "-s",
         "--split",
-        default="dev",
+        default="test",
         help=f"The split you care about, e.g. dev or test",
     )
     parser_execute.add_argument(
@@ -134,6 +136,7 @@ def main():
     )
 
     args = parser.parse_args()
+    cfg = Config("./key.cfg")
     if args.command == "execute":
         if args.docker:
             ctr_name = args.container_name
@@ -145,18 +148,18 @@ def main():
             ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
 
             orcar_agent = OrcarAgent(
-                args, Config("./key.cfg"), args.enable_jit, ctr_bash
+                args, cfg, args.enable_jit, ctr_bash
             )
             response = orcar_agent.chat(args.prompt)
-            print(response)
+            logger.debug(response)
 
             ctr_bash.ctr_subprocess.stdin.close()
             if args.persistent:
                 pause_persistent_container(ctr_bash)
         else:
-            orcar_agent = OrcarAgent(args, Config("./key.cfg"), args.enable_jit)
+            orcar_agent = OrcarAgent(args, cfg, args.enable_jit)
             response = orcar_agent.chat(args.prompt)
-            print(response)
+            logger.debug(response)
     elif args.command == "benchmark":
         ctr_name = args.container_name
         if ctr_name is None:
@@ -168,6 +171,10 @@ def main():
 
         ds = load_filter_hf_dataset(args)
         benchmark_env = BenchMarkEnv(args, ctr_bash, ds)
+
+        extractor = ExtractorAgent(cfg, benchmark_env)
+        extractor.run()
+        logger.debug(extractor.result)
 
         # Run Test on Benchmark
         # TBD

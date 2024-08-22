@@ -1,4 +1,7 @@
 ## Orca Runtime for LLM
+
 Installation: pip install -e .
+
 Executing prompt: orcar execute --docker 'Run ls'
-Running benchmark: orcar benchmark --persistent --container_name test -filter_instance 'marsh'
+
+Run a benchmark: orcar benchmark --p --c test  -f 'astropy__astropy-14182'

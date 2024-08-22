@@ -4,11 +4,12 @@ import pandas as pd
 import time
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
-from .utils import ContainerBash, run_command_in_container, copy_file_to_container, get_exit_code, logger
+from .utils import ContainerBash, run_command_in_container, copy_file_to_container, get_exit_code, get_logger
 
 LONG_TIMEOUT = 500
 PATH_TO_REQS = "/root/requirements.txt"
 PATH_TO_ENV_YML = "/root/environment.yml"
+logger = get_logger('env_benchmark')
 
 def load_filter_hf_dataset(args) -> datasets.arrow_dataset.Dataset:
     ds = datasets.load_dataset(args.dataset)[args.split]
@@ -29,7 +30,8 @@ class BenchMarkEnv:
         self.clone_repos()
         self.create_conda_envs()
         
-        
+    def copy_to_env(self, contents: str, container_path: str) -> None:
+        copy_file_to_container(self.ctr_bash.ctr, contents, container_path)
 
     def run(self, cmd: str, timeout: int=5, output_log: bool = False) -> str:
         return run_command_in_container(self.ctr_bash, cmd, timeout, output_log)
@@ -101,7 +103,7 @@ class BenchMarkEnv:
                 logger.debug("Created conda environment")
                 # Write reqs to requirements.txt in docker container
                 content_reqs = get_requirements(record)
-                copy_file_to_container(self.ctr_bash.ctr, content_reqs, PATH_TO_REQS)
+                self.copy_to_env(content_reqs, PATH_TO_REQS)
                 # Create conda environment + install reqs
                 self.run_with_handle(
                     f"conda activate {env_name}",
@@ -120,7 +122,7 @@ class BenchMarkEnv:
                 # Hotfix for
                 if not install_configs.get("no_use_env"):
                     content_env_yml += f'\n  - python={install_configs["python"]}\n'
-                copy_file_to_container(self.ctr_bash.ctr, content_env_yml, PATH_TO_ENV_YML)
+                self.copy_to_env(content_env_yml, PATH_TO_ENV_YML)
                 if install_configs.get("no_use_env"):
                     # Create conda environment
                     self.run_with_handle(
