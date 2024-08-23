@@ -8,12 +8,13 @@ from Orcar.environment.utils import (
     get_container,
     generate_container_name,
     pause_persistent_container,
-    ContainerBash
+    ContainerBash,
 )
 from Orcar.environment.benchmark import BenchMarkEnv, load_filter_hf_dataset
 from Orcar.extractor.agent import ExtractorAgent
 
-logger = get_logger('cli')
+logger = get_logger("cli")
+
 
 def green(text, attrs=None):
     return colored(text, "green", attrs=attrs)
@@ -88,7 +89,8 @@ def main():
         help=f"Is the prompt executed in local env or docker",
     )
     parser_execute.add_argument(
-        "-c", "--container_name",
+        "-c",
+        "--container_name",
         help=f"The name of container, will be generated from image name if not given",
     )
     parser_execute.add_argument("prompt", type=str, help="The prompt to execute")
@@ -119,7 +121,8 @@ def main():
         help=f"Is the prompt executed in local env or docker",
     )
     parser_execute.add_argument(
-        "-c", "--container_name",
+        "-c",
+        "--container_name",
         help=f"The name of container, will be generated from image name if not given",
     )
     parser_execute.add_argument(
@@ -145,11 +148,11 @@ def main():
             docker_ctr_subprocess = get_container(
                 ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
             )[0]
-            ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
-
-            orcar_agent = OrcarAgent(
-                args, cfg, args.enable_jit, ctr_bash
+            ctr_bash = ContainerBash(
+                ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name
             )
+
+            orcar_agent = OrcarAgent(args, cfg, args.enable_jit, ctr_bash)
             response = orcar_agent.chat(args.prompt)
             logger.debug(response)
 
@@ -167,7 +170,9 @@ def main():
         docker_ctr_subprocess = get_container(
             ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
         )[0]
-        ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
+        ctr_bash = ContainerBash(
+            ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name
+        )
 
         ds = load_filter_hf_dataset(args)
         benchmark_env = BenchMarkEnv(args, ctr_bash, ds)

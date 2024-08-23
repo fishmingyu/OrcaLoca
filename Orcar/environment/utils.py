@@ -314,6 +314,8 @@ def read_generator_with_timeout(
             data = os.read(fd, 4096)
             if data:
                 yield data.decode()
+                # Refresh timeout if got output
+                end_time = time.time() + timeout_duration
         else:
             time.sleep(0.05)  # Prevents CPU hogging
         if execution_finished:

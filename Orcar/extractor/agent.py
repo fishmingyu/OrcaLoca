@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 import pandas as pd
 from pathlib import PurePosixPath, PureWindowsPath, PurePath
 
@@ -20,7 +20,7 @@ class ExtractorAgent:
             api_key=cfg["OPENAI_API_KEY"],
             api_base=cfg["OPENAI_API_BASE_URL"],
         )
-        self.result = dict()
+        self.result: Dict[str, str] = dict()
         self.extractor_program = get_extractor_function(llm=self.llm)
         self.reproducer_program = get_reproducer_function(llm=self.llm)
 
@@ -31,11 +31,13 @@ class ExtractorAgent:
     def run_inst(self, inst: pd.Series):
         repo_dir = get_repo_dir(inst["repo"])
         for cmd in [
-                f"cd /{repo_dir}",
-                f"conda activate {repo_dir + '__' + inst['version']}",
-                f"git reset --hard {inst['base_commit']}",
-                ]:
-                self.env.run_with_handle(cmd=cmd, err_msg=f"Inst {inst['instance_id']} failed at {cmd=}")
+            f"cd /{repo_dir}",
+            f"conda activate {repo_dir + '__' + inst['version']}",
+            f"git reset --hard {inst['base_commit']}",
+        ]:
+            self.env.run_with_handle(
+                cmd=cmd, err_msg=f"Inst {inst['instance_id']} failed at {cmd=}"
+            )
         logger.info("LLM extracting from issue text...")
         output: RawIssueInfo = self.extractor_program(
             issue_description=inst["problem_statement"]
@@ -43,18 +45,20 @@ class ExtractorAgent:
         logger.debug(output.summary)
         logger.debug(output.issue_reproducer)
         logger.debug(output.related_code_snippets)
-        
+
         parsed_codeinfo = self.parse_path_in_code_info(
             output.related_code_snippets, inst
         )
         logger.debug(parsed_codeinfo)
         reproducer_output = self.reproduce_issue(output.issue_reproducer, inst)
         logger.debug(reproducer_output)
-        return IssueInfo(
+        output = IssueInfo(
             summary=output.summary,
             issue_reproducer_info=reproducer_output,
             related_code_snippets=parsed_codeinfo,
-        )
+        ).model_dump_json()
+        logger.debug(output)
+        return output
 
     def reproduce_issue(self, issue_reproducer: str, inst: pd.Series) -> ReproducerInfo:
         reproducer_path = (
@@ -73,7 +77,7 @@ class ExtractorAgent:
             issue_description=inst["problem_statement"],
             reproduce_history=reproduce_history,
         )
-        
+
     def parse_path_in_code_info(
         self, related_code_snippets: List[CodeLocationInfo], inst: pd.Series
     ) -> List[CodeLocationInfo]:
