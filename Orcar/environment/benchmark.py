@@ -95,6 +95,17 @@ class BenchMarkEnv:
             "source /root/miniconda3/etc/profile.d/conda.sh",
             err_msg="Failed to source conda",
         )
+        self.run(f"export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC")
+
+        system = self.run("uname -s").strip().lower()
+        arch = self.run("uname -m").strip().lower()
+        if system == "linux" and arch == "x86_64":
+            self.run_with_handle(
+                "apt update; apt install build-essential -y",
+                err_msg="Failed to install build-essential",
+                timeout=LONG_TIMEOUT,
+                output_log=True
+            )
 
         conda_envs = self.ds.drop_duplicates(["repo", "version"])
         conda_envs.insert(0, "repo_dir", conda_envs.repo.apply(get_repo_dir))

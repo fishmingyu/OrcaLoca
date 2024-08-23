@@ -95,7 +95,10 @@ class ExtractorAgent:
             path_posix_expression = PurePosixPath(path_str)
             path_windows_expression = PureWindowsPath(path_str)
             path_ret = path_posix_expression
-            if len(path_posix_expression.parts) < len(path_windows_expression.parts):
+            if (
+                len(path_posix_expression.parts) < len(path_windows_expression.parts)
+                or path_windows_expression.is_absolute()
+            ):
                 path_ret = path_windows_expression
             return path_ret
 
