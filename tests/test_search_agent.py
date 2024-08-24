@@ -1,7 +1,9 @@
 from Orcar import SearchAgent
+from llama_index.llms.openai import OpenAI
 
 def test_search_agent():
-    agent = SearchAgent(repo_path="./test_repo", llm="gpt-4o")
+    llm = OpenAI(model="gpt-4o")
+    agent = SearchAgent(repo_path="./test_repo", llm=llm)
     response = agent.chat("""There are some bugs in the test_repo code. Below is the relevant info:
                           Traceback (most recent call last):
                             File "/home/zhongming/IntelliCopilot/tests/test_repo/a.py", line 14, in <module>

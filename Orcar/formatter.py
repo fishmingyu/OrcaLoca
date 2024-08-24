@@ -1,6 +1,7 @@
 # ReAct agent formatter
 
 import logging
+import json
 from abc import abstractmethod
 from typing import List, Optional, Sequence
 
@@ -8,10 +9,12 @@ from llama_index.core.agent.react.prompts import (
     CONTEXT_REACT_CHAT_SYSTEM_HEADER,
     REACT_CHAT_SYSTEM_HEADER,
 )
+from .prompts import SEARCH_SYSTEM_HEADER
 from .types import (
     BaseReasoningStep,
     ObservationReasoningStep,
 )
+from .types import SearchStep
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.tools import BaseTool
@@ -127,4 +130,92 @@ class ReActChatFormatter(BaseAgentChatFormatter):
         )
         return ReActChatFormatter.from_defaults(
             system_header=CONTEXT_REACT_CHAT_SYSTEM_HEADER, context=context
+        )
+    
+
+
+def get_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
+    """Tool."""
+    tool_descs = []
+    for tool in tools:
+        tool_desc = (
+            f"> Tool Name: {tool.metadata.name}\n"
+            f"Tool Description: {tool.metadata.description}\n"
+            f"Tool Args: {tool.metadata.fn_schema_str}\n"
+        )
+        tool_descs.append(tool_desc)
+    return tool_descs
+
+
+example_answer = {
+    "API_calls": [
+        "api_call_1(args)", 
+        "api_call_2(args)",
+        # Add more API calls as needed
+    ],
+    "bug_locations": [
+        {
+            "file": "path/to/file",
+            "function": "function_name",
+            "content": "code_snippet"
+        },
+        {
+            "file": "path/to/file",
+            "function": "function_name",
+            "content": "code_snippet"
+        }
+    ]
+}
+
+class SearchChatFormatter(BaseAgentChatFormatter):
+    """ReAct chat formatter."""
+
+    system_header: str = SEARCH_SYSTEM_HEADER  # default
+
+    def format(
+        self,
+        tools: Sequence[BaseTool],
+        chat_history: List[ChatMessage],
+        current_search: Optional[List[SearchStep]] = None,
+    ) -> List[ChatMessage]:
+        """Format chat history into list of ChatMessage."""
+        current_search = current_search or []
+
+        format_args = {
+            "tool_desc": "\n".join(get_tool_descriptions(tools)),
+            "answer_format": "".join(json.dumps(example_answer, indent=4)),
+        }
+
+        fmt_sys_header = self.system_header.format(**format_args)
+        print(fmt_sys_header)
+        logger.info(f"Formatted system header: {fmt_sys_header}")
+
+        # format searching history
+        searching_history = []
+        for searching_step in current_search:
+            message = ChatMessage(
+                role=MessageRole.ASSISTANT,
+                content=searching_step.get_content(),
+            )
+            searching_history.append(message)
+
+        return [
+            ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+            *chat_history,
+            *searching_history,
+        ]
+
+    @classmethod
+    def from_defaults(
+        cls,
+        system_header: Optional[str] = None,
+    ) -> "SearchChatFormatter":
+        """Create SearchChatFormatter from defaults."""
+        if not system_header:
+            system_header = (
+                REACT_CHAT_SYSTEM_HEADER
+            )
+
+        return SearchChatFormatter(
+            system_header=system_header,
         )

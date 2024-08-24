@@ -13,10 +13,15 @@ from .types import (
     ActionReasoningStep,
     BaseReasoningStep,
     ResponseReasoningStep,
+    SearchStep
 )
 from llama_index.core.output_parsers.utils import extract_json_str
 from llama_index.core.types import BaseOutputParser
 
+import logging
+from .environment.utils import get_logger
+
+logger = get_logger(__name__)
 
 THOUGHT_PATTERN = r"Thought: ([^\n]*)"
 ACTION_PATTERN = r"\n*(\d+)\. (\w+)\((.*)\)(\s*#\w+\n)?"
@@ -191,3 +196,46 @@ class ReActOutputParser(BaseOutputParser):
     def format(self, output: str) -> str:
         """Format a query with structured output formatting instructions."""
         raise NotImplementedError
+    
+
+class SearchOutputParser(BaseOutputParser):
+    """ReAct Output parser."""
+
+    def parse(self, output: str) -> SearchStep:
+        """Parse output from Search agent.
+
+        We expect the output to be the following format:
+            "API_calls": [
+                "api_call_1(args)", 
+                "api_call_2(args)",
+                # Add more API calls as needed
+            ],
+            "bug_locations": [
+                {
+                    "file": "path/to/file",
+                    "function": "function_name",
+                    "content": "code_snippet"
+                },
+                {
+                    "file": "path/to/file",
+                    "function": "function_name",
+                    "content": "code_snippet"
+                }
+            ]
+        """
+        if "API_calls" not in output:
+            raise ValueError(f"Unable to parse output: {output}")
+        if "bug_locations" not in output:
+            raise ValueError(f"Unable to parse output: {output}")
+        else:
+            # Extract API calls
+            api_calls = re.findall(r'"(.*?)"', output.split("API_calls")[1])
+            # Extract bug locations
+            bug_locations = re.findall(
+                r'{"file": "(.*?)", "function": "(.*?)", "content": "(.*?)"}', output
+            )
+            logger.debug(f"API calls: {api_calls}")
+            return SearchStep(search_method=api_calls, search_bugs=bug_locations)
+
+    
+
