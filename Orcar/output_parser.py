@@ -1,6 +1,8 @@
 """LLM Compiler Output Parser."""
 
 import re
+import json
+
 from typing import Any, Dict, List, Sequence, Tuple
 
 from llama_index.core.tools import BaseTool
@@ -198,6 +200,7 @@ class ReActOutputParser(BaseOutputParser):
         raise NotImplementedError
     
 
+
 class SearchOutputParser(BaseOutputParser):
     """ReAct Output parser."""
 
@@ -235,6 +238,7 @@ class SearchOutputParser(BaseOutputParser):
                 r'{"file": "(.*?)", "function": "(.*?)", "content": "(.*?)"}', output
             )
             logger.debug(f"API calls: {api_calls}")
+            logger.debug(f"Bug locations: {bug_locations}")
             return SearchStep(search_method=api_calls, search_bugs=bug_locations)
 
     

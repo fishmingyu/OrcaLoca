@@ -192,7 +192,8 @@ The API calls include:
 ## Output Format
 Provide your answer in JSON structure like this, you should ignore the argument placeholders in api calls.
 For example, search_func(func_name="str") should be search_func("str")
-Make sure each API call is written as a valid python expression.
+Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
 {answer_format}
+
 """
 

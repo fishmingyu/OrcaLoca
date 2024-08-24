@@ -187,7 +187,7 @@ class SearchWorker(BaseAgentWorker):
         current_search.append(search_step)
         if self._verbose:
             logger.info(f"Search step: {search_step.get_content()}")
-        if search_step.is_done():
+        if search_step.is_done:
             return message_content, current_search, True
         return message_content, current_search, False
 
@@ -260,11 +260,9 @@ class SearchWorker(BaseAgentWorker):
         tools = self.get_tools(task.input)
         input_chat = self._search_formatter.format(
             tools,
-            chat_history=task.memory.get(input=task.input)
-            + task.extra_state["new_memory"].get_all(),
+            chat_info=task.input,
             current_search=task.extra_state["current_search"],
         )
-        print(task.input)
 
         # send prompt
         chat_response = self._llm.chat(input_chat)

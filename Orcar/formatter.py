@@ -157,12 +157,12 @@ example_answer = {
         {
             "file": "path/to/file",
             "function": "function_name",
-            "content": "code_snippet"
+            "content": "code_snippet",
         },
         {
             "file": "path/to/file",
             "function": "function_name",
-            "content": "code_snippet"
+            "content": "code_snippet",
         }
     ]
 }
@@ -175,12 +175,11 @@ class SearchChatFormatter(BaseAgentChatFormatter):
     def format(
         self,
         tools: Sequence[BaseTool],
-        chat_history: List[ChatMessage],
+        chat_info: ChatMessage,
         current_search: Optional[List[SearchStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
-
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
             "answer_format": "".join(json.dumps(example_answer, indent=4)),
@@ -201,7 +200,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
 
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
-            *chat_history,
+            ChatMessage(role=MessageRole.USER, content=chat_info),
             *searching_history,
         ]
 

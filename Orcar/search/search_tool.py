@@ -54,7 +54,7 @@ class SearchManager:
             func_name (str): The function name to search.
 
         Returns:
-            Tuple[str, str]: The file path and the code snippet of the function definition.
+            Tuple[str, str]: The file path and the code_snippet of the function definition.
         """
         loc = self._search_func_kg(func_name)
         # loc.file_path is relative to the repo_path
