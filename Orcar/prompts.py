@@ -180,3 +180,20 @@ Here is some context to help you answer the question and plan:
 """,
     1,
 )
+
+
+SEARCH_SYSTEM_HEADER = r"""
+You are a helpful assistant that use API calls to report bug code snippets from a text into json format.
+You need to extract where are the bug locations by analyzing the text.
+There are some API calls that you can use to extract the information.
+The API calls include:
+{tool_desc}
+
+## Output Format
+Provide your answer in JSON structure like this, you should ignore the argument placeholders in api calls.
+For example, search_func(func_name="str") should be search_func("str")
+Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
+{answer_format}
+
+"""
+

@@ -1,8 +1,8 @@
 """Base types for ReAct agent."""
 
 from abc import abstractmethod
-from typing import Dict
-
+from typing import Dict, List
+from collections import namedtuple
 from llama_index.core.bridge.pydantic import BaseModel
 
 
@@ -75,4 +75,27 @@ class ResponseReasoningStep(BaseReasoningStep):
     @property
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
+        return True
+    
+
+bug_dict = namedtuple('bugdict', ["file", "function", "content"])
+
+class SearchStep(BaseReasoningStep):
+    """Search reasoning step."""
+
+    search_method: List[str]
+    search_bugs: List[bug_dict]
+
+    def get_content(self) -> str:
+        """Get content."""
+        # recursively format the search method
+        search_method = " -> ".join(self.search_method)
+        return f"Search Method: {search_method}\n" f"Search Bugs: {self.search_bugs}"
+
+    @property
+    def is_done(self) -> bool:
+        """
+        If the search method is empty, the is_done is False. (no matchings)
+        """
+        # len > 0 means there are search results
         return True
