@@ -6,21 +6,17 @@ import uuid
 import json
 from typing import (
     Any,
-    AsyncGenerator,
-    Coroutine,
     Dict,
-    Generator,
     List,
     Optional,
     Sequence,
     Tuple,
     cast,
-    Callable,
-    Type,
 )
 
 from llama_index.core.llms.llm import LLM
 from llama_index.llms.openai import OpenAI
+from llama_index.core.program import FunctionCallingProgram
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.agent.runner.base import AgentRunner
@@ -187,6 +183,7 @@ class SearchWorker(BaseAgentWorker):
         current_search.append(search_step)
         if self._verbose:
             logger.info(f"Search step: {search_step.get_content()}")
+        logger.info(f"Is done: {search_step.is_done}")
         if search_step.is_done:
             return message_content, current_search, True
         return message_content, current_search, False
@@ -258,9 +255,12 @@ class SearchWorker(BaseAgentWorker):
         """Run step."""
         # TODO: see if we want to do step-based inputs
         tools = self.get_tools(task.input)
+        chat_history = task.memory.get_all()
+        # add task input to chat history
+        chat_history.append(ChatMessage(content=task.input, role=MessageRole.USER))
         input_chat = self._search_formatter.format(
             tools,
-            chat_info=task.input,
+            chat_history=chat_history + task.extra_state["new_memory"].get_all(),
             current_search=task.extra_state["current_search"],
         )
 
