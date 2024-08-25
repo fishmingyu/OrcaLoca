@@ -175,7 +175,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
     def format(
         self,
         tools: Sequence[BaseTool],
-        chat_info: ChatMessage,
+        chat_history: List[ChatMessage],
         current_search: Optional[List[SearchStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
@@ -200,7 +200,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
 
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
-            ChatMessage(role=MessageRole.USER, content=chat_info),
+            *chat_history,
             *searching_history,
         ]
 

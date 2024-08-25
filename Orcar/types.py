@@ -98,4 +98,4 @@ class SearchStep(BaseReasoningStep):
         If the search method is empty, the is_done is False. (no matchings)
         """
         # len > 0 means there are search results
-        return True
+        return len(self.search_bugs) > 0

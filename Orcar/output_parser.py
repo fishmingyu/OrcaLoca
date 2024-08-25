@@ -201,6 +201,17 @@ class ReActOutputParser(BaseOutputParser):
     
 
 
+def escape_newlines_in_json_strings(json_str):
+    # Find all strings in the JSON and replace \n within them
+    def replace_newline(match):
+        # Replace \n with \\n inside the string
+        return match.group(0).replace('\n', '\\n')
+    
+    # Regular expression to match strings in the JSON
+    json_str = re.sub(r'\"(.*?)\"', replace_newline, json_str, flags=re.DOTALL)
+    return json_str
+
+
 class SearchOutputParser(BaseOutputParser):
     """ReAct Output parser."""
 
@@ -232,11 +243,22 @@ class SearchOutputParser(BaseOutputParser):
             raise ValueError(f"Unable to parse output: {output}")
         else:
             # Extract API calls
-            api_calls = re.findall(r'"(.*?)"', output.split("API_calls")[1])
+            api_calls_content = re.search(r'"API_calls": \[(.*?)\]', output, re.DOTALL).group(1)
+            api_calls = re.findall(r'"(.*?)"', api_calls_content)
             # Extract bug locations
-            bug_locations = re.findall(
-                r'{"file": "(.*?)", "function": "(.*?)", "content": "(.*?)"}', output
-            )
+
+            bug_locations_match = re.search(r'"bug_locations": \[(.*?)\]', output, re.DOTALL)
+            # add back [ and ] to the bug_locations string
+            
+            if not bug_locations_match:
+                raise ValueError("bug_locations section not found or incorrectly formatted.")
+            bug_locations_str = bug_locations_match.group(1)
+            bug_locations_str = "[" + bug_locations_str + "]"
+
+            # bug_locations_str could contain \n within the code snippet
+            formatted_str = escape_newlines_in_json_strings(bug_locations_str)
+            bug_locations = json.loads(formatted_str)
+            
             logger.debug(f"API calls: {api_calls}")
             logger.debug(f"Bug locations: {bug_locations}")
             return SearchStep(search_method=api_calls, search_bugs=bug_locations)
