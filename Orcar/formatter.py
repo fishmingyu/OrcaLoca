@@ -10,14 +10,16 @@ from llama_index.core.agent.react.prompts import (
     REACT_CHAT_SYSTEM_HEADER,
 )
 from .prompts import SEARCH_SYSTEM_HEADER
+from .prompts import SEARCH_STEP_ANSWER, SEARCH_STEP_EXAMPLE, SEARCH_RESULT, OBSERVATION
 from .types import (
     BaseReasoningStep,
     ObservationReasoningStep,
 )
-from .types import SearchStep
+from .types import SearchActionStep
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.tools import BaseTool
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,25 +149,6 @@ def get_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
     return tool_descs
 
 
-example_answer = {
-    "API_calls": [
-        "api_call_1(args)", 
-        "api_call_2(args)",
-        # Add more API calls as needed
-    ],
-    "bug_locations": [
-        {
-            "file": "path/to/file",
-            "function": "function_name",
-            "content": "code_snippet",
-        },
-        {
-            "file": "path/to/file",
-            "function": "function_name",
-            "content": "code_snippet",
-        }
-    ]
-}
 
 class SearchChatFormatter(BaseAgentChatFormatter):
     """ReAct chat formatter."""
@@ -176,13 +159,16 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        current_search: Optional[List[SearchStep]] = None,
+        current_search: Optional[List[SearchActionStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
-            "answer_format": "".join(json.dumps(example_answer, indent=4)),
+            "search_format": "".join(json.dumps(SEARCH_STEP_ANSWER, indent=4)),
+            "example_output": "".join(json.dumps(SEARCH_STEP_EXAMPLE, indent=4)),
+            "observation": "".join(json.dumps(OBSERVATION, indent=4)),
+            "bug_locations": "".join(json.dumps(SEARCH_RESULT, indent=4)),
         }
 
         fmt_sys_header = self.system_header.format(**format_args)
@@ -194,7 +180,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         for searching_step in current_search:
             message = ChatMessage(
                 role=MessageRole.ASSISTANT,
-                content=searching_step.get_content(),
+                content=searching_step,
             )
             searching_history.append(message)
 

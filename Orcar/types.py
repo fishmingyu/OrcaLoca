@@ -78,24 +78,56 @@ class ResponseReasoningStep(BaseReasoningStep):
         return True
     
 
-bug_dict = namedtuple('bugdict', ["file", "function", "content"])
+class SearchActionStep(BaseReasoningStep):
+    """Search action reasoning step."""
 
-class SearchStep(BaseReasoningStep):
-    """Search reasoning step."""
-
-    search_method: List[str]
-    search_bugs: List[bug_dict]
+    action: str
+    action_input: Dict
 
     def get_content(self) -> str:
         """Get content."""
-        # recursively format the search method
-        search_method = " -> ".join(self.search_method)
-        return f"Search Method: {search_method}\n" f"Search Bugs: {self.search_bugs}"
+        return (
+            f"Search Action: {self.action}\n"
+            f"Search Action Input: {self.action_input}"
+        )
+    
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return False
+
+
+class SearchResult(BaseReasoningStep):
+    """Search result reasoning step."""
+
+    search_action: str
+    search_input: Dict
+    search_content: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"Search Result: {self.search_action}\n"
+            f"Arg Input: {self.search_input}\n"
+            f"Search Content: {self.search_content}"
+        )
 
     @property
     def is_done(self) -> bool:
-        """
-        If the search method is empty, the is_done is False. (no matchings)
-        """
-        # len > 0 means there are search results
-        return len(self.search_bugs) > 0
+        """Is the reasoning step the last one."""
+        return True
+
+class SearchObservationStep(BaseReasoningStep):
+    """Search observation reasoning step."""
+
+    observation: str
+    is_enough_context: bool = False
+
+    def get_content(self) -> str:
+        """Get content."""
+        return f"Search Observation: {self.observation}"
+
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return self.is_enough_context

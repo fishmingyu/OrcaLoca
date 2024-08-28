@@ -15,7 +15,8 @@ from .types import (
     ActionReasoningStep,
     BaseReasoningStep,
     ResponseReasoningStep,
-    SearchStep
+    SearchActionStep,
+    SearchObservationStep
 )
 from llama_index.core.output_parsers.utils import extract_json_str
 from llama_index.core.types import BaseOutputParser
@@ -215,16 +216,48 @@ def escape_newlines_in_json_strings(json_str):
 class SearchOutputParser(BaseOutputParser):
     """ReAct Output parser."""
 
-    def parse(self, output: str) -> SearchStep:
+    def parse(self, output: str, method: str):
+        if method == "search":
+            return self.parse_search(output)
+        elif method == "bug_report":
+            return self.parse_bug_report(output)
+        elif method == "observation":
+            return self.parse_observation(output)
+
+    def parse_search(self, output: str) -> List[SearchActionStep]:
         """Parse output from Search agent.
 
         We expect the output to be the following format:
-            "API_calls": [
-                "api_call_1(args)", 
-                "api_call_2(args)",
-                # Add more API calls as needed
-            ],
-            "bug_locations": [
+            "action_lists": [
+                {
+                    "action": "search_api1",
+                    "action_input": {
+                    "arg1": "str"
+                    }
+                },
+                {
+                    "action": "search_api2",
+                    "action_input": {
+                    "arg1": "print",
+                    "arg2": "add(2, 3)"
+                    }
+                },
+            ]
+        """
+        if "action_lists" in output:
+            action_list : List[SearchActionStep] = []
+            # cast the output to SearchActionStep
+            json_str = json.loads(output)
+            for action in json_str['action_lists']:
+                action_list.append(SearchActionStep(action=action['action'], action_input=action['action_input']))
+            return action_list
+        else:
+            # raise an error if the output is not in the expected format
+            raise ValueError(f"Could not parse search action output: {output}")
+        
+    def parse_bug_report(self, output: str) -> List[Dict[str, str]]:
+        """
+        "bug_locations": [
                 {
                     "file": "path/to/file",
                     "function": "function_name",
@@ -237,31 +270,28 @@ class SearchOutputParser(BaseOutputParser):
                 }
             ]
         """
-        if "API_calls" not in output:
-            raise ValueError(f"Unable to parse output: {output}")
-        if "bug_locations" not in output:
-            raise ValueError(f"Unable to parse output: {output}")
+        if "bug_locations" in output:
+            # cast the output to SearchResult
+            search_result = escape_newlines_in_json_strings(search_result)
+            search_result = json.loads(search_result)
+
+            return search_result
         else:
-            # Extract API calls
-            api_calls_content = re.search(r'"API_calls": \[(.*?)\]', output, re.DOTALL).group(1)
-            api_calls = re.findall(r'"(.*?)"', api_calls_content)
-            # Extract bug locations
-
-            bug_locations_match = re.search(r'"bug_locations": \[(.*?)\]', output, re.DOTALL)
-            # add back [ and ] to the bug_locations string
+            # raise an error if the output is not in the expected format
+            raise ValueError(f"Could not parse bug report output: {output}")
             
-            if not bug_locations_match:
-                raise ValueError("bug_locations section not found or incorrectly formatted.")
-            bug_locations_str = bug_locations_match.group(1)
-            bug_locations_str = "[" + bug_locations_str + "]"
-
-            # bug_locations_str could contain \n within the code snippet
-            formatted_str = escape_newlines_in_json_strings(bug_locations_str)
-            bug_locations = json.loads(formatted_str)
-            
-            logger.debug(f"API calls: {api_calls}")
-            logger.debug(f"Bug locations: {bug_locations}")
-            return SearchStep(search_method=api_calls, search_bugs=bug_locations)
-
     
+    def parse_observation(self, output: str) -> SearchObservationStep:
+        """Parse output from Search agent.
 
+        We expect the output to be the following format:
+            "observation": "observation"
+            "is_enough_context": True
+        """
+        if "obversation_feedback" in output:
+            # cast the output to SearchObservationStep
+            json_str = json.loads(output)
+            return SearchObservationStep(observation=json_str['observation'], is_enough_context=json_str['is_enough_context'])
+        else:
+            # raise an error if the output is not in the expected format
+            raise ValueError(f"Could not parse observation output: {output}")

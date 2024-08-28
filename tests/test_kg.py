@@ -4,7 +4,7 @@ def test_build_graph():
     repo_path = "./test_repo"
     graph_builder = RepoGraph(repo_path, save_jpg=True, out_file_name="repo_graph.jpg", build_kg=True)
     # try to search function "add" in the graph
-    node = graph_builder.dfs_search_function_def("get_sum")
+    node = graph_builder.dfs_search_function_def("add")
     if node:
         print(f"Found the function definition at {node}")
     else:

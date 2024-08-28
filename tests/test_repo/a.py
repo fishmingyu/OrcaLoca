@@ -3,7 +3,7 @@ import numpy
 # calculate the sum of two numbers
 def add(a, b):
     d = a * a
-    return a + b + c
+    return a + b + c + d
 
 # calculate the difference of two numbers
 def subtract(a, b):

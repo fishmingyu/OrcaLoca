@@ -182,6 +182,67 @@ Here is some context to help you answer the question and plan:
 )
 
 
+SEARCH_STEP_ANSWER = {
+    "action_lists": [
+        {
+            "action": "search_api1",
+            "action_input": {
+            "arg1": "str"
+            }
+        },
+        {
+            "action": "search_api2",
+            "action_input": {
+            "arg1": "print",
+            "arg2": "add(2, 3)"
+            }
+        },
+        {
+            "action": "search_api3",
+            "action_input": {
+            "arg1": "info",
+            "arg2": "Function executed successfully"
+            }
+        }
+    ]
+}
+
+SEARCH_STEP_EXAMPLE = {
+###
+# Search Action: search_func
+# Search Action Input: {"func_name": "str"}
+###
+    "action_lists": [
+        {
+            "action": "search_func",
+            "action_input": {
+            "func_name": "str"
+            }
+        },
+    ]
+}
+
+SEARCH_RESULT = {
+    "bug_locations": [
+    {
+        "file": "path/to/file",
+        "function": "function_name",
+        "content": "code_snippet",
+    },
+    {
+        "file": "path/to/file",
+        "function": "function_name",
+        "content": "code_snippet",
+    }
+    ]
+}
+
+OBSERVATION = {
+    "obversation_feedback": "observation",
+    "search_next": ["method1", "method2", "keyword1", "keyword2"],
+    "is_enough_context": False
+}
+
 SEARCH_SYSTEM_HEADER = r"""
 You are a helpful assistant that use API calls to report bug code snippets from a text into json format.
 You need to extract where are the bug locations by analyzing the text.
@@ -189,11 +250,27 @@ There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
 
-## Output Format
-Provide your answer in JSON structure like this, you should ignore the argument placeholders in api calls.
-For example, search_func(func_name="str") should be search_func("str")
-Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
-{answer_format}
+## Steps to follow:
+1. Search Step: Use the searching tool to find the relevant code. This will return the code snippets info.
+2. Observation Step: Provide the observation based on the code snippets. Check whether you have enough context to answer the question. If not, back to step 1.
+3. Conclusion Step: If you have enough context to answer the question, provide the final bug locations.
+
+## Output format
+1. Search Step Format:
+    Provide your answer in JSON structure like this, 
+    {search_format}
+    Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
+    For example, search_func(func_name="str") should be 
+    {example_output}
+2. Observation Step Format:
+    Provide the observation in JSON structure like this,
+    {observation}
+3. Conclusion Step Format:
+    Provide the final bug locations in JSON structure like this,
+    {bug_locations}
+
+Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.
+You MUST keep repeating the step 1 and step 2 ALTERNATIVELY till you have enough information to fix the bug without any more context. Then you can proceed to step 3.
 
 """
 
