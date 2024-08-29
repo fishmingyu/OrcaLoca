@@ -186,6 +186,12 @@ class ExtractWorker(BaseAgentWorker):
                 processed_code_info = code_info.copy(deep=True)
                 processed_code_info.file_path = x
                 processed_code_info_list.append(processed_code_info)
+            if len(output_paths) == 0:
+                # path is relevent, but file not found;
+                # likely to be a parse error, keep the keyword and drop the path
+                processed_code_info = code_info.copy(deep=True)
+                processed_code_info.file_path = ''
+                processed_code_info_list.append(processed_code_info)
 
         return processed_code_info_list
 

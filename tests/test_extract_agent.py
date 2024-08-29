@@ -26,7 +26,12 @@ args_dict = {
     "persistent": True,
     "container_name": "test",
     "split": "test",
-    "filter_instance": "django__django-15814",
+    # Short Issue Test
+    #"filter_instance": "^(sympy__sympy-20154)$",
+    # Long Issue Test
+    #"filter_instance": "^(django__django-15814)$",
+    # Multi Issue Test
+    "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
@@ -48,9 +53,19 @@ def test_extract_agent():
     ctr_bash, env = init_container()
 
     agent = ExtractAgent(llm=llm, env=env, verbose=True)
+    result_dict = dict()
     for _, inst in env.ds.iterrows():
         response: AgentChatResponse = agent.chat(json.dumps(dict(inst)))
-        logger.info(json.loads(response.response))
+        response_json = json.loads(response.response)
+        result_dict[inst['instance_id']] = response_json
+        logger.info(response_json)
+
+    logger.info("Finalizing results:")
+    for _, inst in env.ds.iterrows():
+        logger.info("-------------------------------------------")
+        logger.info(inst['instance_id'])
+        logger.info(inst['problem_statement'])
+        logger.info(result_dict[inst['instance_id']])
 
     ctr_bash.ctr_subprocess.stdin.close()
     if args.persistent:

@@ -329,7 +329,12 @@ EXTRACT_FIELDS = {
 </field>
 <field>
     file_path: The path of the file containing the code. Can be relative or absolute path.
-            Levels of path should only be spliced with slash or backslash, not space. Set to '' if cannot find path.
+            Levels of path should only be spliced with slash or backslash, not space.
+            Specially, python import style path should be parsed as:
+            1. dot replaced with slash;
+            2. add .py suffix if no suffix is found.
+            For example, "pvlib.bifacial.pvfactors" should be interpreted as "pvlib/bifacial/pvfactors.py"
+            Set to '' if cannot find path.
 </field>
 <field>
     code_info_list: list of (keyword, file_path). All keywords mentioned should be extracted to the list.
