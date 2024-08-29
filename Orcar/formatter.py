@@ -172,7 +172,6 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         }
 
         fmt_sys_header = self.system_header.format(**format_args)
-        print(fmt_sys_header)
         logger.info(f"Formatted system header: {fmt_sys_header}")
 
         # format searching history
