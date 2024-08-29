@@ -286,12 +286,13 @@ class SearchOutputParser(BaseOutputParser):
 
         We expect the output to be the following format:
             "observation": "observation"
+            "search_next": ["method1", "method2", "keyword1", "keyword2"],
             "is_enough_context": True
         """
         if "obversation_feedback" in output:
             # cast the output to SearchObservationStep
             json_str = json.loads(output)
-            return SearchObservationStep(observation=json_str['observation'], is_enough_context=json_str['is_enough_context'])
+            return SearchObservationStep(observation=json_str['obversation_feedback'], search_next=json_str['search_next'], is_enough_context=json_str['is_enough_context'])
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse observation output: {output}")

@@ -251,9 +251,9 @@ The API calls include:
 {tool_desc}
 
 ## Steps to follow:
-1. Search Step: Use the searching tool to find the relevant code. This will return the code snippets info.
-2. Observation Step: Provide the observation based on the code snippets. Check whether you have enough context to answer the question. If not, back to step 1.
-3. Conclusion Step: If you have enough context to answer the question, provide the final bug locations.
+1. Search Step: Use the searching tool to find the relevant code. This will return the code snippets info. Search step is always followed by Observation step.
+2. Observation Step: Provide the observation based on the code snippets. Check whether you have enough context to answer the question. If not, back to step 1, if yes, proceed to step 3.
+3. Conclusion Step: This is a standalone step to provide the final bug locations when nothing else to search. It should follow the Observation step.
 
 ## Output format
 1. Search Step Format:
@@ -263,10 +263,10 @@ The API calls include:
     For example, search_func(func_name="str") should be 
     {example_output}
 2. Observation Step Format:
-    Provide the observation in JSON structure like this,
+    Provide the observation in JSON structure like this, make sure this step does not cantain the final bug locations.
     {observation}
 3. Conclusion Step Format:
-    Provide the final bug locations in JSON structure like this,
+    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, DO NOT mix it with the observation,
     {bug_locations}
 
 Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.

@@ -121,11 +121,12 @@ class SearchObservationStep(BaseReasoningStep):
     """Search observation reasoning step."""
 
     observation: str
+    search_next: List[str] = [],
     is_enough_context: bool = False
 
     def get_content(self) -> str:
         """Get content."""
-        return f"Search Observation: {self.observation}"
+        return f"Search Observation: {self.observation}, What to search next: {self.search_next}"
 
     @property
     def is_done(self) -> bool:
