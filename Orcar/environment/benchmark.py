@@ -95,24 +95,14 @@ class BenchMarkEnv:
             "source /root/miniconda3/etc/profile.d/conda.sh",
             err_msg="Failed to source conda",
         )
-        self.run(f"export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC")
-
-        system = self.run("uname -s").strip().lower()
-        arch = self.run("uname -m").strip().lower()
-        if system == "linux" and arch == "x86_64":
-            self.run_with_handle(
-                "apt update; apt install build-essential -y",
-                err_msg="Failed to install build-essential",
-                timeout=LONG_TIMEOUT,
-                output_log=True
-            )
-
+        
         conda_envs = self.ds.drop_duplicates(["repo", "version"])
         conda_envs.insert(0, "repo_dir", conda_envs.repo.apply(get_repo_dir))
         conda_envs.insert(
             0, "conda_env_name", conda_envs.repo_dir + "__" + conda_envs.version
         )
         cur_conda_envs = self.get_cur_conda_envs()
+        has_runned_container_env_init = False
         for _, row in conda_envs.iterrows():
             t0 = time.perf_counter()
             record = dict(row)
@@ -120,6 +110,20 @@ class BenchMarkEnv:
 
             if env_name in cur_conda_envs:
                 continue
+
+            if not has_runned_container_env_init:
+                has_runned_container_env_init = True
+                self.run(f"export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC")
+                system = self.run("uname -s").strip().lower()
+                arch = self.run("uname -m").strip().lower()
+                if system == "linux" and arch == "x86_64":
+                    self.run_with_handle(
+                        "apt update; apt install build-essential -y",
+                        err_msg="Failed to install build-essential",
+                        timeout=LONG_TIMEOUT,
+                        output_log=True
+                    )
+
             self.run(f"cd /{record['repo_dir']}")
             logger.info(f"Env {env_name} not found, installing")
             install_configs: dict = MAP_REPO_VERSION_TO_SPECS[record["repo"]][

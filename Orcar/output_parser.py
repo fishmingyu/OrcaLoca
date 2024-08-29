@@ -16,7 +16,12 @@ from .types import (
     BaseReasoningStep,
     ResponseReasoningStep,
     SearchActionStep,
-    SearchObservationStep
+    SearchObservationStep,
+    ExtractSliceStep,
+    CodeInfo,
+    ExtractParseStep,
+    ExtractJudgeStep,
+    ExtractSummarizeStep,
 )
 from llama_index.core.output_parsers.utils import extract_json_str
 from llama_index.core.types import BaseOutputParser
@@ -296,3 +301,34 @@ class SearchOutputParser(BaseOutputParser):
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse observation output: {output}")
+
+
+class ExtractOutputParser(BaseOutputParser):
+    """Extractor Agent formatter."""
+
+    def parse(self, output: str, method: str) -> BaseReasoningStep:
+        if method == 'slice':
+            json_obj: Dict = json.loads(output)
+            return ExtractSliceStep(
+                traceback_warning_log_slice=json_obj['traceback_warning_log_slice'],
+                issue_reproducer_slice=json_obj['issue_reproducer_slice'],
+                source_code_slice=json_obj['source_code_slice'],
+                natural_language_description_slice=json_obj['natural_language_description_slice'],
+            )
+        elif method == 'parse':
+            json_obj: Dict = json.loads(output)
+            code_info_list: List[CodeInfo] = [
+                CodeInfo(keyword=x['keyword'], file_path=x['file_path']) 
+                for x in json_obj['code_info_list']
+                ]
+            return ExtractParseStep(
+                code_info_list=code_info_list
+            )
+        elif method == 'judge':
+            json_obj: Dict = json.loads(output)
+            return ExtractJudgeStep(
+                is_successful=json_obj['is_successful'],
+            )
+        elif method == 'summarize':
+            return ExtractSummarizeStep(summary=output)
+        raise NotImplementedError
