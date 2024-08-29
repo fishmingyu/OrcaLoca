@@ -1,7 +1,7 @@
 """Base types for ReAct agent."""
 
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from collections import namedtuple
 from llama_index.core.bridge.pydantic import BaseModel
 
@@ -132,3 +132,74 @@ class SearchObservationStep(BaseReasoningStep):
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return self.is_enough_context
+    
+class ExtractSliceStep(BaseReasoningStep):
+    """Extract slice step"""
+    traceback_warning_log_slice: str
+    issue_reproducer_slice: str
+    source_code_slice: str
+    natural_language_description_slice: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"traceback_warning_log_slice: {self.traceback_warning_log_slice}\n"
+            f"issue_reproducer_slice: {self.issue_reproducer_slice}\n"
+            f"source_code_slice: {self.source_code_slice}\n"
+            f"natural_language_description_slice: {self.natural_language_description_slice}"
+        )
+
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return False
+    
+class CodeInfo(BaseModel):
+    """Code keyword and location info"""
+    keyword: str
+    file_path: str
+
+class ExtractParseStep(BaseReasoningStep):
+    """Extract parse step"""
+    code_info_list: List[CodeInfo]
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"code_info_list: {self.code_info_list}\n"
+        )
+
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return False
+    
+class ExtractJudgeStep(BaseReasoningStep):
+    """Extract summarize step"""
+    is_successful: bool
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"is_successful: {self.is_successful}\n"
+        )
+
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return False
+    
+class ExtractSummarizeStep(BaseReasoningStep):
+    """Extract summarize step"""
+    summary: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"summary: {self.summary}\n"
+        )
+
+    @property
+    def is_done(self) -> bool:
+        """Is the reasoning step the last one."""
+        return False

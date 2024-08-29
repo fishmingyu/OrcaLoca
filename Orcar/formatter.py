@@ -11,6 +11,7 @@ from llama_index.core.agent.react.prompts import (
 )
 from .prompts import SEARCH_SYSTEM_HEADER
 from .prompts import SEARCH_STEP_ANSWER, SEARCH_STEP_EXAMPLE, SEARCH_RESULT, OBSERVATION
+from .prompts import EXTRACT_FORMATS, EXTRACT_FIELDS, EXTRACT_EXAMPLES, EXTRACT_PROMPTS
 from .types import (
     BaseReasoningStep,
     ObservationReasoningStep,
@@ -19,6 +20,10 @@ from .types import SearchActionStep
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.tools import BaseTool
+from llama_index.core.agent.types import (
+    Task,
+    TaskStep,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -203,3 +208,86 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         return SearchChatFormatter(
             system_header=system_header,
         )
+    
+class ExtractChatFormatter(BaseAgentChatFormatter):
+    """Extractor Agent formatter."""
+
+    def format(
+        self,
+        step: TaskStep,
+        task: Task,
+        handler: str
+    ) -> List[ChatMessage]:
+        """Format chat history into list of ChatMessage."""
+        sysheader = ChatMessage(role=MessageRole.SYSTEM, content=EXTRACT_PROMPTS['header'])
+        if handler == "slice":
+            example = EXTRACT_PROMPTS['example']
+            example_format_args = {
+                "example_repo_name":            EXTRACT_EXAMPLES[handler]['repo_name'],
+                "example_input_description":    EXTRACT_EXAMPLES[handler]['input_description'],
+                "example_output":               "".join(json.dumps(EXTRACT_EXAMPLES[handler]['example_output'], indent=4)),
+            }
+            fmt_example = example.format(**example_format_args)
+            user_msg = EXTRACT_PROMPTS[handler]
+            format_args = {
+                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
+                "output_fields":        EXTRACT_FIELDS[handler],
+                "example":              fmt_example,
+                "repo_name":            task.extra_state['inst']['repo'],
+                "input_description":    task.extra_state['inst']['problem_statement'],
+            }
+            fmt_user_msg = user_msg.format(**format_args)
+            return [
+                sysheader,
+                ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+            ]
+        elif handler == "parse":
+            step_name = step.step_state['name']
+            parse_type = task.extra_state['parse_type'][step_name]
+            example = EXTRACT_PROMPTS['example']
+            example_format_args = {
+                "example_repo_name":            EXTRACT_EXAMPLES[handler][parse_type]['repo_name'],
+                "example_input_description":    EXTRACT_EXAMPLES[handler][parse_type]['input_description'],
+                "example_output":               "".join(json.dumps(EXTRACT_EXAMPLES[handler][parse_type]['example_output'], indent=4)),
+            }
+            fmt_example = example.format(**example_format_args)
+            user_msg = EXTRACT_PROMPTS[handler]
+            format_args = {
+                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
+                "output_fields":        EXTRACT_FIELDS[handler],
+                "example":              fmt_example,
+                "repo_name":            task.extra_state['inst']['repo'],
+                "input_description":    task.extra_state['slices'][step_name],
+            }
+            fmt_user_msg = user_msg.format(**format_args)
+            return [
+                sysheader,
+                ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+            ]
+        elif handler == "judge":
+            user_msg = EXTRACT_PROMPTS[handler]
+            format_args = {
+                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
+                "output_fields":        EXTRACT_FIELDS[handler],
+                "repo_name":            task.extra_state['inst']['repo'],
+                "input_description":    task.extra_state['inst']['problem_statement'],
+                "reproduce_snippet":    task.extra_state["slices"]["reproduce_code_parse"],
+                "reproducer_log":       task.extra_state["slices"]["reproduce_log_parse"],
+            }
+            fmt_user_msg = user_msg.format(**format_args)
+            return [
+                sysheader,
+                ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+            ]
+        elif handler == "summarize":
+            user_msg = EXTRACT_PROMPTS[handler]
+            format_args = {
+                "repo_name":            task.extra_state['inst']['repo'],
+                "input_description":    task.extra_state['inst']['problem_statement'],
+            }
+            fmt_user_msg = user_msg.format(**format_args)
+            return [
+                sysheader,
+                ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+            ]
+        raise NotImplementedError
