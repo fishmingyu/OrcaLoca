@@ -189,7 +189,7 @@ class ExtractWorker(BaseAgentWorker):
             if len(output_paths) == 0:
                 # path is relevent, but file not found;
                 # likely to be a parse error, keep the keyword and drop the path
-                processed_code_info = CodeInfo(keyword=code_info.keyword, file_path='')
+                processed_code_info = CodeInfo(keyword=code_info.keyword, file_path="")
                 processed_code_info_list.append(processed_code_info)
 
         return processed_code_info_list
@@ -289,11 +289,13 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        judge_step: ExtractJudgeStep = self._output_parser.parse(message_content, "judge")
+        judge_step: ExtractJudgeStep = self._output_parser.parse(
+            message_content, "judge"
+        )
         logger.info(f"{judge_step}")
 
         next_step_names = []
-        if (judge_step.is_successful):
+        if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
         else:
             next_step_names.append("reproduce_code_parse")
@@ -357,7 +359,10 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["step_done"].add(new_step.step_id)
         is_done = len(task.extra_state["step_done"]) == 0
         if is_done:
-            response = ExtractOutput(summary=task.extra_state["summary"], suspicous_code=list(task.extra_state["suspicous_code"]))
+            response = ExtractOutput(
+                summary=task.extra_state["summary"],
+                suspicous_code=list(task.extra_state["suspicous_code"]),
+            )
             agent_response = AgentChatResponse(response=response.json())
         else:
             agent_response = AgentChatResponse(response="")

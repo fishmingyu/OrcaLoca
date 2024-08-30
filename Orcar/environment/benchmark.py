@@ -95,7 +95,7 @@ class BenchMarkEnv:
             "source /root/miniconda3/etc/profile.d/conda.sh",
             err_msg="Failed to source conda",
         )
-        
+
         conda_envs = self.ds.drop_duplicates(["repo", "version"])
         conda_envs.insert(0, "repo_dir", conda_envs.repo.apply(get_repo_dir))
         conda_envs.insert(
@@ -121,7 +121,7 @@ class BenchMarkEnv:
                         "apt update; apt install build-essential -y",
                         err_msg="Failed to install build-essential",
                         timeout=LONG_TIMEOUT,
-                        output_log=True
+                        output_log=True,
                     )
 
             self.run(f"cd /{record['repo_dir']}")
