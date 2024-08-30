@@ -1,5 +1,6 @@
 import os
 import ast
+import json
 import networkx as nx
 from collections import namedtuple
 import matplotlib.pyplot as plt
@@ -11,11 +12,11 @@ Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
 
 # we use knowledge graph for faster retrieval of information
 class RepoGraph:
-    def __init__(self, repo_path, save_jpg=False, out_file_name=None, build_kg=True):
+    def __init__(self, repo_path, save_log=False, log_path=None, build_kg=True):
         self.graph = nx.DiGraph()
-        self.save_jpg = save_jpg
+        self.save_log = save_log
         self.repo_path = repo_path  # Path to the repository (absolute path)
-        self.out_file_name = out_file_name # Name of the output file
+        self.log_path = log_path # Name of the output log directory
         self.function_definitions = {}  # Map to store function definitions by their qualified name
         if build_kg:
             self.build_whole_graph(repo_path)
@@ -79,6 +80,15 @@ class RepoGraph:
             dir_node_name = os.path.relpath(root, repo_path)
             self.add_node(dir_node_name, 'directory')
 
+            # Process each subdirectory
+            for sub_dir in dirs:
+                sub_dir_path = os.path.join(root, sub_dir)
+                sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
+
+                # Add a node for each subdirectory
+                self.add_node(sub_dir_node_name, 'directory')
+                self.add_edge(dir_node_name, sub_dir_node_name, 'contains')
+
             for file in files:
                 # now only consider python files
                 if file.endswith(".py"):
@@ -113,14 +123,28 @@ class RepoGraph:
         """Build the whole graph from a repository."""
         self.build_attribute_from_repo(repo_path)
         self.build_references(repo_path)
-        if self.save_jpg:
-            self.save_graph(self.out_file_name)
+        if self.save_log:
+            if self.log_path is None:
+                self.log_path = "log"
+            if not os.path.exists(self.log_path):
+                os.makedirs(self.log_path)
+            self.dump_graph()
+            # self.save_graph()
 
-    def save_graph(self, filename=None):
+    def dump_graph(self):
+        """Dump the graph as a dictionary."""
+        data = nx.node_link_data(self.graph)
+        log_path = self.log_path
+        filename = os.path.join(log_path, "repo_graph.json")
+        with open(filename, "w") as file:
+            json.dump(data, file)
+        
+
+    def save_graph(self):
         """Save the graph as a JPG file using a tree-like layout."""
         # Use pygraphviz layout
-        if filename is None:
-            filename = self.out_file_name
+        log_path = self.log_path
+        filename = os.path.join(log_path, "repo_graph.jpg")
         pos = nx.nx_agraph.graphviz_layout(self.graph, prog="dot")
 
         node_colors = [self._get_node_color(data['type']) for _, data in self.graph.nodes(data=True)]
@@ -298,14 +322,3 @@ class FunctionReferenceVisitor(ast.NodeVisitor):
                 if caller and callee:
                     self.graph.add_edge(caller, callee, edge_type="references")
         self.generic_visit(node)
-
-if __name__ == "__main__":
-    # Example usage
-    repo_path = "../../tests/test_repo"
-    graph_builder = RepoGraph(repo_path, save_jpg=True, out_file_name="repo_graph.jpg", build_kg=True)
-    # try to search function "add" in the graph
-    node = graph_builder.dfs_search_function_def("get_sum")
-    if node:
-        print(f"Found the function definition at {node}")
-    else:
-        print("Function definition not found")
