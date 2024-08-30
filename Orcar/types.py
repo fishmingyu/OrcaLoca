@@ -154,7 +154,7 @@ class ExtractSliceStep(BaseReasoningStep):
         """Is the reasoning step the last one."""
         return False
     
-class CodeInfo(BaseModel):
+class CodeInfo(BaseModel, frozen=True):
     """Code keyword and location info"""
     keyword: str
     file_path: str
@@ -203,3 +203,8 @@ class ExtractSummarizeStep(BaseReasoningStep):
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return False
+    
+class ExtractOutput(BaseModel):
+    """Extract agent output"""
+    summary: str
+    suspicous_code: List[CodeInfo]

@@ -35,6 +35,7 @@ from .types import (
     ExtractParseStep,
     ExtractJudgeStep,
     ExtractSummarizeStep,
+    ExtractOutput,
 )
 
 logger = get_logger("extract_agent")
@@ -183,14 +184,12 @@ class ExtractWorker(BaseAgentWorker):
                 filter(lambda x: x.endswith(str(relative_path_suffix)), candidates)
             )
             for x in output_paths:
-                processed_code_info = code_info.copy(deep=True)
-                processed_code_info.file_path = x
+                processed_code_info = CodeInfo(keyword=code_info.keyword, file_path=x)
                 processed_code_info_list.append(processed_code_info)
             if len(output_paths) == 0:
                 # path is relevent, but file not found;
                 # likely to be a parse error, keep the keyword and drop the path
-                processed_code_info = code_info.copy(deep=True)
-                processed_code_info.file_path = ''
+                processed_code_info = CodeInfo(keyword=code_info.keyword, file_path="")
                 processed_code_info_list.append(processed_code_info)
 
         return processed_code_info_list
@@ -268,9 +267,7 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["inst"], parse_step.code_info_list
         )
         logger.info(f"{parse_step}")
-        task.extra_state["suspicous_code"].update(
-            [(x.keyword, x.file_path) for x in parse_step.code_info_list]
-        )
+        task.extra_state["suspicous_code"].update(parse_step.code_info_list)
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -292,11 +289,13 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        judge_step: ExtractJudgeStep = self._output_parser.parse(message_content, "judge")
+        judge_step: ExtractJudgeStep = self._output_parser.parse(
+            message_content, "judge"
+        )
         logger.info(f"{judge_step}")
 
         next_step_names = []
-        if (judge_step.is_successful):
+        if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
         else:
             next_step_names.append("reproduce_code_parse")
@@ -360,11 +359,11 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["step_done"].add(new_step.step_id)
         is_done = len(task.extra_state["step_done"]) == 0
         if is_done:
-            response_dict = {
-                "summary": task.extra_state["summary"],
-                "suspicous_code": list(task.extra_state["suspicous_code"]),
-            }
-            agent_response = AgentChatResponse(response=json.dumps(response_dict))
+            response = ExtractOutput(
+                summary=task.extra_state["summary"],
+                suspicous_code=list(task.extra_state["suspicous_code"]),
+            )
+            agent_response = AgentChatResponse(response=response.json())
         else:
             agent_response = AgentChatResponse(response="")
 
@@ -402,7 +401,16 @@ class ExtractWorker(BaseAgentWorker):
 
 
 class ExtractAgent(AgentRunner):
-    """Extractor Agent."""
+    """
+    Extractor Agent. Response type: ExtractOutput
+
+    Calling example:
+    agent = ExtractAgent(llm=llm, env=env, verbose=True)
+    agent_chat_response: AgentChatResponse = agent.chat(input)
+
+    Response parse:
+    extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
+    """
 
     def __init__(
         self,
