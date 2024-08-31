@@ -485,8 +485,14 @@ class SearchAgent(AgentRunner):
         """Set up tools."""
         tools = []
         # tools in SearchManager
-        search_tool = FunctionTool.from_defaults(self._search_manager.search_func)
-        tools.append(search_tool)
+        search_callable_tool = FunctionTool.from_defaults(self._search_manager.search_callable)
+        search_func_tool = FunctionTool.from_defaults(self._search_manager.search_func)
+        search_class_tool = FunctionTool.from_defaults(self._search_manager.search_class)
+        search_method_in_class_tool = FunctionTool.from_defaults(self._search_manager.search_method_in_class)
+        tools.append(search_callable_tool)
+        tools.append(search_func_tool)
+        tools.append(search_class_tool)
+        tools.append(search_method_in_class_tool)
         return tools
 
     def _get_prompt_modules(self) -> PromptMixinType:

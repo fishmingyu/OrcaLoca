@@ -6,7 +6,7 @@ def test_build_graph():
     # try to search function "add" in the graph
     kg_graph = graph_builder.graph
     root = graph_builder.root_node
-    node = graph_builder.dfs_search_function_def("ModelChoiceField")
+    node = graph_builder.dfs_search_method_in_class("ModelChoiceField", "to_python")
     if node:
         print(f"Found the function definition at {node}")
     else:
@@ -16,8 +16,8 @@ def test_build_graph():
 def test_search_manager():
     repo_path = "../../django"
     search_manager = SearchManager(repo_path)
-    # try to search function "add" in the graph
-    file_path, code_snippet = search_manager.search_func("ModelChoiceField")
+    # try to search function "to_python" in ModelChoiceField class
+    file_path, code_snippet = search_manager.search_method_in_class("ModelChoiceField", "to_python")
     print(code_snippet)
 
 if __name__ == "__main__":

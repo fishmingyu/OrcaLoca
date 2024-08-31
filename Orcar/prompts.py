@@ -250,10 +250,18 @@ There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
 
+Everytime you only take one step below:
 ## Steps to follow:
 1. Search Step: Use the searching tool to find the relevant code. This will return the code snippets info. Search step is always followed by Observation step.
-2. Observation Step: Provide the observation based on the code snippets. Check whether you have enough context to answer the question. If not, back to step 1, if yes, proceed to step 3.
-3. Conclusion Step: This is a standalone step to provide the final bug locations when nothing else to search. It should follow the Observation step.
+2. Observation Step: Provide the observation based on the code snippets. Check whether the code snippets contain any method or function you need to further search. 
+Make sure you have enough context to answer the question. If not, back to step 1. If yes, put is_enough_context to True and search_next to empty list.
+
+Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.
+You MUST keep repeating the step 1 or step 2 ALTERNATIVELY till you have enough information to fix the bug without any more context. 
+Make sure the next step is always the opposite of the previous step. Also please always provide one observation step after one search step.
+
+Conclusion is a final standalone step to provide the final bug locations when nothing else to search.
+
 
 ## Output format
 1. Search Step Format:
@@ -265,12 +273,10 @@ The API calls include:
 2. Observation Step Format:
     Provide the observation in JSON structure like this, make sure this step does not cantain the final bug locations.
     {observation}
-3. Conclusion Step Format:
-    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, DO NOT mix it with the observation,
+3. Conclusion Format:
+    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, 
+    DO NOT mix it with the observation or add any title or description.
     {bug_locations}
-
-Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.
-You MUST keep repeating the step 1 and step 2 ALTERNATIVELY till you have enough information to fix the bug without any more context. Then you can proceed to step 3.
 
 """
 
