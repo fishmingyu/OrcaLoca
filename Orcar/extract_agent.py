@@ -28,7 +28,7 @@ from llama_index.core.chat_engine.types import (
 from .formatter import ExtractChatFormatter
 from .output_parser import ExtractOutputParser
 from .environment.utils import get_logger
-from .environment.benchmark import BenchMarkEnv, get_repo_dir
+from .environment.benchmark import BenchmarkEnv, get_repo_dir
 from .types import (
     ExtractSliceStep,
     CodeInfo,
@@ -74,7 +74,7 @@ class ExtractWorker(BaseAgentWorker):
     def __init__(
         self,
         llm: LLM,
-        env: BenchMarkEnv,
+        env: BenchmarkEnv,
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
     ) -> None:
@@ -415,7 +415,7 @@ class ExtractAgent(AgentRunner):
     def __init__(
         self,
         llm: LLM,
-        env: BenchMarkEnv,
+        env: BenchmarkEnv,
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
     ) -> None:

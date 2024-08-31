@@ -2,6 +2,7 @@ import datasets
 import re
 import pandas as pd
 import time
+import json
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
 from .utils import (
@@ -30,7 +31,7 @@ def get_repo_dir(repo: str) -> str:
     return repo.replace("/", "__")
 
 
-class BenchMarkEnv:
+class BenchmarkEnv:
     def __init__(
         self, args, ctr_bash: ContainerBash, ds: datasets.arrow_dataset.Dataset
     ):
@@ -43,6 +44,31 @@ class BenchMarkEnv:
 
     def copy_to_env(self, contents: str, container_path: str) -> None:
         copy_file_to_container(self.ctr_bash.ctr, contents, container_path)
+
+    def read_text_file(self, path: str, timeout: int = 5) -> str:
+        '''
+        path: absolute file path (like /tmp/a.log)
+        return value: content of text file
+        '''
+        return self.run(cmd=f"cat {path}", timeout=timeout)
+
+    def walk(self, path: str, timeout: int = 5):
+        '''
+        path: absolute file path (like /tmp/a.log)
+        return value: type(os.walk(path))
+        '''
+        cmd = "".join(
+            [
+                "python -c 'import os;",
+                "[print(",
+                '"{\\"root\\": \\"" + root + "\\", \\"dirs\\": " + repr(dirs) + ", \\"files\\": " + repr(files) + "}"',
+                ') for root, dirs, files in os.walk("' + path + "\")]'",
+            ]
+        )
+        output = self.run(cmd=cmd, timeout=timeout).split("\n")[:-1]
+        for line in output:
+            line_json = json.loads(line.replace("'", '"'))
+            yield line_json["root"], line_json["dirs"], line_json["files"]
 
     def run(self, cmd: str, timeout: int = 5, output_log: bool = False) -> str:
         return run_command_in_container(self.ctr_bash, cmd, timeout, output_log)

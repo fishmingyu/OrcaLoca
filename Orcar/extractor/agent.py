@@ -4,7 +4,7 @@ from pathlib import PurePosixPath, PureWindowsPath, PurePath
 
 from llama_index.llms.openai import OpenAI
 
-from Orcar.environment.benchmark import BenchMarkEnv, get_repo_dir
+from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.environment.utils import get_logger
 
 from .schema import *
@@ -13,7 +13,7 @@ logger = get_logger("extractor")
 
 
 class ExtractorAgent:
-    def __init__(self, cfg, benchmark_env: BenchMarkEnv):
+    def __init__(self, cfg, benchmark_env: BenchmarkEnv):
         self.env = benchmark_env
         self.llm = OpenAI(
             model=self.env.args.model,
