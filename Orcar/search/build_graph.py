@@ -30,6 +30,17 @@ class RepoGraph:
         if len(parts) == 1: # no prefix, meaning it's a file or directory (not a function)
             return None
         return "::".join(parts[:-1])
+    
+    @staticmethod
+    def check_class_prefix(func_name, prefix):
+        """
+        Given a function name and a prefix, check if the function name has the class prefix
+        """
+        # class prefix is the second last part of the function name
+        parts = func_name.split("::")
+        if len(parts) == 1: # no prefix, meaning it's a file or directory (not a function)
+            return False
+        return parts[-2] == prefix
 
     def add_node(self, node_name, node_type, signature=None, docstring=None, loc=None):
         """Add a node to the graph with a type and its corresponding layer.
@@ -54,8 +65,12 @@ class RepoGraph:
             if node == ".":
                 return node
             
-    # search for the function definition in the graph
-    def dfs_search_function_def(self, query):
+    @property
+    def nodes_num(self):
+        return self.graph.number_of_nodes()
+            
+    # high level search for the callable function or class definition in the graph
+    def dfs_search_callable_def(self, query, constraint=None):
         root = self.root_node
         stack = [root]
         visited = set()
@@ -68,10 +83,49 @@ class RepoGraph:
                 if current_prefix is not None:
                     kg_query_name = current_prefix + "::" + query
                 if node == kg_query_name:
-                    return self.graph.nodes[node]['loc']
+                    if constraint == 'function':
+                        if self.graph.nodes[node]['type'] == 'function':
+                            return self.graph.nodes[node]['loc']
+                    elif constraint == 'class':
+                        if self.graph.nodes[node]['type'] == 'class':
+                            return self.graph.nodes[node]['loc']
+                    elif constraint == 'method':
+                        if self.graph.nodes[node]['type'] == 'method':
+                            return self.graph.nodes[node]['loc']
+                    else: # no constraint
+                        return self.graph.nodes[node]['loc']
                 stack.extend(self.graph.neighbors(node))
         return None
     
+    # constrained search for class definition in the graph
+    def dfs_search_class_def(self, query):
+        return self.dfs_search_callable_def(query, 'class')
+    
+    # constrained search for function definition in the graph
+    def dfs_search_func_def(self, query):
+        return self.dfs_search_callable_def(query, 'function')
+    
+    # constrained search for method definition in the graph (method is a function inside a class)
+    def dfs_search_method_in_class(self, class_name, method_name):
+        root = self.root_node
+        stack = [root]
+        visited = set()
+        kg_query_name = method_name
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                current_prefix = self.extract_prefix(node)
+                if current_prefix is not None:
+                    kg_query_name = current_prefix + "::" + method_name
+                if node == kg_query_name:
+                    prefix_true = self.check_class_prefix(kg_query_name, class_name)
+                    if self.graph.nodes[node]['type'] == 'method' and prefix_true:
+                        return self.graph.nodes[node]['loc']
+                stack.extend(self.graph.neighbors(node))
+        return None
+
+        
     # build the graph from the repository
     def build_attribute_from_repo(self, repo_path):
         """Build a graph from a repository."""
@@ -129,6 +183,8 @@ class RepoGraph:
             if not os.path.exists(self.log_path):
                 os.makedirs(self.log_path)
             self.dump_graph()
+            if self.nodes_num < 100: # only save the graph if it's small
+                self.save_graph()
             # self.save_graph()
 
     def dump_graph(self):
