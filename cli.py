@@ -10,7 +10,7 @@ from Orcar.environment.utils import (
     pause_persistent_container,
     ContainerBash,
 )
-from Orcar.environment.benchmark import BenchMarkEnv, load_filter_hf_dataset
+from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset
 from Orcar.extractor.agent import ExtractorAgent
 
 logger = get_logger("cli")
@@ -175,7 +175,7 @@ def main():
         )
 
         ds = load_filter_hf_dataset(args)
-        benchmark_env = BenchMarkEnv(args, ctr_bash, ds)
+        benchmark_env = BenchmarkEnv(args, ctr_bash, ds)
 
         extractor = ExtractorAgent(cfg, benchmark_env)
         extractor.run()

@@ -13,7 +13,7 @@ from Orcar.environment.utils import (
     pause_persistent_container,
     ContainerBash,
 )
-from Orcar.environment.benchmark import BenchMarkEnv, load_filter_hf_dataset
+from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset
 
 from Orcar import ExtractAgent
 from Orcar.types import ExtractOutput
@@ -49,7 +49,7 @@ def init_container():
     ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
 
     ds = load_filter_hf_dataset(args)
-    return ctr_bash, BenchMarkEnv(args, ctr_bash, ds)
+    return ctr_bash, BenchmarkEnv(args, ctr_bash, ds)
 
 
 def test_extract_agent():
