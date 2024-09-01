@@ -9,6 +9,7 @@ from matplotlib.patches import Patch
 
 
 Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
+Snapshot = namedtuple("snapshot", ["docstring", "signature"])
 
 # we use knowledge graph for faster retrieval of information
 class RepoGraph:
@@ -106,7 +107,7 @@ class RepoGraph:
         return self.dfs_search_callable_def(query, 'function')
     
     # constrained search for method definition in the graph (method is a function inside a class)
-    def dfs_search_method_in_class(self, class_name, method_name):
+    def dfs_search_method_in_class(self, class_name, method_name) -> Loc | None:
         root = self.root_node
         stack = [root]
         visited = set()
@@ -124,7 +125,45 @@ class RepoGraph:
                         return self.graph.nodes[node]['loc']
                 stack.extend(self.graph.neighbors(node))
         return None
-
+    
+    # dfs search for the methods in a class and its docstring
+    def get_class_snapshot(self, class_name) -> str | None:
+        root = self.root_node
+        stack = [root]
+        visited = set()
+        methods = {}
+        class_snapshot = Snapshot("", "")
+        kg_query_name = class_name
+        
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                current_prefix = self.extract_prefix(node)
+                if current_prefix is not None:
+                    kg_query_name = current_prefix + "::" + class_name
+                if node == kg_query_name:
+                    # this is class node                        
+                    # get all neighbors of this node means all methods
+                    for method in self.graph.neighbors(node):
+                        method_name = method.split("::")[-1]
+                        method_snapshot = Snapshot(self.graph.nodes[method]['docstring'], self.graph.nodes[method]['signature'])
+                        methods[method_name] = method_snapshot
+                    class_snapshot = Snapshot(self.graph.nodes[node]['docstring'], self.graph.nodes[node]['signature'])
+                stack.extend(self.graph.neighbors(node))
+        # setup the snapshot
+        snapshot = ""
+        if class_snapshot.signature:
+            snapshot += f"Class Signature: {class_snapshot.signature}\n"
+            snapshot += f"Docstring: {class_snapshot.docstring}\n"
+        else:
+            return None
+        for method_name, method_snapshot in methods.items():
+            snapshot += f"\nMethod: {method_name}\n"
+            snapshot += f"Method Signature: {method_snapshot.signature}\n"
+            snapshot += f"Docstring: {method_snapshot.docstring}\n"
+        
+        return snapshot
         
     # build the graph from the repository
     def build_attribute_from_repo(self, repo_path):

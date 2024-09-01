@@ -226,12 +226,14 @@ SEARCH_RESULT = {
     "bug_locations": [
     {
         "file": "path/to/file",
-        "function": "function_name",
+        "class": "class_name",
+        "method": "function_name",
         "content": "code_snippet",
     },
     {
         "file": "path/to/file",
-        "function": "function_name",
+        "class": "class_name",
+        "method": "function_name",
         "content": "code_snippet",
     }
     ]
@@ -239,7 +241,11 @@ SEARCH_RESULT = {
 
 OBSERVATION = {
     "obversation_feedback": "observation",
-    "search_next": ["method1", "method2", "keyword1", "keyword2"],
+    "search_next": [
+        {"class": "xxx"},
+        {"method": "xxx"},
+        {"keyword": "xxx"}
+    ],
     "is_enough_context": False
 }
 
@@ -257,11 +263,9 @@ Everytime you only take one step below:
 Make sure you have enough context to answer the question. If not, back to step 1. If yes, put is_enough_context to True and search_next to empty list.
 
 Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.
-You MUST keep repeating the step 1 or step 2 ALTERNATIVELY till you have enough information to fix the bug without any more context. 
-Make sure the next step is always the opposite of the previous step. Also please always provide one observation step after one search step.
+Begin with the "Search Step". Every step we will provide instructions on what to do next. Please follow the instructions carefully.
 
 Conclusion is a final standalone step to provide the final bug locations when nothing else to search.
-
 
 ## Output format
 1. Search Step Format:
@@ -275,7 +279,7 @@ Conclusion is a final standalone step to provide the final bug locations when no
     {observation}
 3. Conclusion Format:
     After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, 
-    DO NOT mix it with the observation or add any title or description.
+    DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
     {bug_locations}
 
 """

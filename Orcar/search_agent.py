@@ -77,7 +77,7 @@ def add_user_step_to_memory(
         step.step_state["is_first"] = False
     else:   # conclusion
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
-        logger.info(f"Add conclusion to memory: {step.input}")
+        logger.info(f"Add user input to memory: {step.input}")
 
 class SearchWorker(BaseAgentWorker):
     """OpenAI Agent worker."""
@@ -160,7 +160,8 @@ class SearchWorker(BaseAgentWorker):
 
     def initialize_step(self, task: Task, **kwargs: Any) -> TaskStep:
         """Initialize step from task."""
-        complete: bool = False
+        next_step: str = ""
+        next_step_input: str = ""
         sources: List[ToolOutput] = []
         current_search: List[SearchActionStep] = []
         current_observation: Optional[SearchObservationStep] = []
@@ -169,7 +170,8 @@ class SearchWorker(BaseAgentWorker):
 
         # initialize task state
         task_state = {
-            "complete": complete,
+            "next_step": next_step,
+            "next_step_input": next_step_input,
             "sources": sources,
             "current_search": current_search,
             "current_observation": current_observation,
@@ -227,6 +229,16 @@ class SearchWorker(BaseAgentWorker):
             return "search"
         else:
             raise ValueError("Unknown step type.")
+        
+    def _assign_next_step(self, current_step: str, is_complete: bool) -> str:
+        """Assign next step."""
+        if current_step == "search":
+            return "observation"
+        elif current_step == "observation":
+            if is_complete:
+                return "conclusion"
+            else:
+                return "search"
 
     def _process_search(
         self,
@@ -310,24 +322,36 @@ class SearchWorker(BaseAgentWorker):
         return AgentChatResponse(response=response_str, sources=sources)
 
     def _get_task_step_response(
-        self, agent_response: AGENT_CHAT_RESPONSE_TYPE, step: TaskStep, is_conclusion: bool, is_done: bool = False
+        self, agent_response: AGENT_CHAT_RESPONSE_TYPE, step: TaskStep, next_step: str, next_step_input: str, is_done: bool = False
     ) -> TaskStepOutput:
         """Get task step response."""
         if is_done:
             new_steps = []
-        elif is_conclusion:
+        elif next_step == "conclusion":
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    input="Now let's come to a conclusion.", # this step is conclusion
+                    input="Now let's come to a conclusion. \n"
+                    + next_step_input
+                    , # this step is conclusion
+                )
+            ]
+        elif next_step == "observation":
+            new_steps = [
+                step.get_next_step(
+                    step_id=str(uuid.uuid4()),
+                    input="Please provide observation feedback on the search results below. \n"
+                    + next_step_input
+                    , # this step is observation
                 )
             ]
         else:
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    # NOTE: input is unused
-                    input=None,
+                    input="Please search context according to the observation feedback below. \n"
+                    + next_step_input
+                    , # this step is search
                 )
             ]
 
@@ -360,13 +384,14 @@ class SearchWorker(BaseAgentWorker):
         # send prompt
         chat_response = self._llm.chat(input_chat)
         logger.info(f"Chat response: {chat_response}")
-        if task.extra_state['complete'] is True:
+        if task.extra_state["next_step"] is "conclusion":
             # convert the chat response to str
             chat_response = str(chat_response)
             return self._get_task_step_response(
                 AgentChatResponse(response=chat_response, sources=[]),
                 step,
-                is_conclusion=False,
+                None,
+                None,
                 is_done=True,
             )
         
@@ -374,7 +399,7 @@ class SearchWorker(BaseAgentWorker):
 
         if step_str == "observation":
             # if the output is observation, extract observation step
-            observation_step, is_conclusion = self._extract_observation_step(chat_response)
+            observation_step, is_complete = self._extract_observation_step(chat_response)
             task.extra_state["current_observation"].append(observation_step.get_content())
             agent_response = self._get_response(
                 task.extra_state["current_observation"], task.extra_state["sources"]
@@ -390,16 +415,13 @@ class SearchWorker(BaseAgentWorker):
             agent_response = self._get_response(
                 task.extra_state["current_search"], task.extra_state["sources"]
             )
-            is_conclusion = False
+            is_complete = False
 
         # alternatively run search and observation steps
-        if is_conclusion is False:
-            task.extra_state["new_memory"].put(
-                ChatMessage(content=agent_response.response, role=MessageRole.USER)
-            )
-        task.extra_state["complete"] = is_conclusion
+        task.extra_state["next_step_input"] = agent_response.response
+        task.extra_state["next_step"] = self._assign_next_step(step_str, is_complete)
 
-        return self._get_task_step_response(agent_response, step, is_conclusion, False)
+        return self._get_task_step_response(agent_response, step, task.extra_state["next_step"], task.extra_state["next_step_input"], False)
     
 
     @trace_method("run_step")

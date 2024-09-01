@@ -105,7 +105,7 @@ class SearchManager:
             class_name (str): The class name to search.
 
         Returns:
-            Tuple[str, str]: The file path and the code_snippet of the class definition.
+            Tuple[str, str]: The file path and the snapshot of the class definition. Contains docstring and methods.
         """
         loc = self._search_class_kg(class_name)
         if loc is None:

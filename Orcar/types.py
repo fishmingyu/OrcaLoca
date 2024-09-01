@@ -121,12 +121,15 @@ class SearchObservationStep(BaseReasoningStep):
     """Search observation reasoning step."""
 
     observation: str
-    search_next: List[str] = [],
+    search_next: List[Dict[str, str]] = []  # Updated to a list of dictionaries
     is_enough_context: bool = False
 
     def get_content(self) -> str:
         """Get content."""
-        return f"Search Observation: {self.observation}, What to search next: {self.search_next}"
+        search_items = ", ".join(f"{key}: {value}" for item in self.search_next for key, value in item.items())
+        if not search_items:
+            return f"Observation Feedback: {self.observation} Nothing to search next"
+        return f"Observation Feedback: {self.observation}, What to search next: {search_items}"
 
     @property
     def is_done(self) -> bool:
