@@ -291,7 +291,11 @@ class SearchOutputParser(BaseOutputParser):
 
         We expect the output to be the following format:
             "observation": "observation"
-            "search_next": ["method1", "method2", "keyword1", "keyword2"],
+            "search_next": [
+                {"class": "xxx"},
+                {"method": "xxx"},
+                {"keyword": "xxx"}
+            ],
             "is_enough_context": True
         """
         if "obversation_feedback" in output:
