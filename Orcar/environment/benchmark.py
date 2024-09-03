@@ -3,6 +3,8 @@ import re
 import pandas as pd
 import time
 import json
+import subprocess
+import os
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
 from .utils import (
@@ -41,9 +43,34 @@ class BenchmarkEnv:
         self.ds = pd.DataFrame(ds)
         self.clone_repos()
         self.create_conda_envs()
+        self.cache_repo_to_host()
+    
+    @property
+    def cache_dir(self):
+        return os.path.expanduser("~/.orcar")
 
     def copy_to_env(self, contents: str, container_path: str) -> None:
         copy_file_to_container(self.ctr_bash.ctr, contents, container_path)
+
+    def cache_repo_to_host(self) -> None:
+        ctr_name = self.ctr_bash.ctr_name
+        repo_path = get_repo_dir(self.ds.iloc[0]["repo"])
+        directory_path = self.cache_dir
+        os.makedirs(directory_path, exist_ok=True)
+        host_path = os.path.join(directory_path, repo_path)
+        # check if repo is already cached
+        if os.path.exists(host_path):
+            logger.info(f"Repo {repo_path} already cached")
+            return
+        cmd = f"docker cp {ctr_name}:/{repo_path} {host_path}"
+        logger.info(f"Caching repo to host: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+
+    def remove_cache_repo(self) -> None:
+        repo_path = get_repo_dir(self.ds.iloc[0]["repo"])
+        host_path = os.path.join(self.cache_dir, repo_path)
+        if os.path.exists(host_path):
+            os.rmdir(host_path)
 
     def read_text_file(self, path: str, timeout: int = 5) -> str:
         '''
@@ -104,6 +131,7 @@ class BenchmarkEnv:
                 f"cd /{repo_dir}",
                 "git status",
                 f"git checkout {row['environment_setup_commit']}",
+                f"git reset --hard {row['environment_setup_commit']}",
                 "cd /",
             ]:
                 self.run_with_handle(cmd=cmd, err_msg=f"Git failed in {repo_dir}")
