@@ -49,22 +49,23 @@ def init_container():
     ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
 
     ds = load_filter_hf_dataset(args)
-    return ctr_bash, BenchmarkEnv(args, ctr_bash, ds)
+    return ctr_bash, BenchmarkEnv(args, ctr_bash), ds
 
 
 def test_extract_agent():
-    ctr_bash, env = init_container()
+    ctr_bash, env, ds = init_container()
 
     agent = ExtractAgent(llm=llm, env=env, verbose=True)
     result_dict = dict()
-    for _, inst in env.ds.iterrows():
+    for inst in ds:
+        env.setup(inst)
         agent_chat_response: AgentChatResponse = agent.chat(json.dumps(dict(inst)))
         extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
         result_dict[inst["instance_id"]] = extract_output
         logger.info(extract_output)
 
     logger.info("Finalizing results:")
-    for _, inst in env.ds.iterrows():
+    for inst in ds:
         logger.info("-------------------------------------------")
         logger.info(inst["instance_id"])
         logger.info(inst["problem_statement"])
