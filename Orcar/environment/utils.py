@@ -375,7 +375,8 @@ def run_command_in_container(
 
     ctr_bash.ctr_subprocess.stdin.write(f"{command}\n")
     ctr_bash.ctr_subprocess.stdin.flush()
-    logger.debug(f"Run command in container: {command}")
+    if output_log:
+        logger.debug(f"Run command in container: {command}")
     output = ""
     output_generator = read_generator_with_timeout(
         ctr_bash.ctr_subprocess,
