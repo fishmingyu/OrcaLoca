@@ -6,21 +6,62 @@ from collections import namedtuple
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-
+from ..environment.benchmark import BenchmarkEnv, get_repo_dir
 
 Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
 
+exclude_patterns = [
+        "pytest-dev__pytest/doc",  # Discovered this issue in 'pytest-dev__pytest'
+        "psf__requests/requests/packages",  # Workaround for issue in 'psf__requests'
+        "pylint-dev__pylint/tests/regrtest_data", "pylint-dev__pylint/tests/input", "pylint-dev__pylint/tests/functional",  # Workaround for issue in 'pylint-dev__pylint'
+        "sphinx-doc__sphinx/tests/roots", "sphinx-doc__sphinx/sphinx/templates/latex",  # Workaround for issue in 'sphinx-doc__sphinx'
+        "django__django/tests/test_runner_apps/tagged/", "django__django/django/conf/app_template/"  # Workaround for issue in 'django__django'
+    ]
+
 # we use knowledge graph for faster retrieval of information
 class RepoGraph:
-    def __init__(self, repo_path, save_log=False, log_path=None, build_kg=True):
+    def __init__(self, 
+                 swe_env:BenchmarkEnv = None, 
+                 repo_path:str = None, 
+                 save_log:bool = False, 
+                 log_path:str = None, 
+                 build_kg:bool = True):
+        """
+        swe_env: BenchmarkEnv
+            The environment to build the graph (Caution: we don't recommend using this option, 
+            since it's extremely slow due to low rate of serial communication)
+        repo_path: str
+            The path to the repository to build the graph
+        save_log: bool
+            Whether to save the log
+        log_path: str
+            The path to save the log
+        build_kg: bool  
+            Whether to build the knowledge graph
+        """
         self.graph = nx.DiGraph()
+        # Check that at least one of swe_env or repo_path is provided
+        if swe_env is None and repo_path is None:
+            raise ValueError("Either 'swe_env' or 'repo_path' must be provided.")
+        # check swe_env is an instance of BenchmarkEnv
+        if not isinstance(swe_env, BenchmarkEnv) and swe_env is not None:
+            raise ValueError("swe_env must be an instance of BenchmarkEnv")
+        if swe_env is not None:
+            self.swe_env = swe_env
+        elif repo_path is not None:
+            self.swe_env = None
+            self.repo_path = repo_path  # Path to the repository (absolute path)
+
         self.save_log = save_log
-        self.repo_path = repo_path  # Path to the repository (absolute path)
         self.log_path = log_path # Name of the output log directory
         self.function_definitions = {}  # Map to store function definitions by their qualified name
         if build_kg:
-            self.build_whole_graph(repo_path)
+            if self.swe_env is not None:
+                self.repo_path = "/" + get_repo_dir(self.swe_env.ds.iloc[0]['repo'])
+                self.build_whole_graph_from_env(self.repo_path, swe_env)
+            else:
+                self.build_whole_graph(repo_path)
 
     @staticmethod
     def extract_prefix(func_name):
@@ -69,7 +110,7 @@ class RepoGraph:
     @property
     def nodes_num(self):
         return self.graph.number_of_nodes()
-            
+    
     # high level search for the callable function or class definition in the graph
     def dfs_search_callable_def(self, query, constraint=None):
         root = self.root_node
@@ -171,7 +212,12 @@ class RepoGraph:
         for root, dirs, files in os.walk(repo_path):
             # Add a node for the directory
             dir_node_name = os.path.relpath(root, repo_path)
+            # Skip directories that match any exclude pattern
+            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
+                continue
             self.add_node(dir_node_name, 'directory')
+
+            dirs[:] = [sub_dir for sub_dir in dirs if not any(os.path.join(dir_node_name, sub_dir).startswith(pattern) for pattern in exclude_patterns)]
 
             # Process each subdirectory
             for sub_dir in dirs:
@@ -188,12 +234,57 @@ class RepoGraph:
                     file_path = os.path.join(root, file)
                     file_node_name = os.path.relpath(file_path, repo_path)
 
+                    # Skip files that match any exclude pattern
+                    if any(file_node_name.startswith(pattern) for pattern in exclude_patterns):
+                        continue
+
                     # Add a node for the file and link it to the directory
                     self.add_node(file_node_name, 'file')
                     self.add_edge(dir_node_name, file_node_name, 'contains')
 
                     # Build the graph for the file's content
                     self.build_attribute_from_file(file_path, file_node_name)
+
+        return self.graph
+    
+    def build_attribute_from_env_repo(self, repo_path):
+        """Build a graph from a repository in the environment."""
+        for root, dirs, files in self.swe_env.walk(repo_path):
+            # Add a node for the directory
+            dir_node_name = os.path.relpath(root, repo_path)
+            self.add_node(dir_node_name, 'directory')
+
+            # Skip directories that match any exclude pattern
+            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
+                continue
+
+            dirs[:] = [sub_dir for sub_dir in dirs if not any(os.path.join(dir_node_name, sub_dir).startswith(pattern) for pattern in exclude_patterns)]
+
+            # Process each subdirectory
+            for sub_dir in dirs:
+                sub_dir_path = os.path.join(root, sub_dir)
+                sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
+
+                # Add a node for each subdirectory
+                self.add_node(sub_dir_node_name, 'directory')
+                self.add_edge(dir_node_name, sub_dir_node_name, 'contains')
+
+            for file in files:
+                # now only consider python files
+                if file.endswith(".py"):
+                    file_path = os.path.join(root, file)
+                    file_node_name = os.path.relpath(file_path, repo_path)
+
+                    # Skip files that match any exclude pattern
+                    if any(file_node_name.startswith(pattern) for pattern in exclude_patterns):
+                        continue
+
+                    # Add a node for the file and link it to the directory
+                    self.add_node(file_node_name, 'file')
+                    self.add_edge(dir_node_name, file_node_name, 'contains')
+
+                    # Build the graph for the file's content
+                    self.build_attribute_from_env_file(file_path, file_node_name)
 
         return self.graph
 
@@ -206,11 +297,26 @@ class RepoGraph:
         visitor = FunctionClassVisitor(self, file_node_name, self.function_definitions)
         visitor.visit(tree)
 
+    def build_attribute_from_env_file(self, file_path, file_node_name):
+        """Build a graph from a single file in the environment."""
+        file = self.swe_env.read_text_file(file_path)
+        tree = ast.parse(file)
+
+        # Build the graph for this file's content
+        visitor = FunctionClassVisitor(self, file_node_name, self.function_definitions)
+        visitor.visit(tree)
+
     def build_references(self, repo_path):
         """Build reference edges between functions in the graph."""
         knowledge_graph = self.graph
         self.reference_builder = ReferenceBuilder(knowledge_graph, self.function_definitions)
         self.reference_builder.build_references(repo_path)
+
+    def build_references_from_env(self, repo_path, swe_env:BenchmarkEnv):
+        """Build reference edges between functions in the graph."""
+        knowledge_graph = self.graph
+        self.reference_builder = ReferenceBuilder(knowledge_graph, self.function_definitions, swe_env)
+        self.reference_builder.build_references_from_env(repo_path)
 
     def build_whole_graph(self, repo_path):
         """Build the whole graph from a repository."""
@@ -225,6 +331,19 @@ class RepoGraph:
             if self.nodes_num < 100: # only save the graph if it's small
                 self.save_graph()
             # self.save_graph()
+
+    def build_whole_graph_from_env(self, repo_path, swe_env:BenchmarkEnv):
+        """Build the whole graph from a repository in the environment."""
+        self.build_attribute_from_env_repo(repo_path)
+        self.build_references_from_env(repo_path, swe_env)
+        if self.save_log:
+            if self.log_path is None:
+                self.log_path = "log"
+            if not os.path.exists(self.log_path):
+                os.makedirs(self.log_path)
+            self.dump_graph()
+            if self.nodes_num < 100:
+                self.save_graph()
 
     def dump_graph(self):
         """Dump the graph as a dictionary."""
@@ -366,18 +485,47 @@ class FunctionClassVisitor(ast.NodeVisitor):
 
 # frist collect all the function definitions and then build the references
 class ReferenceBuilder:
-    def __init__(self, graph, function_definitions):
+    def __init__(self, graph, function_definitions, swe_env:BenchmarkEnv=None):
         self.graph = graph  # The graph produced by RepoGraph
         self.function_definitions = function_definitions
+        self.swe_env = swe_env
+
     def build_references(self, repo_path):
         """Build reference edges between functions in the graph."""
-        for root, dirs, files in os.walk(repo_path):
+        for root, _, files in os.walk(repo_path):
+            # Relative path of the current directory
+            dir_node_name = os.path.relpath(root, repo_path)
+            # Skip directories that match any exclude pattern
+            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
+                continue
             for file in files:
                 if file.endswith(".py"):
                     file_path = os.path.join(root, file)
                     rel_file_path = os.path.relpath(file_path, repo_path)
+                    # Skip files that match any exclude pattern
+                    if any(rel_file_path.startswith(pattern) for pattern in exclude_patterns):
+                        continue
                     with open(file_path, "r") as file:
                         tree = ast.parse(file.read())
+                        self._visit_tree(tree, rel_file_path)
+
+    def build_references_from_env(self, repo_path):
+        """Build reference edges between functions in the graph."""
+        for root, _, files in self.swe_env.walk(repo_path):
+            # Relative path of the current directory
+            dir_node_name = os.path.relpath(root, repo_path)
+            # Skip directories that match any exclude pattern
+            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
+                continue
+            for file in files:
+                if file.endswith(".py"):
+                    file_path = os.path.join(root, file)
+                    rel_file_path = os.path.relpath(file_path, repo_path)
+                    # Skip files that match any exclude pattern
+                    if any(rel_file_path.startswith(pattern) for pattern in exclude_patterns):
+                        continue
+                    with self.swe_env.read_text_file(file_path, "r") as file:
+                        tree = ast.parse(file)
                         self._visit_tree(tree, rel_file_path)
 
     def _visit_tree(self, tree, file_path):
