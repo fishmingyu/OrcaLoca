@@ -1,4 +1,5 @@
 from Orcar import SearchAgent
+import pandas as pd
 from llama_index.llms.openai import OpenAI
 import argparse
 from Orcar.key_config import Config
@@ -10,7 +11,11 @@ from Orcar.environment.utils import (
     ContainerBash,
 )
 
-def test_search_agent():
+def load_csv_dataset(file_path):
+    import pandas as pd
+    return pd.read_csv(file_path)
+
+def test_search_agent(instance: str) -> str:
     args_dict = {
         "model": "gpt-4o",
         "image": "sweagent/swe-agent:latest",
@@ -18,7 +23,7 @@ def test_search_agent():
         "persistent": True,
         "container_name": "test",
         "split": "test",
-        "filter_instance": "^(django__django-13933)$",
+        "filter_instance": f"^({instance})$",
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
@@ -34,11 +39,33 @@ def test_search_agent():
     ds = load_filter_hf_dataset(args)
     env = BenchmarkEnv(args, ctr_bash)
     llm = OpenAI(model="gpt-4o")
-    for inst in ds:
+    for inst in ds: # only one instance
         env.setup(inst)
         agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=True)
-        response = agent.chat(inst["problem_statement"])
-        print(response)
+        try:
+            response = agent.chat(inst["problem_statement"])
+        except Exception as e:
+            print(f"Error: {e}")
+            response = ""
+
+    ctr_bash.ctr_subprocess.stdin.close()
+    if args.persistent:
+        pause_persistent_container(ctr_bash)
+    return response
 
 if __name__ == "__main__":
-    test_search_agent()
+    csv_path = "lite_golden_stats.csv"
+    df = load_csv_dataset(csv_path)
+    save_file = "lite_golden_search_results.csv"
+    # save the result to csv for each instance
+    with open(save_file, "w") as f:
+        f.write("instance_id;predicted_patch;golden_patch\n")
+        for i in range(len(df)):
+            instance_id = df.iloc[i]["instance_id"]
+            response = test_search_agent(instance_id)
+            gold_result = df.iloc[i]["parsed_patch"]
+            f.write(f"{instance_id};{response};{gold_result}\n")
+    print(f"Results saved to {save_file}")
+
+
+        

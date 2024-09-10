@@ -1,5 +1,9 @@
 import numpy
 
+
+ops = numpy.random.rand(1000, 1000)
+
+
 # calculate the sum of two numbers
 def add(a, b):
     d = a * a

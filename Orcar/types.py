@@ -121,20 +121,21 @@ class SearchObservationStep(BaseReasoningStep):
     """Search observation reasoning step."""
 
     observation: str
-    search_next: List[Dict[str, str]] = []  # Updated to a list of dictionaries
-    is_enough_context: bool = False
+    search_new: List[Dict[str, str]] = []  # Updated to a list of dictionaries
 
     def get_content(self) -> str:
         """Get content."""
-        search_items = ", ".join(f"{key}: {value}" for item in self.search_next for key, value in item.items())
+        search_items = ", ".join(f"{key}: {value}" for item in self.search_new for key, value in item.items())
         if not search_items:
-            return f"Observation Feedback: {self.observation} Nothing to search next"
-        return f"Observation Feedback: {self.observation}, What to search next: {search_items}"
+            return f"Observation Feedback: {self.observation} Nothing new to search"
+        return f"Observation Feedback: {self.observation}, What new to search: {search_items}"
 
     @property
     def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return self.is_enough_context
+        """ search_new is empty"""
+        if len(self.search_new) == 0:
+            return True
+        return False
     
 class ExtractSliceStep(BaseReasoningStep):
     """Extract slice step"""

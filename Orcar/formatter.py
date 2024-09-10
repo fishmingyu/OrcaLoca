@@ -164,7 +164,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        current_search: Optional[List[SearchActionStep]] = None,
+        current_search: Optional[List[str]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
