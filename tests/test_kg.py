@@ -75,18 +75,20 @@ def test_env_build_graph():
     ctr_bash = ContainerBash(ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name)
 
     ds = load_filter_hf_dataset(args)
-    env = BenchmarkEnv(args, ctr_bash, ds)
-    graph_builder = RepoGraph(repo_path=env.cache_dir, save_log=True, log_path="log", build_kg=True)
-    node = graph_builder.get_class_snapshot("ModelChoiceField")
-    if node:
-        print(f"Snapshot of class ModelChoice   Field: \n {node}")
-    else:
-        print("Class snapshot not found")
+    env = BenchmarkEnv(args, ctr_bash)
+    for inst in ds:
+        env.setup(inst)
+        graph_builder = RepoGraph(repo_path=env.cache_dir, save_log=True, log_path="log", build_kg=True)
+        node = graph_builder.get_class_snapshot("ModelChoiceField")
+        if node:
+            print(f"Snapshot of class ModelChoice   Field: \n {node}")
+        else:
+            print("Class snapshot not found")
 
 
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
     # test_search_manager()
-    # test_local_build_graph()
-    test_env_build_graph()
+    test_local_build_graph()
+    # test_env_build_graph()

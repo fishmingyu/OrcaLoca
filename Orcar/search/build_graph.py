@@ -294,7 +294,7 @@ class RepoGraph:
             tree = ast.parse(file.read())
 
         # Build the graph for this file's content
-        visitor = FunctionClassVisitor(self, file_node_name, self.function_definitions)
+        visitor = AstVistor(self, file_node_name, self.function_definitions)
         visitor.visit(tree)
 
     def build_attribute_from_env_file(self, file_path, file_node_name):
@@ -303,7 +303,7 @@ class RepoGraph:
         tree = ast.parse(file)
 
         # Build the graph for this file's content
-        visitor = FunctionClassVisitor(self, file_node_name, self.function_definitions)
+        visitor = AstVistor(self, file_node_name, self.function_definitions)
         visitor.visit(tree)
 
     def build_references(self, repo_path):
@@ -392,7 +392,8 @@ class RepoGraph:
             Patch(facecolor='lightgreen', edgecolor='black', label='Directory'),
             Patch(facecolor='lightblue', edgecolor='black', label='File'),
             Patch(facecolor='orange', edgecolor='black', label='Class'),
-            Patch(facecolor='pink', edgecolor='black', label='Function/Method')
+            Patch(facecolor='pink', edgecolor='black', label='Function/Method'),
+            Patch(facecolor='yellow', edgecolor='black', label='Global/Class Variable')
         ]
         plt.legend(handles=legend_elements, loc='upper right', fontsize='large')
 
@@ -407,8 +408,10 @@ class RepoGraph:
             return 1
         elif node_type == 'class':
             return 2
-        else:  # function or method
+        elif node_type in ['function', 'method']:
             return 3
+        else: # global_variable, class_variable
+            return 4
 
     def _get_node_color(self, node_type):
         """Return color based on the node type."""
@@ -418,8 +421,10 @@ class RepoGraph:
             return 'lightblue'
         elif node_type == 'class':
             return 'orange'
-        else:  # function or method
+        elif node_type in ['function', 'method']:
             return 'pink'
+        else: # global_variable, class_variable
+            return 'yellow'
         
     def _get_edge_style(self, edge_type):
         return 'solid' if edge_type == 'contains' else 'dotted'
@@ -431,11 +436,12 @@ class RepoGraph:
         return 2 if edge_type == 'contains' else 1  # Thicker width for 'contains', thinner for 'references'
 
 
-class FunctionClassVisitor(ast.NodeVisitor):
+class AstVistor(ast.NodeVisitor):
     def __init__(self, graph_builder, file_node_name, function_definitions):
         self.graph_builder = graph_builder
         self.function_definitions = function_definitions
         self.current_class = None
+        self.current_function = None
         self.current_file = file_node_name
 
     def visit_FunctionDef(self, node):
@@ -458,8 +464,15 @@ class FunctionClassVisitor(ast.NodeVisitor):
         # Link function or method to the file node or class node
         parent_node = self.current_class if self.current_class else self.current_file
         self.graph_builder.add_edge(parent_node, node_name, 'contains')
+
+        # Set the current function context
+        previous_function = self.current_function
+        self.current_function = node_name
         
         self.generic_visit(node)
+
+        # Restore the previous function context
+        self.current_function = previous_function
 
     def visit_ClassDef(self, node):
         class_name = node.name
@@ -482,6 +495,25 @@ class FunctionClassVisitor(ast.NodeVisitor):
         self.generic_visit(node)
         # save the previous class
         self.current_class = previous_class
+
+    def visit_Assign(self, node):
+        # Only handle global assignments
+        if self.current_class is None and self.current_function is None:
+            # It's a global variable
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    var_name = target.id
+                    node_name = f"{self.current_file}::{var_name}"
+                    node_loc = Loc(
+                        file_name=self.current_file,
+                        start_line=node.lineno,
+                        end_line=node.end_lineno
+                    )
+                    self.graph_builder.add_node(node_name, 'global_variable', var_name, None, node_loc)
+                    self.graph_builder.add_edge(self.current_file, node_name, 'contains')
+
+        self.generic_visit(node)
+
 
 # frist collect all the function definitions and then build the references
 class ReferenceBuilder:

@@ -3,6 +3,7 @@ from .build_graph import RepoGraph, Loc
 from typing import Tuple
 from collections.abc import MutableMapping
 import os
+import ast
 
 class SearchManager:
     
@@ -12,8 +13,7 @@ class SearchManager:
         self._setup_graph()
 
     def _setup_graph(self):
-        graph_builder = RepoGraph(self.repo_path)
-        graph_builder.build_whole_graph(self.repo_path)
+        graph_builder = RepoGraph(repo_path=self.repo_path)
         self.kg = graph_builder
 
     def get_code_snippet(self, file_path: str, start: int, end: int) -> str:
@@ -31,6 +31,34 @@ class SearchManager:
             lines = f.readlines()
             return "".join(lines[start-1:end])
         
+    def _search_source_code(self, file_path: str, source_code: str) -> str:
+        """Search the source code in the file.
+
+        Args:
+            file_path (str): The file path to search.
+            source_code (str): The source code to search.
+
+        Returns:
+            str: The related function/class code snippet. 
+                If not found, return the error message.
+        """
+        with open(file_path, "r") as f:
+            file_content = f.read()
+        
+        tree = ast.parse(file_content)
+
+            # Traverse the AST to find all function definitions
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                start_line = node.lineno
+                end_line = node.end_lineno
+                # check if the source_code is in the function body
+                func_body = self.get_code_snippet(file_path, start_line, end_line)
+                if source_code in func_body:
+                    return func_body
+        return f"Cannot find the context of {source_code} in {file_path}"
+
+
     def _search_callable_kg(self, callable: str) -> Loc:
         """Search the callable in the knowledge graph.
 
@@ -145,3 +173,15 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
 
+    def search_source_code(self, file_path: str, source_code: str) -> str:
+        """API to search the source code in the file.
+
+        Args:
+            file_path (str): The file path to search.
+            source_code (str): The source code to search.
+
+        Returns:
+            str: The related function/method code snippet. 
+                If not found, return the error message.
+        """
+        return self._search_source_code(file_path, source_code)

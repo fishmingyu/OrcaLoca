@@ -45,6 +45,7 @@ class BenchmarkEnv:
     def setup(self, inst: Dict[str, Any]):
         logger.info(f"Setting up env for inst {inst['instance_id']}...")
         self.clone_repo(inst)
+        self.cache_repo_to_host(inst)
         self.create_conda_env(inst)
 
     @property
@@ -54,9 +55,9 @@ class BenchmarkEnv:
     def copy_to_env(self, contents: str, container_path: str) -> None:
         copy_file_to_container(self.ctr_bash.ctr, contents, container_path)
 
-    def cache_repo_to_host(self, repo_name: str) -> None:
-        # Usage: env.cache_repo_to_host(inst['repo'])
+    def cache_repo_to_host(self, inst: Dict[str, Any]) -> None:
         ctr_name = self.ctr_bash.ctr_name
+        repo_name = inst["repo"]
         repo_path = get_repo_dir(repo_name)
         directory_path = self.cache_dir
         os.makedirs(directory_path, exist_ok=True)
@@ -64,9 +65,14 @@ class BenchmarkEnv:
         # check if repo is already cached
         if os.path.exists(host_path):
             logger.info(f"Repo {repo_path} already cached")
-            return
-        cmd = f"docker cp {ctr_name}:/{repo_path} {host_path}"
-        logger.info(f"Caching repo to host: {cmd}")
+        else:
+            cmd = f"docker cp {ctr_name}:/{repo_path} {host_path}"
+            logger.info(f"Caching repo to host: {cmd}")
+            subprocess.run(cmd, shell=True, check=True)
+        # git checkout to base commit
+        base_commit = inst["base_commit"]
+        cmd = f"cd {host_path}; git checkout {base_commit}"
+        logger.info(f"Checking out to base commit: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
 
     def remove_cache_repo(self, repo_name: str) -> None:

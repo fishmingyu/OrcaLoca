@@ -4,6 +4,7 @@ A search agent. Process raw response into json format.
 
 import uuid
 import json
+import queue
 from typing import (
     Any,
     Dict,
@@ -163,6 +164,7 @@ class SearchWorker(BaseAgentWorker):
         next_step: str = ""
         next_step_input: str = ""
         sources: List[ToolOutput] = []
+        search_queue: queue.Queue = queue.Queue()
         current_search: List[SearchActionStep] = []
         current_observation: Optional[SearchObservationStep] = []
         # temporary memory for new messages
@@ -173,6 +175,7 @@ class SearchWorker(BaseAgentWorker):
             "next_step": next_step,
             "next_step_input": next_step_input,
             "sources": sources,
+            "search_queue": search_queue,
             "current_search": current_search,
             "current_observation": current_observation,
             "new_memory": new_memory,
@@ -209,13 +212,13 @@ class SearchWorker(BaseAgentWorker):
     
     def _extract_observation_step(
         self, output: ChatResponse
-    ) -> Tuple[SearchObservationStep, bool]:
+    ) -> SearchObservationStep:
         """Extract observation step."""
         if output.message.content is None:
             raise ValueError("Got empty message.")
         message_content = output.message.content
         obsearvation_step = self._output_parser.parse_observation(message_content)
-        return obsearvation_step, obsearvation_step.is_enough_context
+        return obsearvation_step
     
     def _which_step(self, output: ChatResponse) -> str:
         """Judge step."""
@@ -228,7 +231,7 @@ class SearchWorker(BaseAgentWorker):
         elif "action_lists" in message_content:
             return "search"
         else:
-            raise ValueError("Unknown step type.")
+            return "error"
         
     def _assign_next_step(self, current_step: str, is_complete: bool) -> str:
         """Assign next step."""
@@ -245,59 +248,65 @@ class SearchWorker(BaseAgentWorker):
         task: Task,
         tools: Sequence[BaseTool],
         output: ChatResponse,
-    ) -> List[SearchResult]:
+    ) -> SearchResult:
         tools_dict: Dict[str, BaseTool] = {
             tool.metadata.get_name(): tool for tool in tools
         }
         # try to call the tools
-        search_results : List[SearchResult] = []
+        search_result :  SearchResult = []
         try:
             _, search_steps = self._extract_search_step(output)
         except Exception as exc:
             logger.error(f"Error processing search: {exc}")
 
+        # push back search steps to the queue
         for search_step in search_steps:
-            search_step = cast(SearchActionStep, search_step)
-            if search_step.action in tools_dict:
-                tool = tools_dict[search_step.action]
-                with self.callback_manager.event(
-                    CBEventType.FUNCTION_CALL,
-                    payload={
-                        EventPayload.FUNCTION_CALL: search_step.action_input,
-                        EventPayload.TOOL: tool.metadata,
-                    },
-                ) as event:
-                    try:
-                        dispatcher.event(
-                            AgentToolCallEvent(
-                                arguments=json.dumps({**search_step.action_input}),
-                                tool=tool.metadata,
-                            )
-                        )
-                        tool_output = tool.call(**search_step.action_input)
-                    except Exception as e:
-                        tool_output = ToolOutput(
-                            content=f"Error: {e!s}",
-                            tool_name=tool.metadata.name,
-                            raw_input={"kwargs": search_step.action_input},
-                            raw_output=e,
-                            is_error=True,
-                        )
-                    event.on_end(
-                        payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)}
-                    )
-            else:
-                tool_output = ToolOutput(
-                    content=f"Error: Tool {search_step.action} not found.",
-                    tool_name=search_step.action,
-                    raw_input={"kwargs": search_step.action_input},
-                    raw_output=None,
-                    is_error=True,
-                )
-            search_results.append(SearchResult(search_action=search_step.action, search_input=search_step.action_input, search_content=tool_output.content))
-            task.extra_state["sources"].append(tool_output)
+            task.extra_state["search_queue"].put(search_step)
 
-        return search_results 
+        # only process the head of the queue
+        head_search_step = task.extra_state["search_queue"].get()
+
+        search_step = cast(SearchActionStep, head_search_step)
+        if search_step.action in tools_dict:
+            tool = tools_dict[search_step.action]
+            with self.callback_manager.event(
+                CBEventType.FUNCTION_CALL,
+                payload={
+                    EventPayload.FUNCTION_CALL: search_step.action_input,
+                    EventPayload.TOOL: tool.metadata,
+                },
+            ) as event:
+                try:
+                    dispatcher.event(
+                        AgentToolCallEvent(
+                            arguments=json.dumps({**search_step.action_input}),
+                            tool=tool.metadata,
+                        )
+                    )
+                    tool_output = tool.call(**search_step.action_input)
+                except Exception as e:
+                    tool_output = ToolOutput(
+                        content=f"Error: {e!s}",
+                        tool_name=tool.metadata.name,
+                        raw_input={"kwargs": search_step.action_input},
+                        raw_output=e,
+                        is_error=True,
+                    )
+                event.on_end(
+                    payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)}
+                )
+        else:
+            tool_output = ToolOutput(
+                content=f"Error: Tool {search_step.action} not found.",
+                tool_name=search_step.action,
+                raw_input={"kwargs": search_step.action_input},
+                raw_output=None,
+                is_error=True,
+            )
+        search_result = SearchResult(search_action=search_step.action, search_input=search_step.action_input, search_content=tool_output.content)
+        task.extra_state["sources"].append(tool_output)
+
+        return search_result 
     
     def _concat_search_results(self, search_results: List[SearchResult]) -> str:
         """Join and Concatenate search results."""
@@ -399,23 +408,39 @@ class SearchWorker(BaseAgentWorker):
 
         if step_str == "observation":
             # if the output is observation, extract observation step
-            observation_step, is_complete = self._extract_observation_step(chat_response)
+            observation_step= self._extract_observation_step(chat_response)
+            nothing_new = observation_step.is_done
             task.extra_state["current_observation"].append(observation_step.get_content())
             agent_response = self._get_response(
                 task.extra_state["current_observation"], task.extra_state["sources"]
             )
+            # put the observation feedback as assistant memory to new memory
+            task.extra_state["new_memory"].put(ChatMessage(content=observation_step.get_content(), role=MessageRole.ASSISTANT))
+            # check whether queue is empty : if any_new is True, not complete
+            print(f"any_new: {nothing_new}, empty : {task.extra_state['search_queue'].empty()}")
+            is_complete = task.extra_state["search_queue"].empty() and nothing_new
         elif step_str == "search":
             # given prompt outputs, call search tools
-            search_results = self._process_search(
+            search_result = self._process_search(
                 task, tools, output=chat_response
             )
             # add search steps to task state
-            concat_results = self._concat_search_results(search_results)
-            task.extra_state["current_search"].append(concat_results)
+            process_result = search_result.get_content()
+            task.extra_state["current_search"].append(process_result)
             agent_response = self._get_response(
                 task.extra_state["current_search"], task.extra_state["sources"]
             )
             is_complete = False
+        else:
+            # error step
+            chat_response = str("Error: Invalid step.")
+            return self._get_task_step_response(
+                AgentChatResponse(response=chat_response, sources=[]),
+                step,
+                None,
+                None,
+                is_done=True,
+            )
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response

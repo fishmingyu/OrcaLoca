@@ -219,6 +219,13 @@ SEARCH_STEP_EXAMPLE = {
             "func_name": "str"
             }
         },
+        {
+            "action": "search_method_in_class",
+            "action_input": {
+            "class_name": "str",
+            "method_name": "str"
+            }
+        },
     ]
 }
 
@@ -241,12 +248,11 @@ SEARCH_RESULT = {
 
 OBSERVATION = {
     "obversation_feedback": "observation",
-    "search_next": [
+    "search_new": [
         {"class": "xxx"},
         {"method": "xxx"},
         {"keyword": "xxx"}
     ],
-    "is_enough_context": False
 }
 
 SEARCH_SYSTEM_HEADER = r"""
@@ -258,21 +264,26 @@ The API calls include:
 
 Everytime you only take one step below:
 ## Steps to follow:
-1. Search Step: Use the searching tool to find the relevant code. This will return the code snippets info. Search step is always followed by Observation step.
+1. Search Step: Use the searching tools to find the relevant code. This will return the code snippets info. Search step is always followed by Observation step.
 2. Observation Step: Provide the observation based on the code snippets. Check whether the code snippets contain any method or function you need to further search. 
-Make sure you have enough context to answer the question. If not, back to step 1. If yes, put is_enough_context to True and search_next to empty list.
+Notice that you should put new method or function related to your current code snippets. Don't put any method or function we currently haven't searched, since each observation step
+we only take one code snippet. If you make sure the context is enough to answer the question, you can keep the search_new list empty.
 
 Generally, the first step will generate code snippets from the search tool, and the second step will generate the observation based on the code snippets.
-Begin with the "Search Step". Every step we will provide instructions on what to do next. Please follow the instructions carefully.
+Begin with the "Search Step". Every step we will provide instructions on what to do next. DO NOT add these instructions to the output.
+Please follow the instructions carefully. For example,
+If the input begins with " Please search context according to the observation feedback below.", it means next step is Search Step, you should give corresponding search action.
+If the input begins with "Please provide the observation feedback based on the search results below.", it means next step is Observation Step, you should give corresponding observation feedback.
 
 Conclusion is a final standalone step to provide the final bug locations when nothing else to search.
 
 ## Output format
 1. Search Step Format:
-    Provide your answer in JSON structure like this, 
+    Provide your answer in a clear JSON structure like this, 
     {search_format}
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
-    For example, search_func(func_name="str") should be 
+    You can provide multiple actions in the action_lists. DO NOT add any title or description.
+    For example, here is a valid search step:
     {example_output}
 2. Observation Step Format:
     Provide the observation in JSON structure like this, make sure this step does not cantain the final bug locations.
