@@ -78,7 +78,7 @@ def add_user_step_to_memory(
         step.step_state["is_first"] = False
     else:   # conclusion
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
-        logger.info(f"Add user input to memory: {step.input}")
+        # logger.info(f"Add user input to memory: {step.input}")
 
 class SearchWorker(BaseAgentWorker):
     """OpenAI Agent worker."""
@@ -193,7 +193,7 @@ class SearchWorker(BaseAgentWorker):
         """Get tools."""
         return [t for t in self._get_tools(input)]
 
-    def _extract_search_step(
+    def _extract_exploring_step(
         self, output: ChatResponse
     ) -> Tuple[str, List[BaseReasoningStep]]:
         """Extract search step."""
@@ -202,71 +202,28 @@ class SearchWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = output.message.content
         try:
-            search_steps = self._output_parser.parse_search(message_content)
+            obseravtion, explore_step = self._output_parser.parse_explore(message_content)
         except BaseException as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
-        if self._verbose:
-            for search_step in search_steps:
-                logger.info(f"Search step: {search_step.get_content()}")
-        return message_content, search_steps
-    
-    def _extract_observation_step(
-        self, output: ChatResponse
-    ) -> SearchObservationStep:
-        """Extract observation step."""
-        if output.message.content is None:
-            raise ValueError("Got empty message.")
-        message_content = output.message.content
-        obsearvation_step = self._output_parser.parse_observation(message_content)
-        return obsearvation_step
-    
-    def _which_step(self, output: ChatResponse) -> str:
-        """Judge step."""
-        # check if the output is observation or search or conclusion
-        if output.message.content is None:
-            raise ValueError("Got empty message.")
-        message_content = output.message.content
-        if "obversation_feedback" in message_content:
-            return "observation"
-        elif "action_lists" in message_content:
-            return "search"
-        else:
-            return "error"
+        return obseravtion, explore_step
         
-    def _assign_next_step(self, current_step: str, is_complete: bool) -> str:
+    def _assign_next_step(self, is_complete: bool) -> str:
         """Assign next step."""
-        if current_step == "search":
-            return "observation"
-        elif current_step == "observation":
-            if is_complete:
-                return "conclusion"
-            else:
-                return "search"
+        if is_complete:
+            return "conclusion"
+        else:
+            return "explore"
 
     def _process_search(
         self,
         task: Task,
         tools: Sequence[BaseTool],
-        output: ChatResponse,
+        search_step: SearchActionStep,
     ) -> SearchResult:
         tools_dict: Dict[str, BaseTool] = {
             tool.metadata.get_name(): tool for tool in tools
         }
         # try to call the tools
-        search_result :  SearchResult = []
-        try:
-            _, search_steps = self._extract_search_step(output)
-        except Exception as exc:
-            logger.error(f"Error processing search: {exc}")
-
-        # push back search steps to the queue
-        for search_step in search_steps:
-            task.extra_state["search_queue"].put(search_step)
-
-        # only process the head of the queue
-        head_search_step = task.extra_state["search_queue"].get()
-
-        search_step = cast(SearchActionStep, head_search_step)
         if search_step.action in tools_dict:
             tool = tools_dict[search_step.action]
             with self.callback_manager.event(
@@ -341,26 +298,16 @@ class SearchWorker(BaseAgentWorker):
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
                     input="Now let's come to a conclusion. \n"
-                    + next_step_input
                     , # this step is conclusion
                 )
             ]
-        elif next_step == "observation":
+        elif next_step == "explore":
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    input="Please provide observation feedback on the search results below. \n"
+                    input="Please provide observation feedback and new_search_actions on the search results below. \n"
                     + next_step_input
                     , # this step is observation
-                )
-            ]
-        else:
-            new_steps = [
-                step.get_next_step(
-                    step_id=str(uuid.uuid4()),
-                    input="Please search context according to the observation feedback below. \n"
-                    + next_step_input
-                    , # this step is search
                 )
             ]
 
@@ -391,7 +338,7 @@ class SearchWorker(BaseAgentWorker):
             current_search=task.extra_state["current_search"],
         )
         # send prompt
-        chat_response = self._llm.chat(input_chat)
+        chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["next_step"] is "conclusion":
             # convert the chat response to str
@@ -404,47 +351,35 @@ class SearchWorker(BaseAgentWorker):
                 is_done=True,
             )
         
-        step_str = self._which_step(chat_response)
+        observation, search_steps = self._extract_exploring_step(chat_response)
+        # push back search steps to the queue
+        for search_step in search_steps:
+            task.extra_state["search_queue"].put(search_step)
+        # print current queue size
+        logger.info(f"Current search queue size: {task.extra_state['search_queue'].qsize()}")
+        # only process the head of the queue
+        head_search_step = task.extra_state["search_queue"].get()
+        search_step = cast(SearchActionStep, head_search_step)
+        search_result = self._process_search(
+            task, tools, search_step
+        )
+        # pop the head of the queue after processing
+        task.extra_state["search_queue"].task_done()
 
-        if step_str == "observation":
-            # if the output is observation, extract observation step
-            observation_step= self._extract_observation_step(chat_response)
-            nothing_new = observation_step.is_done
-            task.extra_state["current_observation"].append(observation_step.get_content())
-            agent_response = self._get_response(
-                task.extra_state["current_observation"], task.extra_state["sources"]
-            )
-            # put the observation feedback as assistant memory to new memory
-            task.extra_state["new_memory"].put(ChatMessage(content=observation_step.get_content(), role=MessageRole.ASSISTANT))
-            # check whether queue is empty : if any_new is True, not complete
-            print(f"any_new: {nothing_new}, empty : {task.extra_state['search_queue'].empty()}")
-            is_complete = task.extra_state["search_queue"].empty() and nothing_new
-        elif step_str == "search":
-            # given prompt outputs, call search tools
-            search_result = self._process_search(
-                task, tools, output=chat_response
-            )
-            # add search steps to task state
-            process_result = search_result.get_content()
-            task.extra_state["current_search"].append(process_result)
-            agent_response = self._get_response(
-                task.extra_state["current_search"], task.extra_state["sources"]
-            )
-            is_complete = False
-        else:
-            # error step
-            chat_response = str("Error: Invalid step.")
-            return self._get_task_step_response(
-                AgentChatResponse(response=chat_response, sources=[]),
-                step,
-                None,
-                None,
-                is_done=True,
-            )
+        # add search steps to task state
+        process_result = search_result.get_content()
+        task.extra_state["current_search"].append(process_result)
+        agent_response = self._get_response(
+            task.extra_state["current_search"], task.extra_state["sources"]
+        )
+        
+        is_complete = task.extra_state["search_queue"].empty()
+        # add observation feedback to new memory
+        task.extra_state["new_memory"].put(ChatMessage(content=observation, role=MessageRole.ASSISTANT))
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
-        task.extra_state["next_step"] = self._assign_next_step(step_str, is_complete)
+        task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
         return self._get_task_step_response(agent_response, step, task.extra_state["next_step"], task.extra_state["next_step_input"], False)
     

@@ -10,7 +10,7 @@ from llama_index.core.agent.react.prompts import (
     REACT_CHAT_SYSTEM_HEADER,
 )
 from .prompts import SEARCH_SYSTEM_HEADER
-from .prompts import SEARCH_STEP_ANSWER, SEARCH_STEP_EXAMPLE, SEARCH_RESULT, OBSERVATION
+from .prompts import STEP_EXAMPLE, SEARCH_RESULT
 from .prompts import EXTRACT_FORMATS, EXTRACT_FIELDS, EXTRACT_EXAMPLES, EXTRACT_PROMPTS
 from .types import (
     BaseReasoningStep,
@@ -170,9 +170,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
-            "search_format": "".join(json.dumps(SEARCH_STEP_ANSWER, indent=4)),
-            "example_output": "".join(json.dumps(SEARCH_STEP_EXAMPLE, indent=4)),
-            "observation": "".join(json.dumps(OBSERVATION, indent=4)),
+            "step_format": "".join(json.dumps(STEP_EXAMPLE, indent=4)),
             "bug_locations": "".join(json.dumps(SEARCH_RESULT, indent=4)),
         }
 
