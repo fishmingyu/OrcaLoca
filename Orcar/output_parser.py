@@ -222,17 +222,16 @@ class SearchOutputParser(BaseOutputParser):
     """ReAct Output parser."""
 
     def parse(self, output: str, method: str):
-        if method == "search":
-            return self.parse_search(output)
+        if method == "explore":
+            return self.parse_explore(output)
         elif method == "bug_report":
             return self.parse_bug_report(output)
-        elif method == "observation":
-            return self.parse_observation(output)
 
-    def parse_search(self, output: str) -> List[SearchActionStep]:
+    def parse_explore(self, output: str) -> Tuple[str, List[SearchActionStep]]:
         """Parse output from Search agent.
 
         We expect the output to be the following format:
+            "observation": "str",
             "action_lists": [
                 {
                     "action": "search_api1",
@@ -249,13 +248,14 @@ class SearchOutputParser(BaseOutputParser):
                 },
             ]
         """
-        if "action_lists" in output:
+        if "obversation_feedback" in output:
             action_list : List[SearchActionStep] = []
             # cast the output to SearchActionStep
             json_str = json.loads(output)
-            for action in json_str['action_lists']:
+            observation = json_str['obversation_feedback']
+            for action in json_str['new_search_actions']:
                 action_list.append(SearchActionStep(action=action['action'], action_input=action['action_input']))
-            return action_list
+            return observation, action_list
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse search action output: {output}")
@@ -285,25 +285,6 @@ class SearchOutputParser(BaseOutputParser):
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse bug report output: {output}")
             
-    
-    def parse_observation(self, output: str) -> SearchObservationStep:
-        """Parse output from Search agent.
-
-        We expect the output to be the following format:
-            "observation": "observation"
-            "search_new": [
-                {"class": "xxx"},
-                {"method": "xxx"},
-                {"keyword": "xxx"}
-            ],
-        """
-        if "obversation_feedback" in output:
-            # cast the output to SearchObservationStep
-            json_str = json.loads(output)
-            return SearchObservationStep(observation=json_str['obversation_feedback'], search_new=json_str['search_new'])
-        else:
-            # raise an error if the output is not in the expected format
-            raise ValueError(f"Could not parse observation output: {output}")
 
 
 class ExtractOutputParser(BaseOutputParser):

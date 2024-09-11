@@ -36,7 +36,7 @@ def test_search_agent():
     llm = OpenAI(model="gpt-4o")
     for inst in ds:
         env.setup(inst)
-        agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=True)
+        agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=False)
         response = agent.chat(inst["problem_statement"])
         print(response)
 
