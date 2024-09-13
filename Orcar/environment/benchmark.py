@@ -35,9 +35,7 @@ def get_repo_dir(repo: str) -> str:
 
 
 class BenchmarkEnv:
-    def __init__(
-        self, args, ctr_bash: ContainerBash
-    ):
+    def __init__(self, args, ctr_bash: ContainerBash):
         super().__init__()
         self.args = args
         self.ctr_bash = ctr_bash
@@ -54,6 +52,11 @@ class BenchmarkEnv:
 
     def copy_to_env(self, contents: str, container_path: str) -> None:
         copy_file_to_container(self.ctr_bash.ctr, contents, container_path)
+
+    def copy_file_from_env(self, container_path: str, host_path: str) -> None:
+        cmd = f"docker cp {self.ctr_bash.ctr_name}:/{container_path} {host_path}"
+        logger.info(f"Copying file to host: {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
 
     def cache_repo_to_host(self, inst: Dict[str, Any]) -> None:
         ctr_name = self.ctr_bash.ctr_name
@@ -82,17 +85,17 @@ class BenchmarkEnv:
             os.rmdir(host_path)
 
     def read_text_file(self, path: str, timeout: int = 5) -> str:
-        '''
+        """
         path: absolute file path (like /tmp/a.log)
         return value: content of text file
-        '''
+        """
         return self.run(cmd=f"cat {path}", timeout=timeout)
 
     def walk(self, path: str, timeout: int = 5):
-        '''
+        """
         path: absolute file path (like /tmp/a.log)
         return value: type(os.walk(path))
-        '''
+        """
         cmd = "".join(
             [
                 "python -c 'import os;",
@@ -124,7 +127,7 @@ class BenchmarkEnv:
     def clone_repo(self, inst: Dict[str, Any]):
         self.run("cd /")
         cur_folders = self.run("ls").split("\n")
-        
+
         repo = inst["repo"]
         repo_dir = get_repo_dir(repo)
         if repo_dir not in cur_folders:
@@ -156,12 +159,12 @@ class BenchmarkEnv:
             "source /root/miniconda3/etc/profile.d/conda.sh",
             err_msg="Failed to source conda",
         )
-        inst['repo_dir'] = get_repo_dir(inst['repo'])
+        inst["repo_dir"] = get_repo_dir(inst["repo"])
         cur_conda_envs = self.get_cur_conda_envs()
         has_runned_container_env_init = False
-    
+
         t0 = time.perf_counter()
-        env_name = inst['repo_dir'] + "__" + inst['version']
+        env_name = inst["repo_dir"] + "__" + inst["version"]
 
         if env_name in cur_conda_envs:
             return
@@ -307,5 +310,15 @@ class BenchmarkEnv:
                     post_install_cmd,
                     err_msg="Post-install commands failed to execute successfully",
                 )
+
+        # Install Tracer
+        self.run_with_handle(
+            f"conda activate {env_name}",
+            err_msg="Failed to activate conda environment",
+        )
+        self.run_with_handle(
+            f"pip install viztracer",
+            err_msg="Failed to install viztracer",
+        )
 
         logger.info("Installation step took %.2f seconds", time.perf_counter() - t0)
