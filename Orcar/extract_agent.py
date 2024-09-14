@@ -1,44 +1,31 @@
-import uuid
 import json
 import os
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    cast,
-)
-from pathlib import PurePosixPath, PureWindowsPath, PurePath
+import uuid
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
-from llama_index.core.agent.types import (
-    BaseAgentWorker,
-    Task,
-    TaskStep,
-    TaskStepOutput,
-)
-from llama_index.core.llms.llm import LLM
-from llama_index.core.callbacks import CallbackManager
 from llama_index.core.agent.runner.base import AgentRunner
+from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
+from llama_index.core.callbacks import CallbackManager
 from llama_index.core.chat_engine.types import (
     AGENT_CHAT_RESPONSE_TYPE,
     AgentChatResponse,
 )
+from llama_index.core.llms.llm import LLM
 
+from .environment.benchmark import BenchmarkEnv, get_repo_dir
+from .environment.utils import get_logger
 from .formatter import ExtractChatFormatter
 from .output_parser import ExtractOutputParser
-from .environment.utils import get_logger
-from .environment.benchmark import BenchmarkEnv, get_repo_dir
-from .types import (
-    ExtractSliceStep,
-    CodeInfo,
-    ExtractParseStep,
-    ExtractJudgeStep,
-    ExtractSummarizeStep,
-    ExtractOutput,
-)
 from .tracer import gen_tracer_cmd, read_tracer_output
+from .types import (
+    CodeInfo,
+    ExtractJudgeStep,
+    ExtractOutput,
+    ExtractParseStep,
+    ExtractSliceStep,
+    ExtractSummarizeStep,
+)
 
 logger = get_logger("extract_agent")
 

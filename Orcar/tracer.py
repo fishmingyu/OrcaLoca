@@ -1,6 +1,6 @@
-import json
 import bisect
 import copy
+import json
 import re
 from typing import Any, Dict, Generator, List, Optional, Set
 

@@ -280,7 +280,8 @@ EXTRACT_FIELDS = {
     issue_reproducer_slice: Code snippet to reproduce the issue. Should be a python code snippet that can be directly runned.
             \n should be used for new line, 4 spaces should be used for indentation.
             If file creation is necessary, python file IO should be used.
-            If the reproducer is mentioned in interactive mode, the code should be extracted and spliced into a snippet.
+            If the reproducer is mentioned in interactive mode, the code should be extracted and parsed into an .py file.
+            For example, '>>> ' should never be used in an .py file.
             Code shouldn't be inferred from natural language description. Set to '' if not found.
 </field>
 <field>

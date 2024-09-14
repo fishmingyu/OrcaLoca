@@ -2,7 +2,8 @@ from Orcar import SearchAgent
 from llama_index.llms.openai import OpenAI
 import argparse
 from Orcar.key_config import Config
-from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset, get_repo_dir
+from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
+from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.environment.utils import (
     get_container,
     get_logger,

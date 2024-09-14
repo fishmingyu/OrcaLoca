@@ -1,33 +1,24 @@
-import datasets
-import re
-import pandas as pd
-import time
 import json
-import subprocess
 import os
-from typing import Dict, Any
+import subprocess
+import time
+from typing import Any, Dict
+
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
+
 from .utils import (
     ContainerBash,
-    run_command_in_container,
     copy_file_to_container,
     get_exit_code,
     get_logger,
+    run_command_in_container,
 )
 
 LONG_TIMEOUT = 500
 PATH_TO_REQS = "/root/requirements.txt"
 PATH_TO_ENV_YML = "/root/environment.yml"
 logger = get_logger("env_benchmark")
-
-
-def load_filter_hf_dataset(args) -> datasets.arrow_dataset.Dataset:
-    ds = datasets.load_dataset(args.dataset)[args.split]
-    return ds.filter(
-        input_columns=["instance_id"],
-        function=lambda x: bool(re.match(args.filter_instance, x)),
-    )
 
 
 def get_repo_dir(repo: str) -> str:

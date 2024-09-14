@@ -1,4 +1,5 @@
 import os
+
 import config
 
 
@@ -9,7 +10,7 @@ class Config:
         if self.file_path and os.path.isfile(self.file_path):
             self.file_config = config.Config(self.file_path)
         self.fallback_config = dict()
-        self.fallback_config['OPENAI_API_BASE_URL'] = ""
+        self.fallback_config["OPENAI_API_BASE_URL"] = ""
 
     def __getitem__(self, index):
         # Values in key.cfg has priority over env variables

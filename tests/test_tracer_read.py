@@ -1,6 +1,7 @@
 import os
-from Orcar.tracer import read_tracer_output
+
 from Orcar.environment.utils import get_logger
+from Orcar.tracer import read_tracer_output
 
 logger = get_logger("test_tracer_read")
 
