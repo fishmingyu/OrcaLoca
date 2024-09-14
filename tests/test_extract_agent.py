@@ -1,21 +1,19 @@
-import json
 import argparse
+import json
+
+from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.llms.openai import OpenAI
-from llama_index.core.chat_engine.types import (
-    AgentChatResponse,
-)
 
-
-from Orcar.key_config import Config
+from Orcar import ExtractAgent
+from Orcar.environment.benchmark import BenchmarkEnv
 from Orcar.environment.utils import (
+    ContainerBash,
     get_container,
     get_logger,
     pause_persistent_container,
-    ContainerBash,
 )
-from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset
-
-from Orcar import ExtractAgent
+from Orcar.key_config import Config
+from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.types import ExtractOutput
 
 logger = get_logger("test_extract_agent")

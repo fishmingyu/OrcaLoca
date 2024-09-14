@@ -8,7 +8,8 @@ from Orcar.environment.utils import (
     pause_persistent_container,
     ContainerBash,
 )
-from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset, get_repo_dir
+from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
+from Orcar.load_cache_dataset import load_filter_hf_dataset
 
 from Orcar import ExtractAgent
 from Orcar.types import ExtractOutput
