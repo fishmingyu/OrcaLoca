@@ -28,7 +28,7 @@ args_dict = {
     "container_name": "test",
     "split": "test",
     # Short Issue Test
-    "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(sympy__sympy-20154)$",
     # Long Issue Test
     # "filter_instance": "^(django__django-15814)$",
     # Multi Issue Test

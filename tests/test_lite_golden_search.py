@@ -1,5 +1,6 @@
 from Orcar import SearchAgent
 import pandas as pd
+import csv
 from llama_index.llms.openai import OpenAI
 import argparse
 from Orcar.key_config import Config
@@ -57,15 +58,19 @@ if __name__ == "__main__":
     csv_path = "lite_golden_stats.csv"
     df = load_csv_dataset(csv_path)
     save_file = "lite_golden_search_results.csv"
-    # save the result to csv for each instance
-    with open(save_file, "w") as f:
-        f.write("instance_id;predicted_patch;golden_patch\n")
+
+    # Open the file with the 'newline' parameter to prevent extra blank lines
+    with open(save_file, "w", newline='', encoding='utf-8') as f:
+        # Create a CSV writer object with your desired delimiter
+        writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        # Write the header row
+        writer.writerow(["instance_id", "predicted_patch", "golden_patch"])
+        # Iterate over the DataFrame rows
         for i in range(len(df)):
             instance_id = df.iloc[i]["instance_id"]
             response = test_search_agent(instance_id)
             gold_result = df.iloc[i]["parsed_patch"]
-            f.write(f"{instance_id};{response};{gold_result}\n")
+            # Write the row to the CSV file
+            writer.writerow([instance_id, response, gold_result])
     print(f"Results saved to {save_file}")
 
-
-        

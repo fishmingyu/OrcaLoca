@@ -16,7 +16,7 @@ from .types import (
     BaseReasoningStep,
     ObservationReasoningStep,
 )
-from .types import SearchActionStep
+from .types import SearchActionStep, SearchResult
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.tools import BaseTool
@@ -164,7 +164,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        current_search: Optional[List[str]] = None,
+        current_search: Optional[List[SearchResult]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
@@ -182,7 +182,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         for searching_step in current_search:
             message = ChatMessage(
                 role=MessageRole.ASSISTANT,
-                content=searching_step,
+                content=searching_step.get_content(),
             )
             searching_history.append(message)
 

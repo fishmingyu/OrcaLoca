@@ -12,6 +12,8 @@ from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset, ge
 
 from Orcar import ExtractAgent
 from Orcar.types import ExtractOutput
+import os
+
 logger = get_logger("test_env")
 
 def test_build_graph():
@@ -50,6 +52,11 @@ def test_local_build_graph():
         print(f"Found the function definition at {node_get_sum}")
     else:
         print("Function definition not found")
+    file_content = graph_builder.dfs_search_file_skeleton("a.py")
+    if file_content:
+        print(f"File content of a.py: \n {file_content}")
+    else:
+        print("File content not found")
 
 def test_env_build_graph():
     logger = get_logger("test_env")
@@ -85,10 +92,22 @@ def test_env_build_graph():
         else:
             print("Class snapshot not found")
 
+def test_fitsrec():
+    repo_path = "~/.orcar/astropy__astropy"
+    # convert the path to absolute
+    repo_path = os.path.expanduser(repo_path)
+    graph_builder = RepoGraph(repo_path=repo_path, save_log=True, log_path="log", build_kg=True)
+    node = graph_builder.dfs_search_file_skeleton("fitsrec.py")
+    if node:
+        print(f"Contents of fitsrec.py: \n {node}")
+    else:
+        print("File contents not found")
+
 
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
     # test_search_manager()
-    test_local_build_graph()
+    # test_local_build_graph()
     # test_env_build_graph()
+    test_fitsrec()  
