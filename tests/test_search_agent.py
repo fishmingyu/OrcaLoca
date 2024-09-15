@@ -26,7 +26,7 @@ def test_search_agent():
         "persistent": True,
         "container_name": "test",
         "split": "test",
-        "filter_instance": "^(astropy__astropy-6938)$",
+        "filter_instance": "^(astropy__astropy-12907)$",
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
