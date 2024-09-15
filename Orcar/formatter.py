@@ -10,8 +10,10 @@ from llama_index.core.agent.react.prompts import (
     CONTEXT_REACT_CHAT_SYSTEM_HEADER,
     REACT_CHAT_SYSTEM_HEADER,
 )
+
 from llama_index.core.agent.types import Task, TaskStep
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
+
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import BaseTool
@@ -25,7 +27,7 @@ from .prompts import (
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .types import BaseReasoningStep, ObservationReasoningStep, SearchActionStep
+from .types import BaseReasoningStep, ObservationReasoningStep, SearchActionStep, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +193,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        current_search: Optional[List[str]] = None,
+        current_search: Optional[List[SearchResult]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
@@ -209,7 +211,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         for searching_step in current_search:
             message = ChatMessage(
                 role=MessageRole.ASSISTANT,
-                content=searching_step,
+                content=searching_step.get_content(),
             )
             searching_history.append(message)
 

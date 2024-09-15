@@ -16,6 +16,17 @@ class SearchManager:
         graph_builder = RepoGraph(repo_path=self.repo_path)
         self.kg = graph_builder
 
+
+    def get_search_functions(self) -> list:
+        """Return a list of search functions."""
+        return [
+            self.search_callable,
+            self.search_func,
+            self.search_class,
+            self.search_method_in_class,
+            self.search_file_skeleton,
+        ]
+
     def get_code_snippet(self, file_path: str, start: int, end: int) -> str:
         """Get the code snippet in the range in the file, without line numbers.
 
@@ -57,7 +68,17 @@ class SearchManager:
                 if source_code in func_body:
                     return func_body
         return f"Cannot find the context of {source_code} in {file_path}"
+    
+    def _get_file_skeleton(self, file_name: str) -> str:
+        """Get the skeleton of the file, including class and function definitions.
 
+        Args:
+            file_name (str): The file name to get the skeleton.
+
+        Returns:
+            str: The skeleton of the file.
+        """
+        return self.kg.dfs_search_file_skeleton(file_name)
 
     def _search_callable_kg(self, callable: str) -> Loc:
         """Search the callable in the knowledge graph.
@@ -109,6 +130,20 @@ class SearchManager:
     #################
     # Interface methods
     #################
+
+    def search_file_skeleton(self, file_name: str) -> str:
+        """API to search the file skeleton
+            If you want to see the structure of the file, including class and function signatures.
+            Be sure to call other search functions to get detailed information of the class/function.
+
+        Args:
+            file_name (str): The file name to search. Usage: search_file_contents("example.py")
+            Do not include the path, only the file name.
+
+        Returns:
+            str: The skeleton of the file.
+        """
+        return self._get_file_skeleton(file_name)
 
     def search_callable(self, callable: str) -> Tuple[str, str]:
         """API to search the callable in given repo. Only if you can't make sure if it's a class or a function.

@@ -10,6 +10,11 @@ from Orcar.environment.utils import (
     pause_persistent_container,
     ContainerBash,
 )
+import json
+from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset
+
+from Orcar import ExtractAgent
+from Orcar.types import ExtractOutput
 
 def test_search_agent():
     args_dict = {
@@ -19,7 +24,7 @@ def test_search_agent():
         "persistent": True,
         "container_name": "test",
         "split": "test",
-        "filter_instance": "^(django__django-13933)$",
+        "filter_instance": "^(django__django-11283)$",
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
@@ -37,8 +42,13 @@ def test_search_agent():
     llm = OpenAI(model="gpt-4o")
     for inst in ds:
         env.setup(inst)
+        agent = ExtractAgent(llm=llm, env=env, verbose=True)
+        agent_chat_response = agent.chat(json.dumps(dict(inst)))
+        extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
         agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=False)
-        response = agent.chat(inst["problem_statement"])
+        # concat inst["problem_statement"] with the extracted output
+        input = inst["problem_statement"] + "\n" + str(extract_output)
+        response = agent.chat(input)
         print(response)
 
 if __name__ == "__main__":

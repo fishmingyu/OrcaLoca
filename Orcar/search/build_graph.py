@@ -74,6 +74,16 @@ class RepoGraph:
         return "::".join(parts[:-1])
     
     @staticmethod
+    def extract_file_name(query):
+        """
+        Given a query, extract the file name from the query
+        """
+        path = query.split("::")[0]
+        # then we get a path
+        parts = path.split("/")
+        return parts[-1]
+    
+    @staticmethod
     def check_class_prefix(func_name, prefix):
         """
         Given a function name and a prefix, check if the function name has the class prefix
@@ -205,6 +215,49 @@ class RepoGraph:
             snapshot += f"Docstring: {method_snapshot.docstring}\n"
         
         return snapshot
+    
+    # dfs search for contents in a file
+    def dfs_search_file_skeleton(self, file_name) -> str | None:
+        root = self.root_node
+        stack = [root]
+        visited = set()
+        contents = {}
+
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                extracted_file = self.extract_file_name(node)
+                # first check if the node is a file
+                type_of_node = self.graph.nodes[node]['type']
+                if type_of_node == 'file':
+                    if extracted_file == file_name:
+                        # this is file node                        
+                        # get all neighbors of this node means all methods
+                        for childs in self.graph.neighbors(node):
+                            child_name = childs.split("::")[-1]
+                            # child could be class/function or global variable
+                            if self.graph.nodes[childs]['type'] in ['function', 'class']:
+                                snapshot = (self.graph.nodes[childs]['type'], self.graph.nodes[childs]['signature'], self.graph.nodes[childs]['docstring'])
+                                contents[child_name] = snapshot
+                            else: # global variable
+                                contents[child_name] = (self.graph.nodes[childs]['type'], None, None)
+                # only add neighbors that are files or directories
+                for neighbor in self.graph.neighbors(node):
+                    if self.graph.nodes[neighbor]['type'] in ['file', 'directory']:
+                        stack.append(neighbor)
+        # setup the snapshot
+        snapshot = ""
+        if contents:
+            for child_name, child_snapshot in contents.items():
+                node_type, signature, docstring = child_snapshot
+                snapshot += f"\n{node_type.capitalize()}: {child_name}\n"
+                if signature:
+                    snapshot += f"Signature: {signature}\n"
+                if docstring:
+                    snapshot += f"Docstring: {docstring}\n"
+            return snapshot
+        return None
         
     # build the graph from the repository
     def build_attribute_from_repo(self, repo_path):

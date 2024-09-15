@@ -240,7 +240,7 @@ Conclusion is a final standalone step to provide the final bug locations when no
     {step_format}
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
-3. Conclusion Format:
+2. Conclusion Format:
     After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, 
     DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
     {bug_locations}

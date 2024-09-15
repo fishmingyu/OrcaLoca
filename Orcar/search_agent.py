@@ -165,8 +165,8 @@ class SearchWorker(BaseAgentWorker):
         next_step_input: str = ""
         sources: List[ToolOutput] = []
         search_queue: queue.Queue = queue.Queue()
-        current_search: List[SearchActionStep] = []
-        current_observation: Optional[SearchObservationStep] = []
+        action_history: List[SearchActionStep] = []
+        current_search: List[SearchResult] = []
         # temporary memory for new messages
         new_memory = ChatMemoryBuffer.from_defaults()
 
@@ -176,8 +176,8 @@ class SearchWorker(BaseAgentWorker):
             "next_step_input": next_step_input,
             "sources": sources,
             "search_queue": search_queue,
+            "action_history": action_history,
             "current_search": current_search,
-            "current_observation": current_observation,
             "new_memory": new_memory,
         }
         task.extra_state.update(task_state)
@@ -282,7 +282,7 @@ class SearchWorker(BaseAgentWorker):
             raise ValueError("No searching steps were taken.")
         elif len(current_res) == self._max_iterations:
             raise ValueError("Reached max iterations.")
-        response_str = current_res[-1]
+        response_str = current_res[-1].get_content()
 
         # TODO: add sources from reasoning steps
         return AgentChatResponse(response=response_str, sources=sources)
@@ -354,7 +354,11 @@ class SearchWorker(BaseAgentWorker):
         observation, search_steps = self._extract_exploring_step(chat_response)
         # push back search steps to the queue
         for search_step in search_steps:
+            # if search_step in history, skip
+            if search_step in task.extra_state["action_history"]:
+                continue
             task.extra_state["search_queue"].put(search_step)
+            task.extra_state["action_history"].append(search_step)
         # print current queue size
         logger.info(f"Current search queue size: {task.extra_state['search_queue'].qsize()}")
         # only process the head of the queue
@@ -367,8 +371,7 @@ class SearchWorker(BaseAgentWorker):
         task.extra_state["search_queue"].task_done()
 
         # add search steps to task state
-        process_result = search_result.get_content()
-        task.extra_state["current_search"].append(process_result)
+        task.extra_state["current_search"].append(search_result)
         agent_response = self._get_response(
             task.extra_state["current_search"], task.extra_state["sources"]
         )
@@ -467,14 +470,12 @@ class SearchAgent(AgentRunner):
         """Set up tools."""
         tools = []
         # tools in SearchManager
-        search_callable_tool = FunctionTool.from_defaults(self._search_manager.search_callable)
-        search_func_tool = FunctionTool.from_defaults(self._search_manager.search_func)
-        search_class_tool = FunctionTool.from_defaults(self._search_manager.search_class)
-        search_method_in_class_tool = FunctionTool.from_defaults(self._search_manager.search_method_in_class)
-        tools.append(search_callable_tool)
-        tools.append(search_func_tool)
-        tools.append(search_class_tool)
-        tools.append(search_method_in_class_tool)
+
+        functions = self._search_manager.get_search_functions()
+        for function in functions:
+            tool = FunctionTool.from_defaults(function)
+            tools.append(tool)
+
         return tools
 
     def _get_prompt_modules(self) -> PromptMixinType:
