@@ -161,7 +161,7 @@ class SearchWorker(BaseAgentWorker):
 
     def initialize_step(self, task: Task, **kwargs: Any) -> TaskStep:
         """Initialize step from task."""
-        next_step: str = ""
+        is_done = False
         next_step_input: str = ""
         sources: List[ToolOutput] = []
         search_queue: queue.Queue = queue.Queue()
@@ -172,7 +172,7 @@ class SearchWorker(BaseAgentWorker):
 
         # initialize task state
         task_state = {
-            "next_step": next_step,
+            "is_done": is_done,
             "next_step_input": next_step_input,
             "sources": sources,
             "search_queue": search_queue,
@@ -206,13 +206,6 @@ class SearchWorker(BaseAgentWorker):
         except BaseException as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, explore_step
-        
-    def _assign_next_step(self, is_complete: bool) -> str:
-        """Assign next step."""
-        if is_complete:
-            return "conclusion"
-        else:
-            return "explore"
 
     def _process_search(
         self,
@@ -340,7 +333,7 @@ class SearchWorker(BaseAgentWorker):
         # send prompt
         chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
         logger.info(f"Chat response: {chat_response}")
-        if task.extra_state["next_step"] is "conclusion":
+        if task.extra_state["is_done"]:
             # convert the chat response to str
             chat_response = str(chat_response)
             return self._get_task_step_response(
@@ -361,6 +354,16 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["action_history"].append(search_step)
         # print current queue size
         logger.info(f"Current search queue size: {task.extra_state['search_queue'].qsize()}")
+        is_complete = task.extra_state["search_queue"].empty()
+        if is_complete:
+            task.extra_state["is_done"] = True
+            return self._get_task_step_response(
+                AgentChatResponse(response=observation, sources=[]),
+                step,
+                "conclusion",
+                None,
+                is_done=False,
+            )
         # only process the head of the queue
         head_search_step = task.extra_state["search_queue"].get()
         search_step = cast(SearchActionStep, head_search_step)
@@ -376,15 +379,15 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["current_search"], task.extra_state["sources"]
         )
         
-        is_complete = task.extra_state["search_queue"].empty()
+        # is_complete = task.extra_state["search_queue"].empty()
         # add observation feedback to new memory
         task.extra_state["new_memory"].put(ChatMessage(content=observation, role=MessageRole.ASSISTANT))
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
-        task.extra_state["next_step"] = self._assign_next_step(is_complete)
+        # task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
-        return self._get_task_step_response(agent_response, step, task.extra_state["next_step"], task.extra_state["next_step_input"], False)
+        return self._get_task_step_response(agent_response, step, "explore", task.extra_state["next_step_input"], False)
     
 
     @trace_method("run_step")
