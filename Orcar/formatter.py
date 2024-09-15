@@ -27,7 +27,7 @@ from .prompts import (
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .types import BaseReasoningStep, ObservationReasoningStep, SearchActionStep, SearchResult
+from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
 
 logger = logging.getLogger(__name__)
 

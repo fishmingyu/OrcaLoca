@@ -11,7 +11,9 @@ from Orcar.environment.utils import (
     ContainerBash,
 )
 import json
-from Orcar.environment.benchmark import BenchmarkEnv, load_filter_hf_dataset
+from Orcar.environment.benchmark import BenchmarkEnv
+from Orcar.load_cache_dataset import load_filter_hf_dataset
+
 
 from Orcar import ExtractAgent
 from Orcar.types import ExtractOutput
@@ -24,7 +26,7 @@ def test_search_agent():
         "persistent": True,
         "container_name": "test",
         "split": "test",
-        "filter_instance": "^(django__django-11283)$",
+        "filter_instance": "^(astropy__astropy-6938)$",
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
