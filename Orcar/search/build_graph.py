@@ -406,7 +406,6 @@ class RepoGraph:
         with open(filename, "w") as file:
             json.dump(data, file)
         
-
     def save_graph(self):
         """Save the graph as a JPG file using a tree-like layout."""
         # Use pygraphviz layout
