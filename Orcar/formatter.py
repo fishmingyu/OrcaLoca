@@ -1,30 +1,31 @@
 # ReAct agent formatter
 
-import logging
 import json
+import logging
 from abc import abstractmethod
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
+import tiktoken
 from llama_index.core.agent.react.prompts import (
     CONTEXT_REACT_CHAT_SYSTEM_HEADER,
     REACT_CHAT_SYSTEM_HEADER,
 )
-from .prompts import SEARCH_SYSTEM_HEADER
-from .prompts import STEP_EXAMPLE, SEARCH_RESULT
-from .prompts import EXTRACT_FORMATS, EXTRACT_FIELDS, EXTRACT_EXAMPLES, EXTRACT_PROMPTS
-from .types import (
-    BaseReasoningStep,
-    ObservationReasoningStep,
-)
-from .types import SearchActionStep
-from llama_index.core.base.llms.types import ChatMessage, MessageRole
+from llama_index.core.agent.types import Task, TaskStep
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
+from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import BaseTool
-from llama_index.core.agent.types import (
-    Task,
-    TaskStep,
-)
 
+from .prompts import (
+    EXTRACT_EXAMPLES,
+    EXTRACT_FIELDS,
+    EXTRACT_FORMATS,
+    EXTRACT_PROMPTS,
+    SEARCH_RESULT,
+    SEARCH_SYSTEM_HEADER,
+    STEP_EXAMPLE,
+)
+from .types import BaseReasoningStep, ObservationReasoningStep, SearchActionStep
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,34 @@ def get_react_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
         )
         tool_descs.append(tool_desc)
     return tool_descs
+
+
+class TokenCount(BaseModel, frozen=True):
+    """Token count of an LLM call"""
+
+    in_token_cnt: int
+    out_token_cnt: int
+
+
+class TokenCounter:
+    """Token counter based on tiktoken"""
+
+    def __init__(self, encoding_name: str) -> None:
+        self.encoding = tiktoken.encoding_for_model(encoding_name)
+
+    def count(self, string: str) -> int:
+        return len(self.encoding.encode(string))
+
+    def count_chat(
+        self, messages: List[ChatMessage], llm: LLM
+    ) -> Tuple[ChatResponse, TokenCount]:
+        in_token_cnt = self.count(llm.messages_to_prompt(messages))
+        response = llm.chat(messages)
+        out_token_cnt = self.count(response.message.content)
+        return (
+            response,
+            TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt),
+        )
 
 
 # TODO: come up with better name
@@ -138,7 +167,6 @@ class ReActChatFormatter(BaseAgentChatFormatter):
         return ReActChatFormatter.from_defaults(
             system_header=CONTEXT_REACT_CHAT_SYSTEM_HEADER, context=context
         )
-    
 
 
 def get_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
@@ -152,7 +180,6 @@ def get_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
         )
         tool_descs.append(tool_desc)
     return tool_descs
-
 
 
 class SearchChatFormatter(BaseAgentChatFormatter):
@@ -199,40 +226,42 @@ class SearchChatFormatter(BaseAgentChatFormatter):
     ) -> "SearchChatFormatter":
         """Create SearchChatFormatter from defaults."""
         if not system_header:
-            system_header = (
-                REACT_CHAT_SYSTEM_HEADER
-            )
+            system_header = REACT_CHAT_SYSTEM_HEADER
 
         return SearchChatFormatter(
             system_header=system_header,
         )
-    
+
+
 class ExtractChatFormatter(BaseAgentChatFormatter):
     """Extractor Agent formatter."""
 
-    def format(
-        self,
-        step: TaskStep,
-        task: Task,
-        handler: str
-    ) -> List[ChatMessage]:
+    def format(self, step: TaskStep, task: Task, handler: str) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
-        sysheader = ChatMessage(role=MessageRole.SYSTEM, content=EXTRACT_PROMPTS['header'])
+        sysheader = ChatMessage(
+            role=MessageRole.SYSTEM, content=EXTRACT_PROMPTS["header"]
+        )
         if handler == "slice":
-            example = EXTRACT_PROMPTS['example']
+            example = EXTRACT_PROMPTS["example"]
             example_format_args = {
-                "example_repo_name":            EXTRACT_EXAMPLES[handler]['repo_name'],
-                "example_input_description":    EXTRACT_EXAMPLES[handler]['input_description'],
-                "example_output":               "".join(json.dumps(EXTRACT_EXAMPLES[handler]['example_output'], indent=4)),
+                "example_repo_name": EXTRACT_EXAMPLES[handler]["repo_name"],
+                "example_input_description": EXTRACT_EXAMPLES[handler][
+                    "input_description"
+                ],
+                "example_output": "".join(
+                    json.dumps(EXTRACT_EXAMPLES[handler]["example_output"], indent=4)
+                ),
             }
             fmt_example = example.format(**example_format_args)
             user_msg = EXTRACT_PROMPTS[handler]
             format_args = {
-                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
-                "output_fields":        EXTRACT_FIELDS[handler],
-                "example":              fmt_example,
-                "repo_name":            task.extra_state['inst']['repo'],
-                "input_description":    task.extra_state['inst']['problem_statement'],
+                "output_format": "".join(
+                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
+                ),
+                "output_fields": EXTRACT_FIELDS[handler],
+                "example": fmt_example,
+                "repo_name": task.extra_state["inst"]["repo"],
+                "input_description": task.extra_state["inst"]["problem_statement"],
             }
             fmt_user_msg = user_msg.format(**format_args)
             return [
@@ -240,22 +269,31 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
             ]
         elif handler == "parse":
-            step_name = step.step_state['name']
-            parse_type = task.extra_state['parse_type'][step_name]
-            example = EXTRACT_PROMPTS['example']
+            step_name = step.step_state["name"]
+            parse_type = task.extra_state["parse_type"][step_name]
+            example = EXTRACT_PROMPTS["example"]
             example_format_args = {
-                "example_repo_name":            EXTRACT_EXAMPLES[handler][parse_type]['repo_name'],
-                "example_input_description":    EXTRACT_EXAMPLES[handler][parse_type]['input_description'],
-                "example_output":               "".join(json.dumps(EXTRACT_EXAMPLES[handler][parse_type]['example_output'], indent=4)),
+                "example_repo_name": EXTRACT_EXAMPLES[handler][parse_type]["repo_name"],
+                "example_input_description": EXTRACT_EXAMPLES[handler][parse_type][
+                    "input_description"
+                ],
+                "example_output": "".join(
+                    json.dumps(
+                        EXTRACT_EXAMPLES[handler][parse_type]["example_output"],
+                        indent=4,
+                    )
+                ),
             }
             fmt_example = example.format(**example_format_args)
             user_msg = EXTRACT_PROMPTS[handler]
             format_args = {
-                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
-                "output_fields":        EXTRACT_FIELDS[handler],
-                "example":              fmt_example,
-                "repo_name":            task.extra_state['inst']['repo'],
-                "input_description":    task.extra_state['slices'][step_name],
+                "output_format": "".join(
+                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
+                ),
+                "output_fields": EXTRACT_FIELDS[handler],
+                "example": fmt_example,
+                "repo_name": task.extra_state["inst"]["repo"],
+                "input_description": task.extra_state["slices"][step_name],
             }
             fmt_user_msg = user_msg.format(**format_args)
             return [
@@ -265,12 +303,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
         elif handler == "judge":
             user_msg = EXTRACT_PROMPTS[handler]
             format_args = {
-                "output_format":        "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4)),
-                "output_fields":        EXTRACT_FIELDS[handler],
-                "repo_name":            task.extra_state['inst']['repo'],
-                "input_description":    task.extra_state['inst']['problem_statement'],
-                "reproduce_snippet":    task.extra_state["slices"]["reproduce_code_parse"],
-                "reproducer_log":       task.extra_state["slices"]["reproduce_log_parse"],
+                "output_format": "".join(
+                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
+                ),
+                "output_fields": EXTRACT_FIELDS[handler],
+                "repo_name": task.extra_state["inst"]["repo"],
+                "input_description": task.extra_state["inst"]["problem_statement"],
+                "reproduce_snippet": task.extra_state["slices"]["reproduce_code_parse"],
+                "reproducer_log": task.extra_state["slices"]["reproduce_log_parse"],
             }
             fmt_user_msg = user_msg.format(**format_args)
             return [
@@ -280,8 +320,8 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
         elif handler == "summarize":
             user_msg = EXTRACT_PROMPTS[handler]
             format_args = {
-                "repo_name":            task.extra_state['inst']['repo'],
-                "input_description":    task.extra_state['inst']['problem_statement'],
+                "repo_name": task.extra_state["inst"]["repo"],
+                "input_description": task.extra_state["inst"]["problem_statement"],
             }
             fmt_user_msg = user_msg.format(**format_args)
             return [

@@ -319,7 +319,7 @@ EXTRACT_FIELDS = {
     is_successful: whether the reproduce snippet successfully reproduced the issue.
             Note that 'successfully reproduce' means the similar phenomenon is observed;
             It does not necessarily means the snippet finished without error
-            (Like when the issue is reporting an error, getting the same error means reproduction is successful)
+            (Getting the same error reported in issue means reproduction is successful)
 </field>
 """
 }
@@ -329,7 +329,8 @@ EXTRACT_EXAMPLES = {
 "repo_name": "marshmallow-code/marshmallow",
 "input_description": """
 3.0: DateTime fields cannot be used as inner field for List or Tuple fields
-Between releases 3.0.0rc8 and 3.0.0rc9, `DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. The snippet below works in <=3.0.0rc8 and throws the error below in >=3.0.0rc9 (and, worryingly, 3.0.0):
+
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
 
 ```python
 from marshmallow import fields, Schema
@@ -347,18 +348,10 @@ Traceback (most recent call last):
     s = MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 913, in _init_fields
-    self._bind_field(field_name, field_obj)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 969, in _bind_field
-    field_obj._bind_to_schema(field_name, self)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 636, in _bind_to_schema
-    self.inner._bind_to_schema(field_name, self)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 1117, in _bind_to_schema
-    or getattr(schema.opts, self.SCHEMA_OPTS_VAR_NAME)
 AttributeError: 'List' object has no attribute 'opts'
 ```
 
-It seems like it's treating the parent field as a Schema without checking that it is indeed a schema, so the `schema.opts` statement fails as fields don't have an `opts` attribute.
+It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
 """,
 "example_output": {
 "traceback_warning_log_slice": """
@@ -367,14 +360,6 @@ Traceback (most recent call last):
     s = MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 913, in _init_fields
-    self._bind_field(field_name, field_obj)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 969, in _bind_field
-    field_obj._bind_to_schema(field_name, self)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 636, in _bind_to_schema
-    self.inner._bind_to_schema(field_name, self)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 1117, in _bind_to_schema
-    or getattr(schema.opts, self.SCHEMA_OPTS_VAR_NAME)
 AttributeError: 'List' object has no attribute 'opts'
 """,
 "issue_reproducer_slice": """
@@ -388,8 +373,8 @@ s = MySchema()
 "source_code_slice": "",
 "natural_language_description_slice": """
 3.0: DateTime fields cannot be used as inner field for List or Tuple fields
-Between releases 3.0.0rc8 and 3.0.0rc9, `DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. The snippet below works in <=3.0.0rc8 and throws the error below in >=3.0.0rc9 (and, worryingly, 3.0.0):
-It seems like it's treating the parent field as a Schema without checking that it is indeed a schema, so the `schema.opts` statement fails as fields don't have an `opts` attribute.
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
+It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
 """,
 }
 },
@@ -398,8 +383,8 @@ It seems like it's treating the parent field as a Schema without checking that i
 "repo_name": "marshmallow-code/marshmallow",
 "input_description": """
 3.0: DateTime fields cannot be used as inner field for List or Tuple fields
-Between releases 3.0.0rc8 and 3.0.0rc9, `DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. The snippet below works in <=3.0.0rc8 and throws the error below in >=3.0.0rc9 (and, worryingly, 3.0.0):
-It seems like it's treating the parent field as a Schema without checking that it is indeed a schema, so the `schema.opts` statement fails as fields don't have an `opts` attribute.
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`.
+The `schema.opts` statement fails as fields don't have an `opts` attribute.
 """,
 "example_output": {
     "code_info_list": [
@@ -426,14 +411,8 @@ Traceback (most recent call last):
     s = MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 913, in _init_fields
-    self._bind_field(field_name, field_obj)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 969, in _bind_field
-    field_obj._bind_to_schema(field_name, self)
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 636, in _bind_to_schema
     self.inner._bind_to_schema(field_name, self)
-  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 1117, in _bind_to_schema
-    or getattr(schema.opts, self.SCHEMA_OPTS_VAR_NAME)
 AttributeError: 'List' object has no attribute 'opts'
 """,
 "example_output": {
@@ -445,18 +424,6 @@ AttributeError: 'List' object has no attribute 'opts'
         {
             'keyword': '__init__',
             'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py'
-        },
-        {
-            'keyword': '_init_fields',
-            'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py'
-        },
-        {
-            'keyword': '_bind_field',
-            'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py'
-        },
-        {
-            'keyword': '_bind_to_schema',
-            'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py'
         },
         {
             'keyword': '_bind_to_schema',
