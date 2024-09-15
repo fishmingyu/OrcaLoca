@@ -12,3 +12,4 @@ rich
 datasets
 swebench
 matplotlib
+tiktoken

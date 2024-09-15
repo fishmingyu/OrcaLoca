@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.callbacks import CallbackManager
 from llama_index.core.chat_engine.types import (
     AGENT_CHAT_RESPONSE_TYPE,
@@ -15,7 +16,7 @@ from llama_index.core.llms.llm import LLM
 
 from .environment.benchmark import BenchmarkEnv, get_repo_dir
 from .environment.utils import get_logger
-from .formatter import ExtractChatFormatter
+from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
 from .output_parser import ExtractOutputParser
 from .tracer import gen_tracer_cmd, read_tracer_output
 from .types import (
@@ -73,6 +74,16 @@ class ExtractWorker(BaseAgentWorker):
         self._chat_formatter = ExtractChatFormatter()
         self._output_parser = ExtractOutputParser()
         self._verbose = verbose
+        self._token_counter = TokenCounter(llm.metadata.model_name)
+
+    def chat_with_count(
+        self, messages: List[ChatMessage], tag: str, task: Task
+    ) -> ChatResponse:
+        response, token_cnt = self._token_counter.count_chat(
+            messages=messages, llm=self._llm
+        )
+        task.extra_state["token_cnts"].append((tag, token_cnt))
+        return response
 
     def set_callback_manager(self, callback_manager: CallbackManager) -> None:
         """Set callback manager."""
@@ -92,6 +103,7 @@ class ExtractWorker(BaseAgentWorker):
             "suspicous_code": set(),
             "summary": "",
             "inst": dict(),
+            "token_cnts": list(),
         }
         task.extra_state.update(task_state)
 
@@ -200,9 +212,11 @@ class ExtractWorker(BaseAgentWorker):
         logger.info(f"Current step: {step_name} in handle_step_slice")
 
         # TODO: extract into a function?
-        prompt = self._chat_formatter.format(step, task, "slice")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "slice")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -243,9 +257,11 @@ class ExtractWorker(BaseAgentWorker):
         step_name = step.step_state["name"]
         logger.info(f"Current step: {step_name} in handle_step_parse")
 
-        prompt = self._chat_formatter.format(step, task, "parse")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "parse")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -274,9 +290,11 @@ class ExtractWorker(BaseAgentWorker):
         )
         task.extra_state["parse_type"]["reproduce_log_parse"] = "traceback"
 
-        prompt = self._chat_formatter.format(step, task, "judge")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "judge")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -298,9 +316,11 @@ class ExtractWorker(BaseAgentWorker):
         step_name = step.step_state["name"]
         logger.info(f"Current step: {step_name} in handle_step_summarize")
 
-        prompt = self._chat_formatter.format(step, task, "summarize")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "summarize")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -403,8 +423,26 @@ class ExtractWorker(BaseAgentWorker):
 
     def finalize_task(self, task: Task, **kwargs: Any) -> None:
         """Finalize task, after all the steps are completed."""
-        # TODO
-        pass
+        token_cnts: List[Tuple[str, TokenCount]] = task.extra_state["token_cnts"]
+        in_token_cnt = 0
+        out_token_cnt = 0
+        for tag, token_cnt in token_cnts:
+            in_token_cnt += token_cnt.in_token_cnt
+            out_token_cnt += token_cnt.out_token_cnt
+            logger.info(
+                (
+                    f"{tag:<25}: "
+                    f"in {token_cnt.in_token_cnt:<5} tokens, "
+                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                )
+            )
+        logger.info(
+            (
+                f"{'Total cnt':<25}: "
+                f"in {in_token_cnt:<5} tokens, "
+                f"out {out_token_cnt:<5} tokens"
+            )
+        )
 
     def run_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
         """Run step."""
