@@ -1,41 +1,31 @@
-import uuid
 import json
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    cast,
-)
-from pathlib import PurePosixPath, PureWindowsPath, PurePath
+import os
+import uuid
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
-from llama_index.core.agent.types import (
-    BaseAgentWorker,
-    Task,
-    TaskStep,
-    TaskStepOutput,
-)
-from llama_index.core.llms.llm import LLM
-from llama_index.core.callbacks import CallbackManager
 from llama_index.core.agent.runner.base import AgentRunner
+from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse
+from llama_index.core.callbacks import CallbackManager
 from llama_index.core.chat_engine.types import (
     AGENT_CHAT_RESPONSE_TYPE,
     AgentChatResponse,
 )
+from llama_index.core.llms.llm import LLM
 
-from .formatter import ExtractChatFormatter
-from .output_parser import ExtractOutputParser
-from .environment.utils import get_logger
 from .environment.benchmark import BenchmarkEnv, get_repo_dir
+from .environment.utils import get_logger
+from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
+from .output_parser import ExtractOutputParser
+from .tracer import gen_tracer_cmd, read_tracer_output
 from .types import (
-    ExtractSliceStep,
     CodeInfo,
-    ExtractParseStep,
     ExtractJudgeStep,
-    ExtractSummarizeStep,
     ExtractOutput,
+    ExtractParseStep,
+    ExtractSliceStep,
+    ExtractSummarizeStep,
 )
 
 logger = get_logger("extract_agent")
@@ -84,6 +74,16 @@ class ExtractWorker(BaseAgentWorker):
         self._chat_formatter = ExtractChatFormatter()
         self._output_parser = ExtractOutputParser()
         self._verbose = verbose
+        self._token_counter = TokenCounter(llm.metadata.model_name)
+
+    def chat_with_count(
+        self, messages: List[ChatMessage], tag: str, task: Task
+    ) -> ChatResponse:
+        response, token_cnt = self._token_counter.count_chat(
+            messages=messages, llm=self._llm
+        )
+        task.extra_state["token_cnts"].append((tag, token_cnt))
+        return response
 
     def set_callback_manager(self, callback_manager: CallbackManager) -> None:
         """Set callback manager."""
@@ -103,6 +103,7 @@ class ExtractWorker(BaseAgentWorker):
             "suspicous_code": set(),
             "summary": "",
             "inst": dict(),
+            "token_cnts": list(),
         }
         task.extra_state.update(task_state)
 
@@ -195,12 +196,15 @@ class ExtractWorker(BaseAgentWorker):
         return processed_code_info_list
 
     def reproduce_issue(self, issue_reproducer: str, inst: Dict[str, Any]) -> str:
-        reproducer_path = (
-            f"/tmp/reproducer_{get_repo_dir(inst['repo'])}__{inst['version']}.py"
-        )
+        repo_dir = get_repo_dir(inst["repo"])
+        reproducer_path = f"/{repo_dir}/reproducer_{inst['instance_id']}.py"
+        output_path = f"/tmp/tracer_output_{inst['instance_id']}.json"
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
-        log = self.env.run(f"python {reproducer_path}", output_log=True)
+        log = self.env.run(
+            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
+            output_log=True,
+        )
         return log
 
     def handle_step_slice(self, step: TaskStep, task: Task) -> List[TaskStep]:
@@ -208,9 +212,11 @@ class ExtractWorker(BaseAgentWorker):
         logger.info(f"Current step: {step_name} in handle_step_slice")
 
         # TODO: extract into a function?
-        prompt = self._chat_formatter.format(step, task, "slice")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "slice")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -251,9 +257,11 @@ class ExtractWorker(BaseAgentWorker):
         step_name = step.step_state["name"]
         logger.info(f"Current step: {step_name} in handle_step_parse")
 
-        prompt = self._chat_formatter.format(step, task, "parse")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "parse")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -282,9 +290,11 @@ class ExtractWorker(BaseAgentWorker):
         )
         task.extra_state["parse_type"]["reproduce_log_parse"] = "traceback"
 
-        prompt = self._chat_formatter.format(step, task, "judge")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "judge")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -297,6 +307,7 @@ class ExtractWorker(BaseAgentWorker):
         next_step_names = []
         if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
+            next_step_names.append("reproduce_trace")
         else:
             next_step_names.append("reproduce_code_parse")
         return self.gen_next_steps(step, next_step_names)
@@ -305,9 +316,11 @@ class ExtractWorker(BaseAgentWorker):
         step_name = step.step_state["name"]
         logger.info(f"Current step: {step_name} in handle_step_summarize")
 
-        prompt = self._chat_formatter.format(step, task, "summarize")
-        logger.info(f"{prompt}")
-        chat_response = self._llm.chat(messages=prompt)
+        messages = self._chat_formatter.format(step, task, "summarize")
+        logger.info(f"{messages}")
+        chat_response = self.chat_with_count(
+            messages=messages, tag=step_name, task=task
+        )
         if chat_response.message.content is None:
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
@@ -317,6 +330,38 @@ class ExtractWorker(BaseAgentWorker):
         )
 
         task.extra_state["summary"] = summarize_step.summary
+        next_step_names = []
+        return self.gen_next_steps(step, next_step_names)
+
+    def handle_step_trace(self, step: TaskStep, task: Task) -> List[TaskStep]:
+        step_name = step.step_state["name"]
+        if step_name != "reproduce_trace":
+            raise NotImplementedError
+        logger.info(f"Current step: {step_name} in handle_step_trace")
+
+        # Get instance ID
+        instance_id = task.extra_state["inst"]["instance_id"]
+
+        # docker cp the result out
+        output_path = f"/tmp/tracer_output_{instance_id}.json"
+        self.env.run(f"ls {output_path}", output_log=True)
+        assert os.path.isdir("/tmp")
+        self.env.copy_file_from_env(output_path, output_path)
+
+        # parse the result
+        sensitivity_list = [
+            code_info.keyword for code_info in task.extra_state["suspicous_code"]
+        ]
+        logger.info(f"sensitivity_list: {sensitivity_list}")
+        function_list = read_tracer_output(
+            output_path=output_path, sensitivity_list=sensitivity_list
+        )
+        function_list = self.parse_path_in_code_info(
+            task.extra_state["inst"], function_list
+        )
+        logger.info(f"function_list: {function_list}")
+        task.extra_state["suspicous_code"].update(function_list)
+
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -330,6 +375,8 @@ class ExtractWorker(BaseAgentWorker):
             return self.handle_step_judge(step, task)
         elif "summarize" in step_name:
             return self.handle_step_summarize(step, task)
+        elif "trace" in step_name:
+            return self.handle_step_trace(step, task)
         raise ValueError(
             f"ExtractWorker.handle_step: Cannot recognize step name {step_name}"
         )
@@ -376,8 +423,26 @@ class ExtractWorker(BaseAgentWorker):
 
     def finalize_task(self, task: Task, **kwargs: Any) -> None:
         """Finalize task, after all the steps are completed."""
-        # TODO
-        pass
+        token_cnts: List[Tuple[str, TokenCount]] = task.extra_state["token_cnts"]
+        in_token_cnt = 0
+        out_token_cnt = 0
+        for tag, token_cnt in token_cnts:
+            in_token_cnt += token_cnt.in_token_cnt
+            out_token_cnt += token_cnt.out_token_cnt
+            logger.info(
+                (
+                    f"{tag:<25}: "
+                    f"in {token_cnt.in_token_cnt:<5} tokens, "
+                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                )
+            )
+        logger.info(
+            (
+                f"{'Total cnt':<25}: "
+                f"in {in_token_cnt:<5} tokens, "
+                f"out {out_token_cnt:<5} tokens"
+            )
+        )
 
     def run_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
         """Run step."""
