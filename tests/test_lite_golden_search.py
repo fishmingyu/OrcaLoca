@@ -12,6 +12,9 @@ from Orcar.environment.utils import (
     pause_persistent_container,
     ContainerBash,
 )
+from Orcar import ExtractAgent
+from Orcar.types import ExtractOutput
+import json
 
 def load_csv_dataset(file_path):
     import pandas as pd
@@ -23,7 +26,7 @@ def test_search_agent(instance: str) -> str:
         "image": "sweagent/swe-agent:latest",
         "dataset": "princeton-nlp/SWE-bench_Lite",
         "persistent": True,
-        "container_name": "test",
+        "container_name": "test_0",
         "split": "test",
         "filter_instance": f"^({instance})$",
     }
@@ -41,14 +44,26 @@ def test_search_agent(instance: str) -> str:
     ds = load_filter_hf_dataset(args)
     env = BenchmarkEnv(args, ctr_bash)
     llm = OpenAI(model="gpt-4o")
-    for inst in ds: # only one instance
-        env.setup(inst)
-        agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=True)
-        try:
-            response = agent.chat(inst["problem_statement"])
-        except Exception as e:
-            print(f"Error: {e}")
-            response = ""
+    inst = ds[0] # only one instance
+    env.setup(inst)
+    extract_agent = ExtractAgent(llm=llm, env=env, verbose=True)
+    try:
+        agent_chat_response = extract_agent.chat(json.dumps(dict(inst)))
+        extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
+        # concat inst["problem_statement"] with the extracted output
+        input = inst["problem_statement"] + "\n" + str(extract_output)
+    except Exception as e:
+        print(f"Error: {e}")
+        agent_chat_response = ""
+        extract_output = ""
+        input = inst["problem_statement"]
+
+    search_agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=False)
+    try:
+        response = search_agent.chat(input)
+    except Exception as e:
+        print(f"Error: {e}")
+        response = ""
 
     ctr_bash.ctr_subprocess.stdin.close()
     if args.persistent:
@@ -56,22 +71,29 @@ def test_search_agent(instance: str) -> str:
     return response
 
 if __name__ == "__main__":
+    # Load your CSV dataset
     csv_path = "lite_golden_stats.csv"
-    df = load_csv_dataset(csv_path)
-    save_file = "lite_golden_search_results.csv"
+    df = load_csv_dataset(csv_path)  # Assuming this function loads the dataset into a DataFrame
 
-    # Open the file with the 'newline' parameter to prevent extra blank lines
-    with open(save_file, "w", newline='', encoding='utf-8') as f:
-        # Create a CSV writer object with your desired delimiter
-        writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        # Write the header row
-        writer.writerow(["instance_id", "predicted_patch", "golden_patch"])
-        # Iterate over the DataFrame rows
-        for i in range(len(df)):
-            instance_id = df.iloc[i]["instance_id"]
-            response = test_search_agent(instance_id)
-            gold_result = df.iloc[i]["parsed_patch"]
-            # Write the row to the CSV file
-            writer.writerow([instance_id, response, gold_result])
+    # Prepare data to save
+    data = []
+    for i in range(len(df)):
+        instance_id = df.iloc[i]["instance_id"]
+        response = test_search_agent(instance_id)
+        gold_result = df.iloc[i]["parsed_patch"]
+
+        # Append each row as a dictionary
+        data.append({
+            "instance_id": instance_id,
+            "predicted_patch": response,
+            "golden_patch": gold_result
+        })
+
+    # Convert to a DataFrame
+    result_df = pd.DataFrame(data)
+
+    # Save to Excel format
+    save_file = "lite_golden_search_results.xlsx"
+    result_df.to_excel(save_file, index=False)
+
     print(f"Results saved to {save_file}")
-

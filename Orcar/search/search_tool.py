@@ -22,7 +22,7 @@ class SearchManager:
         return [
             self.search_callable,
             self.search_func,
-            self.search_class,
+            self.search_class_skeleton,
             self.search_method_in_class,
             self.search_file_skeleton,
         ]
@@ -69,14 +69,14 @@ class SearchManager:
                     return func_body
         return f"Cannot find the context of {source_code} in {file_path}"
     
-    def _get_file_skeleton(self, file_name: str) -> str:
+    def _get_file_skeleton(self, file_name: str) -> str | None:
         """Get the skeleton of the file, including class and function definitions.
 
         Args:
             file_name (str): The file name to get the skeleton.
 
         Returns:
-            str: The skeleton of the file.
+            str | None: The skeleton of the file or None if not found.
         """
         return self.kg.dfs_search_file_skeleton(file_name)
 
@@ -92,16 +92,16 @@ class SearchManager:
         """
         return self.kg.dfs_search_callable_def(callable)
     
-    def _search_class_kg(self, class_name: str) -> Loc:
+    def _get_class_skeleton(self, class_name: str) -> str | None:
         """Search the class in the knowledge graph.
 
         Args:
             class_name (str): The class name to search.
 
         Returns:
-            Loc: The location of the class definition.
+            str | None: The skeleton of the class or None if not found.
         """
-        return self.kg.dfs_search_class_def(class_name)
+        return self.kg.get_class_snapshot(class_name)
     
     def _search_func_kg(self, func_name: str) -> Loc:
         """Search the function in the knowledge graph.
@@ -134,7 +134,7 @@ class SearchManager:
     def search_file_skeleton(self, file_name: str) -> str:
         """API to search the file skeleton
             If you want to see the structure of the file, including class and function signatures.
-            Be sure to call other search functions to get detailed information of the class/function.
+            Be sure to call search_class_skeleton and search_func to get detailed information.
 
         Args:
             file_name (str): The file name to search. Usage: search_file_contents("example.py")
@@ -143,7 +143,10 @@ class SearchManager:
         Returns:
             str: The skeleton of the file.
         """
-        return self._get_file_skeleton(file_name)
+        res = self._get_file_skeleton(file_name)
+        if res is None:
+            return f"Cannot find the file skeleton of {file_name}"
+        return res
 
     def search_callable(self, callable: str) -> Tuple[str, str]:
         """API to search the callable in given repo. Only if you can't make sure if it's a class or a function.
@@ -161,20 +164,21 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
     
-    def search_class(self, class_name: str) -> Tuple[str, str]:
-        """API to search the class in given repo.
+    def search_class_skeleton(self, class_name: str) -> str:
+        """API to search the class skeleton in given repo.
 
         Args:
             class_name (str): The class name to search.
 
         Returns:
-            Tuple[str, str]: The file path and the snapshot of the class definition. Contains docstring and methods.
+            str: The skeleton snapshot of the class. Including methods within the class.
+            Please call search_method_in_class to get detailed information of the method.
+            If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
-        loc = self._search_class_kg(class_name)
-        if loc is None:
-            return ("", f"Cannot find the definition of class:{class_name}")
-        joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        snapshot = self._get_class_skeleton(class_name)
+        if snapshot is None:
+            return f"Cannot find the class:{class_name}"
+        return snapshot
     
     def search_func(self, func_name: str) -> Tuple[str, str]:
         """API to search the standalone function in given repo.

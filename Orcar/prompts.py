@@ -221,6 +221,7 @@ SEARCH_RESULT = {
 SEARCH_SYSTEM_HEADER = r"""
 You are a helpful assistant that use API calls to report bug code snippets from a text into json format.
 You need to extract where are the bug locations by analyzing the text.
+The given text will give you suspicous_code containing keyword. Make sure to search for the keyword in the codebase. 
 There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
