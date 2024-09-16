@@ -282,7 +282,7 @@ EXTRACT_FIELDS = {
             \n should be used for new line, 4 spaces should be used for indentation.
             If file creation is necessary, python file IO should be used.
             If the reproducer is mentioned in interactive mode, the code should be extracted and parsed into an .py file.
-            For example, '>>> ' should never be used in an .py file.
+            For example, '>>> ' should never be used in an .py file, and the output of interactive shell should also be commented.
             Code shouldn't be inferred from natural language description. Set to '' if not found.
 </field>
 <field>

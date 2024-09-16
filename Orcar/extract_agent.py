@@ -101,6 +101,7 @@ class ExtractWorker(BaseAgentWorker):
             "slices": dict(),
             "parse_type": dict(),
             "suspicous_code": set(),
+            "suspicous_code_max_size_soft": 10,
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
@@ -307,7 +308,9 @@ class ExtractWorker(BaseAgentWorker):
         next_step_names = []
         if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
-            next_step_names.append("reproduce_trace")
+            if "traceback_parse" not in task.extra_state["slices"]:
+                # Only read trace when traceback is not present
+                next_step_names.append("reproduce_trace")
         else:
             next_step_names.append("reproduce_code_parse")
         return self.gen_next_steps(step, next_step_names)
@@ -360,7 +363,14 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["inst"], function_list
         )
         logger.info(f"function_list: {function_list}")
-        task.extra_state["suspicous_code"].update(function_list)
+        for function_item in function_list:
+            task.extra_state["suspicous_code"].add(function_item)
+            if (
+                len(task.extra_state["suspicous_code"])
+                >= task.extra_state["suspicous_code_max_size_soft"]
+            ):
+                # trace should not make suspicous_code size exceed suspicous_code_max_size_soft
+                break
 
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
