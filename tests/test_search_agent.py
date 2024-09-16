@@ -24,7 +24,7 @@ def test_search_agent():
         "image": "sweagent/swe-agent:latest",
         "dataset": "princeton-nlp/SWE-bench_Lite",
         "persistent": True,
-        "container_name": "test",
+        "container_name": "test_0",
         "split": "test",
         "filter_instance": "^(astropy__astropy-12907)$",
     }

@@ -104,6 +104,13 @@ def test_fitsrec():
     else:
         print("File contents not found")
 
+    class_ = graph_builder.get_class_snapshot("FITS_rec")
+    if class_:
+        print(f"Snapshot of class FITS_rec: \
+            \n {class_}")
+    else:
+        print("Class snapshot not found")
+
 
 if __name__ == "__main__":
     # Example usage

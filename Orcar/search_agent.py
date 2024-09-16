@@ -370,6 +370,7 @@ class SearchWorker(BaseAgentWorker):
         search_result = self._process_search(
             task, tools, search_step
         )
+        # logger.info(f"Search result: {search_result}")
         # pop the head of the queue after processing
         task.extra_state["search_queue"].task_done()
 
@@ -439,7 +440,7 @@ class SearchAgent(AgentRunner):
         repo_path: str = "",
         tools: Optional[List[BaseTool]] = None,
         memory: Optional[BaseMemory] = None,
-        max_iterations: int = 10,
+        max_iterations: int = 20,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,
