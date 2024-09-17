@@ -142,7 +142,6 @@ class ExtractSliceStep(BaseReasoningStep):
     traceback_warning_log_slice: str
     issue_reproducer_slice: str
     source_code_slice: str
-    natural_language_description_slice: str
 
     def get_content(self) -> str:
         """Get content."""
@@ -150,7 +149,6 @@ class ExtractSliceStep(BaseReasoningStep):
             f"traceback_warning_log_slice: {self.traceback_warning_log_slice}\n"
             f"issue_reproducer_slice: {self.issue_reproducer_slice}\n"
             f"source_code_slice: {self.source_code_slice}\n"
-            f"natural_language_description_slice: {self.natural_language_description_slice}"
         )
 
     @property

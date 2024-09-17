@@ -26,9 +26,12 @@ args_dict = {
     "container_name": "test",
     "split": "test",
     # Short Issue Test
-    "filter_instance": "^(astropy__astropy-14182)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
+    # "filter_instance": "^(mwaskom__seaborn-2848)$",
     # Long Issue Test
-    # "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(pylint-dev__pylint-7080)$",
+    "filter_instance": "^(matplotlib__matplotlib-26020)$",
+    # "filter_instance": "^(pytest-dev__pytest-7490)$",
     # Multi Issue Test
     # "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
 }

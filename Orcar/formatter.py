@@ -56,9 +56,15 @@ class TokenCounter:
     """Token counter based on tiktoken"""
 
     def __init__(self, encoding_name: str) -> None:
-        self.encoding = tiktoken.encoding_for_model(encoding_name)
+        self.encoding = None
+        if encoding_name in ['gpt-4o', 'gpt-4']:
+            # OpenAI Model
+            self.encoding = tiktoken.encoding_for_model(encoding_name)
+        # TBD: Anthropic Model
 
     def count(self, string: str) -> int:
+        if self.encoding == None:
+            return 0
         return len(self.encoding.encode(string))
 
     def count_chat(
