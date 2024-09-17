@@ -111,6 +111,17 @@ def test_fitsrec():
     else:
         print("Class snapshot not found")
 
+def test_fitsrec_source_code():
+    repo_path = "~/.orcar/astropy__astropy"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    source_code = """
+    output_field.replace(encode_ascii('E'),               
+         encode_ascii('D'))
+    """
+    line_num = search_manager.search_source_code("astropy/io/fits/fitsrec.py", source_code)
+    print(line_num)
+
 
 if __name__ == "__main__":
     # Example usage
@@ -118,4 +129,5 @@ if __name__ == "__main__":
     # test_search_manager()
     # test_local_build_graph()
     # test_env_build_graph()
-    test_fitsrec()  
+    # test_fitsrec()  
+    test_fitsrec_source_code()
