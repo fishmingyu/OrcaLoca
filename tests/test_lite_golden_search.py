@@ -26,7 +26,7 @@ def test_search_agent(instance: str) -> str:
         "image": "sweagent/swe-agent:latest",
         "dataset": "princeton-nlp/SWE-bench_Lite",
         "persistent": True,
-        "container_name": "test_0",
+        "container_name": "test",
         "split": "test",
         "filter_instance": f"^({instance})$",
     }

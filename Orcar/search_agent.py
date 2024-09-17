@@ -59,7 +59,7 @@ from llama_index.core.instrumentation.events.agent import AgentToolCallEvent
 import logging
 from .environment.utils import get_logger
 from .search import SearchManager
-from .formatter import SearchChatFormatter
+from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .types import SearchActionStep, SearchObservationStep
 
@@ -99,6 +99,7 @@ class SearchWorker(BaseAgentWorker):
         self._max_iterations = max_iterations
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
+        self._token_counter = TokenCounter(llm.metadata.model_name)
         self._verbose = verbose
 
         if len(tools) > 0 and tool_retriever is not None:
@@ -179,6 +180,7 @@ class SearchWorker(BaseAgentWorker):
             "action_history": action_history,
             "current_search": current_search,
             "new_memory": new_memory,
+            "token_cnts": list(),
         }
         task.extra_state.update(task_state)
 
@@ -330,14 +332,21 @@ class SearchWorker(BaseAgentWorker):
             chat_history=task.memory.get(input=task.input) + task.extra_state["new_memory"].get_all(),
             current_search=task.extra_state["current_search"],
         )
+
         # send prompt
+        in_token_cnt = self._token_counter.count(self._llm.messages_to_prompt(input_chat))
         chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
+        out_token_cnt = self._token_counter.count(chat_response.message.content)
+        token_cnt = TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt)
+        logger.info(token_cnt)
+        task.extra_state["token_cnts"].append(('Searcher step', token_cnt))
+
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
             # convert the chat response to str
-            chat_response = str(chat_response)
+            # chat_response = str(chat_response)
             return self._get_task_step_response(
-                AgentChatResponse(response=chat_response, sources=[]),
+                AgentChatResponse(response=chat_response.message.content, sources=[]),
                 step,
                 None,
                 None,
@@ -415,6 +424,27 @@ class SearchWorker(BaseAgentWorker):
         )
         # reset new memory
         task.extra_state["new_memory"].reset()
+
+        token_cnts: List[Tuple[str, TokenCount]] = task.extra_state["token_cnts"]
+        in_token_cnt = 0
+        out_token_cnt = 0
+        for tag, token_cnt in token_cnts:
+            in_token_cnt += token_cnt.in_token_cnt
+            out_token_cnt += token_cnt.out_token_cnt
+            logger.info(
+                (
+                    f"{tag:<25}: "
+                    f"in {token_cnt.in_token_cnt:<5} tokens, "
+                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                )
+            )
+        logger.info(
+            (
+                f"{'Total cnt':<25}: "
+                f"in {in_token_cnt:<5} tokens, "
+                f"out {out_token_cnt:<5} tokens"
+            )
+        )
 
     def set_callback_manager(self, callback_manager: CallbackManager) -> None:
         """Set callback manager."""

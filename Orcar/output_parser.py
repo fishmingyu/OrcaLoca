@@ -297,7 +297,6 @@ class ExtractOutputParser(BaseOutputParser):
                 traceback_warning_log_slice=json_obj['traceback_warning_log_slice'],
                 issue_reproducer_slice=json_obj['issue_reproducer_slice'],
                 source_code_slice=json_obj['source_code_slice'],
-                natural_language_description_slice=json_obj['natural_language_description_slice'],
             )
         elif method == 'parse':
             json_obj: Dict = json.loads(output)

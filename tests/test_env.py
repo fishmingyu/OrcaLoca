@@ -21,12 +21,14 @@ args_dict = {
     "image": "sweagent/swe-agent:latest",
     "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
-    "container_name": "test",
+    "container_name": "test_env",
     "split": "test",
     # Short Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
     # Multi Issue Test
-    "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|pylint-dev__pylint-7080)$",
+    # "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|pylint-dev__pylint-7080)$",
+    # Env Test
+    "filter_instance": ".*",
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")

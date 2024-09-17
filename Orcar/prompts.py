@@ -253,7 +253,6 @@ EXTRACT_FORMATS = {
     "traceback_warning_log_slice": "log_slice_string",
     "issue_reproducer_slice": "code_slice_string",
     "source_code_slice": "code_slice_string",
-    "natural_language_description_slice": "description_slice_string",
 },
 "parse": {
     "code_info_list": [
@@ -292,10 +291,6 @@ EXTRACT_FIELDS = {
             Shouldn't overlap with traceback_warning_log_slice or issue_reproducer_slice.
             Set to '' if no code satisfies this requirement.
 </field>
-<field>
-    natural_language_description_slice: The problem statement with all code and log removed.
-            Shouldn't overlap with traceback_warning_log_slice, issue_reproducer_slice or source_code_slice.
-</field>
 """,
 "parse": """
 <field>
@@ -317,7 +312,7 @@ EXTRACT_FIELDS = {
 """,
 "judge": """
 <field>
-    is_successful: whether the reproduce snippet successfully reproduced the issue.
+    is_successful: whether the reproduce_snippet successfully reproduced the issue, based on the reproducer_log it generated.
             Note that 'successfully reproduce' means the similar phenomenon is observed;
             It does not necessarily means the snippet finished without error
             (Getting the same error reported in issue means reproduction is successful)
@@ -372,11 +367,6 @@ class MySchema(Schema):
 s = MySchema()
 """,
 "source_code_slice": "",
-"natural_language_description_slice": """
-3.0: DateTime fields cannot be used as inner field for List or Tuple fields
-`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
-It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
-""",
 }
 },
 "parse":{
@@ -511,7 +501,7 @@ Below is the real task for you to solve:
 </input_description>
 """,
 "judge": r"""
-Your task is to judge whether an input github issue is successfully reproduced by a given reproduce python snippet.
+Your task is to judge whether an input github issue is successfully reproduced by a reproduce_snippet based on the reproducer_log it generated.
 Non-existanct filepath should be set to ''.
 
 Your output should strictly follow the format below.
