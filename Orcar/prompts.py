@@ -506,7 +506,9 @@ An example is given below:
 
 Below is the real task for you to solve:
 <repo_name>{repo_name}</repo_name>
+<input_description>
 {input_description}
+</input_description>
 """,
 "judge": r"""
 Your task is to judge whether an input github issue is successfully reproduced by a given reproduce python snippet.
