@@ -23,7 +23,15 @@ def load_filter_hf_dataset_explicit(
     dataset_file = f'{dataset.replace("/", "__")}_{split}.json'
     dataset_path = f"{cache_dir}/{dataset_file}"
     if not os.path.exists(dataset_path):
-        ds = datasets.load_dataset(dataset, split=split)
+        if (dataset == 'SWE-bench_common'):
+            ds_lite: datasets.arrow_dataset.Dataset = datasets.load_dataset('princeton-nlp/SWE-bench_Lite', split=split)
+            ds_verified: datasets.arrow_dataset.Dataset = datasets.load_dataset('princeton-nlp/SWE-bench_Verified', split=split)
+            ds = ds_verified.filter(
+                input_columns=["instance_id"],
+                function=lambda x: x in ds_lite['instance_id'],
+            )
+        else:
+            ds = datasets.load_dataset(dataset, split=split)
         ds.to_json(dataset_path)
     else:
         data_files = {split: dataset_path}

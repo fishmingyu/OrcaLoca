@@ -244,12 +244,14 @@ class ExtractWorker(BaseAgentWorker):
                 "source_code_parse"
             ] = slice_step.source_code_slice
             task.extra_state["parse_type"]["source_code_parse"] = "code"
-        if slice_step.natural_language_description_slice:
-            next_step_names.append("NL_parse")
-            task.extra_state["slices"][
-                "NL_parse"
-            ] = slice_step.natural_language_description_slice
-            task.extra_state["parse_type"]["NL_parse"] = "NL"
+
+        # Always parse whole issue as NL
+        next_step_names.append("NL_parse")
+        task.extra_state["slices"]["NL_parse"] = task.extra_state["inst"][
+            "problem_statement"
+        ]
+        task.extra_state["parse_type"]["NL_parse"] = "NL"
+
         next_step_names.append("summarize")
 
         return self.gen_next_steps(step, next_step_names)
@@ -347,9 +349,13 @@ class ExtractWorker(BaseAgentWorker):
 
         # docker cp the result out
         output_path = f"/tmp/tracer_output_{instance_id}.json"
+        output_host_dir = os.path.expanduser(f"~/.orcar/tracer/")
+        os.makedirs(output_host_dir, exist_ok=True)
+        output_host_path = output_host_dir + f"tracer_output_{instance_id}.json"
+
         self.env.run(f"ls {output_path}", output_log=True)
         assert os.path.isdir("/tmp")
-        self.env.copy_file_from_env(output_path, output_path)
+        self.env.copy_file_from_env(output_path, output_host_path)
 
         # parse the result
         sensitivity_list = [
@@ -373,6 +379,7 @@ class ExtractWorker(BaseAgentWorker):
                 break
 
         next_step_names = []
+        os.remove(output_host_path)
         return self.gen_next_steps(step, next_step_names)
 
     def handle_step(self, step: TaskStep, task: Task) -> List[TaskStep]:
