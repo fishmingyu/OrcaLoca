@@ -156,7 +156,7 @@ class RepoGraph:
     # constrained search for function definition in the graph
     def dfs_search_func_def(self, query):
         return self.dfs_search_callable_def(query, 'function')
-    
+
     # constrained search for method definition in the graph (method is a function inside a class)
     def dfs_search_method_in_class(self, class_name, method_name) -> Loc | None:
         root = self.root_node

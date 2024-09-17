@@ -4,6 +4,8 @@ from typing import Tuple
 from collections.abc import MutableMapping
 import os
 import ast
+import subprocess
+import re
 
 class SearchManager:
     
@@ -22,9 +24,11 @@ class SearchManager:
         return [
             self.search_callable,
             self.search_func,
+            # self.search_class,
             self.search_class_skeleton,
             self.search_method_in_class,
             self.search_file_skeleton,
+            # self.search_source_code,
         ]
 
     def get_code_snippet(self, file_path: str, start: int, end: int) -> str:
@@ -44,6 +48,7 @@ class SearchManager:
         
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
+        Do not use this method to search the file skeleton.
 
         Args:
             file_path (str): The file path to search.
@@ -53,9 +58,19 @@ class SearchManager:
             str: The related function/class code snippet. 
                 If not found, return the error message.
         """
-        with open(file_path, "r") as f:
+        abs_file_path = os.path.join(self.repo_path, file_path)
+        with open(abs_file_path, "r") as f:
             file_content = f.read()
-        
+
+        def normalize_code(code: str) -> str:
+            """Normalize whitespace in the code."""
+            # Remove leading and trailing whitespace
+            code = code.strip()
+            # Replace all sequences of whitespace (space, tab, newline) with a single space
+            code = re.sub(r'\s+', ' ', code)
+            return code
+
+        source_code = normalize_code(source_code)
         tree = ast.parse(file_content)
 
             # Traverse the AST to find all function definitions
@@ -64,8 +79,9 @@ class SearchManager:
                 start_line = node.lineno
                 end_line = node.end_lineno
                 # check if the source_code is in the function body
-                func_body = self.get_code_snippet(file_path, start_line, end_line)
-                if source_code in func_body:
+                func_body = self.get_code_snippet(abs_file_path, start_line, end_line)
+                normalized_func_body = normalize_code(func_body)
+                if source_code in normalized_func_body:
                     return func_body
         return f"Cannot find the context of {source_code} in {file_path}"
     
@@ -113,6 +129,17 @@ class SearchManager:
             Loc: The location of the function definition.
         """
         return self.kg.dfs_search_func_def(func_name)
+    
+    def _search_class_kg(self, class_name: str) -> Loc:
+        """Search the class in the knowledge graph.
+
+        Args:
+            class_name (str): The class name to search.
+
+        Returns:
+            Loc: The location of the class definition.
+        """
+        return self.kg.dfs_search_class_def(class_name)
     
     def _search_method_in_class_kg(self, class_name: str, method_name: str) -> Loc:
         """Search the method in the knowledge graph.
@@ -196,6 +223,21 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
     
+    def search_class(self, class_name: str) -> Tuple[str, str]:
+        """API to search the class in given repo.
+
+        Args:
+            class_name (str): The class name to search.
+
+        Returns:
+            Tuple[str, str]: The file path and the code_snippet of the class definition.
+        """
+        loc = self._search_class_kg(class_name)
+        if loc is None:
+            return ("", f"Cannot find the definition of class:{class_name}")
+        joined_path = os.path.join(self.repo_path, loc.file_name)
+        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+    
     def search_method_in_class(self, class_name: str, method_name: str) -> Tuple[str, str]:
         """API to search the method in the class in given repo.
         
@@ -213,7 +255,7 @@ class SearchManager:
         return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
-        """API to search the source code in the file.
+        """API to search the source code in the file. If you want to search the code snippet in the file.
 
         Args:
             file_path (str): The file path to search.
