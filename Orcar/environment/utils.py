@@ -316,12 +316,24 @@ def read_generator_with_timeout(
                 yield data.decode()
                 # Refresh timeout if got output
                 end_time = time.time() + timeout_duration
+            time.sleep(0.05)  # Prevents CPU hogging
         else:
             time.sleep(0.05)  # Prevents CPU hogging
         if execution_finished:
             break
-        pids = pid_func()
-        execution_finished = (len(pids) == 0)
+        for i in range(3):
+            # Issue 3 consecutive PID check within 0.1s to make sure we really finished
+            # E.g. If we run 'cmd A && cmd B', 
+            # There will be a short no-PID interval between finishing A and starting B
+            if i != 0:
+                # Don't waste time sleeping before 1st trial
+                time.sleep(0.05)
+            pids = pid_func()
+            execution_finished = (len(pids) == 0)
+            if not execution_finished:
+                 # Don't waste time sleeping if not finished
+                 break
+            
 
     if container.poll() is not None:
         msg = f"Subprocess exited unexpectedly.\n"
@@ -387,6 +399,20 @@ def run_command_in_container(
         if output_log:
             print(output_fraction, end="")
         output += output_fraction
+
+    time.sleep(0.05)
+    if len(get_children_pids(ctr_bash.ctr, ctr_bash.ctr_pid)):
+        extra_output = read_with_timeout(
+            ctr_bash.ctr_subprocess,
+            lambda: get_children_pids(ctr_bash.ctr, ctr_bash.ctr_pid),
+            timeout,
+        )
+        if extra_output:
+            logger.warning(f"Got extra output suffix:\n{extra_output}")
+            if output_log:
+                print(extra_output, end="")
+            output += extra_output
+
     return output
 
 def get_exit_code(
