@@ -194,11 +194,13 @@ class ExtractJudgeStep(BaseReasoningStep):
 class ExtractSummarizeStep(BaseReasoningStep):
     """Extract summarize step"""
     summary: str
+    code_info_list: List[CodeInfo]
 
     def get_content(self) -> str:
         """Get content."""
         return (
             f"summary: {self.summary}\n"
+            f"code_info_list: {self.code_info_list}\n"
         )
 
     @property
@@ -207,6 +209,9 @@ class ExtractSummarizeStep(BaseReasoningStep):
         return False
     
 class ExtractOutput(BaseModel):
-    """Extract agent output"""
+    """
+    Extract agent output
+    """
     summary: str
     suspicous_code: List[CodeInfo]
+    suspicous_code_with_path: List[CodeInfo]

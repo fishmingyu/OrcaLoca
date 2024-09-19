@@ -2,16 +2,13 @@ import json
 import os
 import uuid
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.chat_engine.types import (
-    AGENT_CHAT_RESPONSE_TYPE,
-    AgentChatResponse,
-)
+from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
 from .environment.benchmark import BenchmarkEnv, get_repo_dir
@@ -101,7 +98,9 @@ class ExtractWorker(BaseAgentWorker):
             "slices": dict(),
             "parse_type": dict(),
             "suspicous_code": set(),
-            "suspicous_code_max_size_soft": 10,
+            "suspicous_code_with_path": set(),
+            "suspicous_code_with_path_min_size_soft": 3,
+            "suspicous_code_with_path_max_size_soft": 10,
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
@@ -175,24 +174,28 @@ class ExtractWorker(BaseAgentWorker):
                 *cut_since_last_sensitive(path.parts, sensitive_list)
             )
 
-            # if not (path.is_absolute() or path.parts[0] == "~"):
-            #    # relative path, stay as is
-            #    processed_code_info_list.append(code_info)
-            #    continue
-
             find_output = self.env.run(f"find {repo_root} -name {path.parts[-1]}")
             candidates = find_output.split("\n")
             output_paths = list(
                 filter(lambda x: x.endswith(str(relative_path_suffix)), candidates)
             )
+            output_paths_with_existence = []
             for x in output_paths:
-                processed_code_info = CodeInfo(keyword=code_info.keyword, file_path=x)
-                processed_code_info_list.append(processed_code_info)
-            if len(output_paths) == 0:
+                existence = self.env.run(f"grep -cE '{code_info.keyword}' {x}")
+                if int(existence.strip()):
+                    output_paths_with_existence.append(x)
+
+            if len(output_paths_with_existence) == 0:
                 # path is relevent, but file not found;
                 # likely to be a parse error, keep the keyword and drop the path
                 processed_code_info = CodeInfo(keyword=code_info.keyword, file_path="")
                 processed_code_info_list.append(processed_code_info)
+            else:
+                for x in output_paths_with_existence:
+                    processed_code_info = CodeInfo(
+                        keyword=code_info.keyword, file_path=x
+                    )
+                    processed_code_info_list.append(processed_code_info)
 
         return processed_code_info_list
 
@@ -222,7 +225,9 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        slice_step = self._output_parser.parse(message_content, "slice")
+        slice_step: ExtractSliceStep = self._output_parser.parse(
+            message_content, "slice"
+        )
         logger.info(f"{slice_step}")
 
         next_step_names = []
@@ -244,13 +249,6 @@ class ExtractWorker(BaseAgentWorker):
                 "source_code_parse"
             ] = slice_step.source_code_slice
             task.extra_state["parse_type"]["source_code_parse"] = "code"
-
-        # Always parse whole issue as NL
-        next_step_names.append("NL_parse")
-        task.extra_state["slices"]["NL_parse"] = task.extra_state["inst"][
-            "problem_statement"
-        ]
-        task.extra_state["parse_type"]["NL_parse"] = "NL"
 
         next_step_names.append("summarize")
 
@@ -278,7 +276,11 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["inst"], parse_step.code_info_list
         )
         logger.info(f"{parse_step}")
-        task.extra_state["suspicous_code"].update(parse_step.code_info_list)
+        for code_info in parse_step.code_info_list:
+            if code_info.file_path:
+                task.extra_state["suspicous_code_with_path"].add(code_info)
+            else:
+                task.extra_state["suspicous_code"].add(code_info)
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -334,7 +336,18 @@ class ExtractWorker(BaseAgentWorker):
             message_content, "summarize"
         )
 
+        logger.info(f"{summarize_step.code_info_list}")
+        summarize_step.code_info_list = self.parse_path_in_code_info(
+            task.extra_state["inst"], summarize_step.code_info_list
+        )
+        logger.info(f"{summarize_step.code_info_list}")
+        for code_info in summarize_step.code_info_list:
+            if code_info.file_path:
+                task.extra_state["suspicous_code_with_path"].add(code_info)
+            else:
+                task.extra_state["suspicous_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
+
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -359,8 +372,9 @@ class ExtractWorker(BaseAgentWorker):
 
         # parse the result
         sensitivity_list = [
-            code_info.keyword for code_info in task.extra_state["suspicous_code"]
-        ]
+            code_info.keyword
+            for code_info in task.extra_state["suspicous_code_with_path"]
+        ] + [code_info.keyword for code_info in task.extra_state["suspicous_code"]]
         logger.info(f"sensitivity_list: {sensitivity_list}")
         function_list = read_tracer_output(
             output_path=output_host_path, sensitivity_list=sensitivity_list
@@ -369,14 +383,17 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["inst"], function_list
         )
         logger.info(f"function_list: {function_list}")
+
+        max_size_soft = task.extra_state["suspicous_code_with_path_max_size_soft"]
+        min_size_soft = task.extra_state["suspicous_code_with_path_min_size_soft"]
+        initial_length = len(task.extra_state["suspicous_code_with_path"])
+        max_size = max(min_size_soft + initial_length, max_size_soft)
         for function_item in function_list:
-            task.extra_state["suspicous_code"].add(function_item)
-            if (
-                len(task.extra_state["suspicous_code"])
-                >= task.extra_state["suspicous_code_max_size_soft"]
-            ):
-                # trace should not make suspicous_code size exceed suspicous_code_max_size_soft
-                break
+            if not function_item.file_path:
+                # Unexpected, drop
+                continue
+            if len(task.extra_state["suspicous_code_with_path"]) < max_size:
+                task.extra_state["suspicous_code_with_path"].add(function_item)
 
         next_step_names = []
         os.remove(output_host_path)
@@ -411,6 +428,27 @@ class ExtractWorker(BaseAgentWorker):
                 cmd=cmd, err_msg=f"Inst {inst['instance_id']} failed at {cmd=}"
             )
 
+    def gen_output(self, task: Task) -> ExtractOutput:
+        suspicous_code_with_path: Set[CodeInfo] = task.extra_state[
+            "suspicous_code_with_path"
+        ]
+        suspicous_keywords_with_path = set(
+            [code_loc.keyword for code_loc in suspicous_code_with_path]
+        )
+        suspicous_code: Set[CodeInfo] = task.extra_state["suspicous_code"]
+        suspicous_code = set(
+            [
+                code_loc
+                for code_loc in suspicous_code
+                if code_loc.keyword not in suspicous_keywords_with_path
+            ]
+        )
+        return ExtractOutput(
+            summary=task.extra_state["summary"],
+            suspicous_code=list(suspicous_code),
+            suspicous_code_with_path=list(suspicous_code_with_path),
+        )
+
     def _run_step(self, step: TaskStep, task: Task) -> TaskStepOutput:
         task.extra_state["step_done"].remove(step.step_id)
 
@@ -423,10 +461,7 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["step_done"].add(new_step.step_id)
         is_done = len(task.extra_state["step_done"]) == 0
         if is_done:
-            response = ExtractOutput(
-                summary=task.extra_state["summary"],
-                suspicous_code=list(task.extra_state["suspicous_code"]),
-            )
+            response = self.gen_output(task)
             agent_response = AgentChatResponse(response=response.json())
         else:
             agent_response = AgentChatResponse(response="")

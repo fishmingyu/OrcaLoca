@@ -23,17 +23,17 @@ args_dict = {
     "image": "sweagent/swe-agent:latest",
     "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
-    "container_name": "test",
+    "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    # "filter_instance": "^(astropy__astropy-12907)$",
-    # "filter_instance": "^(mwaskom__seaborn-2848)$",
+    # "filter_instance": "^(django__django-14999)$",
     # Long Issue Test
+    # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
-    "filter_instance": "^(matplotlib__matplotlib-26020)$",
+    # "filter_instance": "^(matplotlib__matplotlib-26020)$",
     # "filter_instance": "^(pytest-dev__pytest-7490)$",
     # Multi Issue Test
-    # "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
+    "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
