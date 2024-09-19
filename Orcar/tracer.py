@@ -4,6 +4,8 @@ import json
 import re
 from typing import Any, Dict, Generator, List, Optional, Set
 
+from pydantic import BaseModel
+
 from .environment.utils import get_logger
 from .types import CodeInfo
 
@@ -156,6 +158,13 @@ def gen_tracer_cmd(input_path: str, output_path: str) -> str:
     return cmd
 
 
+class FuncItem(BaseModel, arbitrary_types_allowed=True):
+    "Function call item in tracer log"
+    node: FuncTreeNode
+    layer: int
+    should_care: bool
+
+
 def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[CodeInfo]:
     with open(output_path) as f:
         tracer_output = json.load(f)
@@ -184,23 +193,34 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
     func_tree = list(func_trees.values())[0]
     logger.info("Successfully parsed tracer output into func_tree")
 
-    lst = [(func_tree.root, 0, False)]
-    return_set: Set[CodeInfo] = set()
+    lst: List[FuncItem] = [FuncItem(node=func_tree.root, layer=0, should_care=False)]
+    list_with_layer_order: List[CodeInfo] = []
     file_sensitivity_set: Set[str] = set()
     while lst:
         ret = lst.pop()
-        should_care = ret[2]
-        if ret[0].funcname in sensitivity_list:
+        should_care = ret.should_care
+        if ret.node.funcname in sensitivity_list:
             should_care = True
-            file_sensitivity_set.add(ret[0].filename)
+            file_sensitivity_set.add(ret.node.filename)
         lst.extend(
-            [(child, ret[1] + 1, should_care) for child in ret[0].children[::-1]]
+            [
+                FuncItem(node=child, layer=ret.layer + 1, should_care=should_care)
+                for child in ret.node.children[::-1]
+            ]
         )
         if (
-            ret[0].funcname
+            ret.node.funcname
             and should_care
-            and (ret[0].filename in file_sensitivity_set)
+            and (ret.node.filename in file_sensitivity_set)
         ):
-            return_set.add(CodeInfo(keyword=ret[0].funcname, file_path=ret[0].filename))
+            list_with_layer_order.append(
+                CodeInfo(keyword=ret.node.funcname, file_path=ret.node.filename)
+            )
+
+    return_list = []
+    for item in list_with_layer_order:
+        if item not in return_list:
+            return_list.append(item)
+
     logger.info("Finished tracer output parsing")
-    return return_set
+    return return_list

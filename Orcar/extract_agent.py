@@ -2,15 +2,13 @@ import json
 import os
 import uuid
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
-from typing import Any, Dict, List, Set, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.callbacks import CallbackManager
-from llama_index.core.chat_engine.types import (
-    AgentChatResponse,
-)
+from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
 from .environment.benchmark import BenchmarkEnv, get_repo_dir
@@ -101,6 +99,7 @@ class ExtractWorker(BaseAgentWorker):
             "parse_type": dict(),
             "suspicous_code": set(),
             "suspicous_code_with_path": set(),
+            "suspicous_code_with_path_min_size_soft": 3,
             "suspicous_code_with_path_max_size_soft": 10,
             "summary": "",
             "inst": dict(),
@@ -190,7 +189,7 @@ class ExtractWorker(BaseAgentWorker):
                 existence = self.env.run(f"grep -cE '{code_info.keyword}' {x}")
                 if int(existence.strip()):
                     output_paths_with_existence.append(x)
-                
+
             if len(output_paths_with_existence) == 0:
                 # path is relevent, but file not found;
                 # likely to be a parse error, keep the keyword and drop the path
@@ -198,7 +197,9 @@ class ExtractWorker(BaseAgentWorker):
                 processed_code_info_list.append(processed_code_info)
             else:
                 for x in output_paths_with_existence:
-                    processed_code_info = CodeInfo(keyword=code_info.keyword, file_path=x)
+                    processed_code_info = CodeInfo(
+                        keyword=code_info.keyword, file_path=x
+                    )
                     processed_code_info_list.append(processed_code_info)
 
         return processed_code_info_list
@@ -383,17 +384,17 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["inst"], function_list
         )
         logger.info(f"function_list: {function_list}")
+
+        max_size_soft = task.extra_state["suspicous_code_with_path_max_size_soft"]
+        min_size_soft = task.extra_state["suspicous_code_with_path_min_size_soft"]
+        initial_length = len(task.extra_state["suspicous_code_with_path"])
+        max_size = max(min_size_soft + initial_length, max_size_soft)
         for function_item in function_list:
             if not function_item.file_path:
                 # Unexpected, drop
                 continue
-            if (
-                len(task.extra_state["suspicous_code_with_path"])
-                >= task.extra_state["suspicous_code_with_path_max_size_soft"]
-            ):
-                # trace should not make suspicous_code size exceed suspicous_code_max_size_soft
-                break
-            task.extra_state["suspicous_code_with_path"].add(function_item)
+            if len(task.extra_state["suspicous_code_with_path"]) < max_size:
+                task.extra_state["suspicous_code_with_path"].add(function_item)
 
         next_step_names = []
         os.remove(output_host_path)
