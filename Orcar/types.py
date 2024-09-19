@@ -207,6 +207,9 @@ class ExtractSummarizeStep(BaseReasoningStep):
         return False
     
 class ExtractOutput(BaseModel):
-    """Extract agent output"""
+    """
+    Extract agent output
+    """
     summary: str
     suspicous_code: List[CodeInfo]
+    suspicous_code_with_path: List[CodeInfo]
