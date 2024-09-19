@@ -363,7 +363,7 @@ class ExtractWorker(BaseAgentWorker):
         ]
         logger.info(f"sensitivity_list: {sensitivity_list}")
         function_list = read_tracer_output(
-            output_path=output_path, sensitivity_list=sensitivity_list
+            output_path=output_host_path, sensitivity_list=sensitivity_list
         )
         function_list = self.parse_path_in_code_info(
             task.extra_state["inst"], function_list
