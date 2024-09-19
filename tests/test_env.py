@@ -1,5 +1,7 @@
 import argparse
-import json
+import os
+import re
+import sys
 
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.llms.openai import OpenAI
@@ -46,8 +48,29 @@ env = BenchmarkEnv(args, ctr_bash)
 
 
 def main():
-    for inst in ds:
-        env.setup(inst)
+
+    # Open the file in write mode
+    log_dir = "./log"
+    os.makedirs(log_dir, exist_ok=True)
+    for i, inst in enumerate(ds):
+        # create a new log subdirectory for each instance
+        instance_id = inst["instance_id"]
+        sub_dir = f"{log_dir}/{instance_id}"
+        os.makedirs(sub_dir, exist_ok=True)
+        with open(f"{sub_dir}/test_env_{instance_id}.log", "w") as f:
+            sys.stdout = f
+            env.setup(inst)
+
+    sys.stdout = sys.__stdout__
+    for i, inst in enumerate(ds):
+        instance_id = inst["instance_id"]
+        sub_dir = f"{log_dir}/{instance_id}"
+        with open(f"{sub_dir}/test_env_{instance_id}.log", "r") as f:
+            content = f.read()
+        content = re.sub(r"\[.*?m", "", content)
+        with open(f"{sub_dir}/rich_free_{instance_id}.log", "w") as f:
+            f.write(content)
+
     input = "deadbeef\ndeadbeef\ndeadbeef    \n    deadbeef"
     file = "/tmp/test_env.txt"
     env.copy_to_env(input, file)
