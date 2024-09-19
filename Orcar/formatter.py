@@ -57,7 +57,7 @@ class TokenCounter:
 
     def __init__(self, encoding_name: str) -> None:
         self.encoding = None
-        if encoding_name in ['gpt-4o', 'gpt-4']:
+        if encoding_name in ["gpt-4o", "gpt-4"]:
             # OpenAI Model
             self.encoding = tiktoken.encoding_for_model(encoding_name)
         # TBD: Anthropic Model
@@ -327,7 +327,26 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
             ]
         elif handler == "summarize":
             user_msg = EXTRACT_PROMPTS[handler]
+            example = EXTRACT_PROMPTS["example"]
+            example_format_args = {
+                "example_repo_name": EXTRACT_EXAMPLES[handler]["repo_name"],
+                "example_input_description": EXTRACT_EXAMPLES[handler][
+                    "input_description"
+                ],
+                "example_output": "".join(
+                    json.dumps(
+                        EXTRACT_EXAMPLES[handler]["example_output"],
+                        indent=4,
+                    )
+                ),
+            }
+            fmt_example = example.format(**example_format_args)
             format_args = {
+                "output_format": "".join(
+                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
+                ),
+                "output_fields": EXTRACT_FIELDS[handler],
+                "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
             }

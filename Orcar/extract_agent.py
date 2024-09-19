@@ -174,11 +174,6 @@ class ExtractWorker(BaseAgentWorker):
                 *cut_since_last_sensitive(path.parts, sensitive_list)
             )
 
-            # if not (path.is_absolute() or path.parts[0] == "~"):
-            #    # relative path, stay as is
-            #    processed_code_info_list.append(code_info)
-            #    continue
-
             find_output = self.env.run(f"find {repo_root} -name {path.parts[-1]}")
             candidates = find_output.split("\n")
             output_paths = list(
@@ -254,13 +249,6 @@ class ExtractWorker(BaseAgentWorker):
                 "source_code_parse"
             ] = slice_step.source_code_slice
             task.extra_state["parse_type"]["source_code_parse"] = "code"
-
-        # Always parse whole issue as NL
-        next_step_names.append("NL_parse")
-        task.extra_state["slices"]["NL_parse"] = task.extra_state["inst"][
-            "problem_statement"
-        ]
-        task.extra_state["parse_type"]["NL_parse"] = "NL"
 
         next_step_names.append("summarize")
 
@@ -348,7 +336,18 @@ class ExtractWorker(BaseAgentWorker):
             message_content, "summarize"
         )
 
+        logger.info(f"{summarize_step.code_info_list}")
+        summarize_step.code_info_list = self.parse_path_in_code_info(
+            task.extra_state["inst"], summarize_step.code_info_list
+        )
+        logger.info(f"{summarize_step.code_info_list}")
+        for code_info in summarize_step.code_info_list:
+            if code_info.file_path:
+                task.extra_state["suspicous_code_with_path"].add(code_info)
+            else:
+                task.extra_state["suspicous_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
+
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 

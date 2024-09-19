@@ -101,8 +101,6 @@ class LLMCompilerJoinerParser(BaseOutputParser):
             elif answer.startswith("Thought:"):
                 thought = answer.split("Thought:")[1].strip()
         return JoinerOutput(thought=thought, answer=answer, is_replan=is_replan)
-    
-
 
 
 def extract_tool_use(input_text: str) -> Tuple[str, str, str]:
@@ -204,17 +202,16 @@ class ReActOutputParser(BaseOutputParser):
     def format(self, output: str) -> str:
         """Format a query with structured output formatting instructions."""
         raise NotImplementedError
-    
 
 
 def escape_newlines_in_json_strings(json_str):
     # Find all strings in the JSON and replace \n within them
     def replace_newline(match):
         # Replace \n with \\n inside the string
-        return match.group(0).replace('\n', '\\n')
-    
+        return match.group(0).replace("\n", "\\n")
+
     # Regular expression to match strings in the JSON
-    json_str = re.sub(r'\"(.*?)\"', replace_newline, json_str, flags=re.DOTALL)
+    json_str = re.sub(r"\"(.*?)\"", replace_newline, json_str, flags=re.DOTALL)
     return json_str
 
 
@@ -249,17 +246,21 @@ class SearchOutputParser(BaseOutputParser):
             ]
         """
         if "obversation_feedback" in output:
-            action_list : List[SearchActionStep] = []
+            action_list: List[SearchActionStep] = []
             # cast the output to SearchActionStep
             json_str = json.loads(output)
-            observation = json_str['obversation_feedback']
-            for action in json_str['new_search_actions']:
-                action_list.append(SearchActionStep(action=action['action'], action_input=action['action_input']))
+            observation = json_str["obversation_feedback"]
+            for action in json_str["new_search_actions"]:
+                action_list.append(
+                    SearchActionStep(
+                        action=action["action"], action_input=action["action_input"]
+                    )
+                )
             return observation, action_list
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse search action output: {output}")
-        
+
     def parse_bug_report(self, output: str) -> List[Dict[str, str]]:
         """
         "bug_locations": [
@@ -284,34 +285,38 @@ class SearchOutputParser(BaseOutputParser):
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse bug report output: {output}")
-            
 
 
 class ExtractOutputParser(BaseOutputParser):
     """Extractor Agent formatter."""
 
     def parse(self, output: str, method: str) -> BaseReasoningStep:
-        if method == 'slice':
+        if method == "slice":
             json_obj: Dict = json.loads(output)
             return ExtractSliceStep(
-                traceback_warning_log_slice=json_obj['traceback_warning_log_slice'],
-                issue_reproducer_slice=json_obj['issue_reproducer_slice'],
-                source_code_slice=json_obj['source_code_slice'],
+                traceback_warning_log_slice=json_obj["traceback_warning_log_slice"],
+                issue_reproducer_slice=json_obj["issue_reproducer_slice"],
+                source_code_slice=json_obj["source_code_slice"],
             )
-        elif method == 'parse':
+        elif method == "parse":
             json_obj: Dict = json.loads(output)
             code_info_list: List[CodeInfo] = [
-                CodeInfo(keyword=x['keyword'], file_path=x['file_path']) 
-                for x in json_obj['code_info_list']
-                ]
-            return ExtractParseStep(
-                code_info_list=code_info_list
-            )
-        elif method == 'judge':
+                CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
+                for x in json_obj["code_info_list"]
+            ]
+            return ExtractParseStep(code_info_list=code_info_list)
+        elif method == "judge":
             json_obj: Dict = json.loads(output)
             return ExtractJudgeStep(
-                is_successful=json_obj['is_successful'],
+                is_successful=json_obj["is_successful"],
             )
-        elif method == 'summarize':
-            return ExtractSummarizeStep(summary=output)
+        elif method == "summarize":
+            json_obj: Dict = json.loads(output)
+            code_info_list: List[CodeInfo] = [
+                CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
+                for x in json_obj["code_info_list"]
+            ]
+            return ExtractSummarizeStep(
+                summary=json_obj["summary"], code_info_list=code_info_list
+            )
         raise NotImplementedError
