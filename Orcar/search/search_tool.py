@@ -161,7 +161,7 @@ class SearchManager:
     def search_file_skeleton(self, file_name: str) -> str:
         """API to search the file skeleton
             If you want to see the structure of the file, including class and function signatures.
-            Be sure to call search_class_skeleton and search_func to get detailed information.
+            Be sure to call search_class_skeleton and search_func to get detailed information in the file.
 
         Args:
             file_name (str): The file name to search. Usage: search_file_contents("example.py")
@@ -199,7 +199,7 @@ class SearchManager:
 
         Returns:
             str: The skeleton snapshot of the class. Including methods within the class.
-            Please call search_method_in_class to get detailed information of the method.
+            Please call search_method_in_class to get detailed information of the method after skeleton search.
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
         snapshot = self._get_class_skeleton(class_name)

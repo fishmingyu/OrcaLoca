@@ -24,13 +24,14 @@ logger = get_logger("test_search_agent")
 args_dict = {
     "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "princeton-nlp/SWE-bench_Lite",
-    "dataset": "SWE-bench_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
+    # "dataset": "SWE-bench_common",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
     # "filter_instance": "^(django__django-13933)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(mwaskom__seaborn-2848)$",
     # Long Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
