@@ -23,20 +23,21 @@ logger = get_logger("test_search_agent")
 args_dict = {
     "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "princeton-nlp/SWE-bench_Lite",
-    "dataset": "SWE-bench_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
+    # "dataset": "SWE-bench_common",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
     # "filter_instance": "^(django__django-13933)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(mwaskom__seaborn-2848)$",
     # Long Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
     # Multi Issue Test
     # "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
     # Full test
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
     # if django__django-13933 failed, run with 
     # "filter_instance": "^(?!(django__django-13933)$)"
     # if pylint-dev__pylint-7080 failed, 
@@ -90,8 +91,13 @@ def test_search_agent():
             extract_json_obj = json.loads('{}')
         
         try:
-            # concat inst["problem_statement"] with the extracted output
-            search_input = inst["problem_statement"] + "\n" + json.dumps(extract_json_obj)
+            # concat inst["problem_statement"] with the extracted output only token is < 3000 to save token
+            token_len = len(inst["problem_statement"])
+            if token_len > 3000:
+                search_input = json.dumps(extract_json_obj)
+            else:
+                search_input = inst["problem_statement"] + "\n" + json.dumps(extract_json_obj)
+            
             search_agent = SearchAgent(repo_path=env.cache_dir, llm=llm, verbose=False)
             search_agent_chat_response: AgentChatResponse = search_agent.chat(search_input)
             logger.info(search_agent_chat_response.response)
