@@ -269,6 +269,19 @@ EXTRACT_FORMATS = {
 "judge": {
     "is_successful": True
 },
+"summarize": {
+    "summary": "summary_string",
+    "code_info_list": [
+        {
+            'keyword': 'class_or_function_name_1',
+            'file_path': ''
+        },
+        {
+            'keyword': 'class_or_function_name_2',
+            'file_path': 'file_path_2'
+        }
+    ]
+}
 }
 
 EXTRACT_FIELDS = {
@@ -316,6 +329,31 @@ EXTRACT_FIELDS = {
             Note that 'successfully reproduce' means the similar phenomenon is observed;
             It does not necessarily means the snippet finished without error
             (Getting the same error reported in issue means reproduction is successful)
+</field>
+""",
+"summarize": """
+<field>
+    summary: Summary in natural language. Requirements include:
+            1. Describe the issue;
+            2. Suggest the methods/classes/functions/files that following agents should examine;
+            3. Be within 50 words.
+</field>
+<field>
+    code_info_list: list of (keyword, file_path). 
+            All keywords mentioned in natural language (not code snippet or traceback) should be extracted to the list.
+</field>
+<field>
+    keyword: the name of the class or function where the suspicious code lies in.
+            Should be a single word, not spliced with dot.
+</field>
+<field>
+    file_path: The path of the file containing the code. Can be relative or absolute path.
+            Levels of path should only be spliced with slash or backslash, not space.
+            Specially, python import style path should be parsed as:
+            1. dot replaced with slash;
+            2. add .py suffix if no suffix is found.
+            For example, "pvlib.bifacial.pvfactors" should be interpreted as "pvlib/bifacial/pvfactors.py"
+            Set to '' if cannot find path.
 </field>
 """
 }
@@ -370,30 +408,6 @@ s = MySchema()
 }
 },
 "parse":{
-"NL":{
-"repo_name": "marshmallow-code/marshmallow",
-"input_description": """
-3.0: DateTime fields cannot be used as inner field for List or Tuple fields
-`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`.
-The `schema.opts` statement fails as fields don't have an `opts` attribute.
-""",
-"example_output": {
-    "code_info_list": [
-        {
-            'keyword': 'DateTime',
-            'file_path': ''
-        },
-        {
-            'keyword': 'Schema',
-            'file_path': ''
-        },
-        {
-            'keyword': 'opts',
-            'file_path': ''
-        }
-    ]
-}
-},
 "traceback":{
 "repo_name": "marshmallow-code/marshmallow",
 "input_description": """
@@ -446,6 +460,56 @@ s = MySchema()
     ]
 }
 },
+},
+"summarize":{
+"repo_name": "marshmallow-code/marshmallow",
+"input_description": """
+3.0: DateTime fields cannot be used as inner field for List or Tuple fields
+
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
+
+```python
+from marshmallow import fields, Schema
+
+class MySchema(Schema):
+    times = fields.List(fields.DateTime())
+
+s = MySchema()
+```
+
+Traceback:
+```
+Traceback (most recent call last):
+  File "test-mm.py", line 8, in <module>
+    s = MySchema()
+  File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
+    self.fields = self._init_fields()
+AttributeError: 'List' object has no attribute 'opts'
+```
+
+It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
+""",
+"example_output": {
+"summarize": """
+In marshmallow 3.0, using DateTime fields as inner fields in List or Tuple containers triggers an AttributeError.
+The error occurs because List is mistakenly treated as a schema.
+Examine the fields.List, fields.DateTime, and _init_fields methods in schema.py for debugging.
+""",
+"code_info_list": [
+        {
+            'keyword': 'DateTime',
+            'file_path': ''
+        },
+        {
+            'keyword': 'Schema',
+            'file_path': ''
+        },
+        {
+            'keyword': 'opts',
+            'file_path': ''
+        }
+    ]
+}
 }
 }
 
@@ -525,14 +589,22 @@ Below is the real task for you to solve:
 """,
 "summarize": r"""
 Your task is to summarize a human reported github issue in natural language.
-Your output should:
-1. Describe the issue in natural language;
-2. Suggest the methods/files that following agents should examine;
-3. Be within 50 words.
+
+Your output should strictly follow the format below.
+{output_format}
+DO NOT SPEAK ANY REDUNDANT WORDS (like 'json', 'output', etc.)
+
+The meanings of each field are:
+{output_fields}
+
+An example is given below:
+{example}
 
 Below is the issue for you to summarize:
 <repo_name>{repo_name}</repo_name>
+<input_description>
 {input_description}
+</input_description>
 """,
 }
 
