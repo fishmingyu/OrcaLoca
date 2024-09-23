@@ -216,3 +216,21 @@ class ExtractOutput(BaseModel):
     suspicous_code: List[CodeInfo]
     suspicous_code_with_path: List[CodeInfo]
     related_source_code: str
+
+
+class SearchInput(BaseModel):
+    """
+    Search input
+    """
+    problem_statement: str
+    extract_output: ExtractOutput
+
+    def get_content(self) -> str:
+        """Get content."""
+        suspicous_code = ", ".join(f"{code.keyword}" for code in self.extract_output.suspicous_code)
+        summary = self.extract_output.summary
+        return (
+            f"Problem Statement: {self.problem_statement}\n"
+            f"Suspicious Keyword: {suspicous_code}\n"
+            f"Summary: {summary}\n"
+        )

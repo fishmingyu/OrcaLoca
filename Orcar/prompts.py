@@ -184,6 +184,7 @@ Here is some context to help you answer the question and plan:
 
 STEP_EXAMPLE = {
     "obversation_feedback": "observation",
+    "relevance": "True",
     "new_search_actions": [
         {
             "action": "search_func",
@@ -228,9 +229,9 @@ The API calls include:
 
 Everytime you will do the following things:
 
-Provide the observation based on given input. Check whether it contains any method or function you need to further search. 
-Notice that you should put new methods or functions related to your current code snippets. Don't put any method or function we currently haven't searched. 
-You can put multiple methods or functions in the new_search_actions list.
+Provide the observation based on given input. Check whether it contains any class, method or function you need to further search. 
+Notice that you should put new classes, methods or functions related to your current code snippets. Don't put any class, method or function we currently haven't searched. 
+You can put multiple classes, methods or functions in the new_search_actions list.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 
 Conclusion is a final standalone step to provide the final bug locations when nothing else to search.
@@ -240,6 +241,7 @@ Conclusion is a final standalone step to provide the final bug locations when no
     Provide your answer in a clear JSON structure like this, 
     {step_format}
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
+    In relevance, set to True if the given context is relevant to the bug location, otherwise set to False.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
     After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, 
