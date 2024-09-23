@@ -224,11 +224,12 @@ class SearchOutputParser(BaseOutputParser):
         elif method == "bug_report":
             return self.parse_bug_report(output)
 
-    def parse_explore(self, output: str) -> Tuple[str, List[SearchActionStep]]:
+    def parse_explore(self, output: str) -> Tuple[str, bool, List[SearchActionStep]]:
         """Parse output from Search agent.
 
         We expect the output to be the following format:
             "observation": "str",
+            "relevance": "bool",
             "action_lists": [
                 {
                     "action": "search_api1",
@@ -250,13 +251,15 @@ class SearchOutputParser(BaseOutputParser):
             # cast the output to SearchActionStep
             json_str = json.loads(output)
             observation = json_str["obversation_feedback"]
+            # convert the string to boolean
+            relevance = json_str["relevance"] == "True"
             for action in json_str["new_search_actions"]:
                 action_list.append(
                     SearchActionStep(
                         action=action["action"], action_input=action["action_input"]
                     )
                 )
-            return observation, action_list
+            return observation, relevance, action_list
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse search action output: {output}")

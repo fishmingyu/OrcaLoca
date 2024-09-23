@@ -38,7 +38,7 @@ args_dict = {
     # Multi Issue Test
     # "filter_instance": "^(django__django-15814|psf__requests-2317|django__django-13933|sympy__sympy-20154)$",
     # Full test
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
     # if django__django-13933 failed, run with
     # "filter_instance": "^(?!(django__django-13933)$)"
     # if pylint-dev__pylint-7080 failed,

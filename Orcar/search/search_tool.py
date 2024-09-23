@@ -28,6 +28,7 @@ class SearchManager:
             self.search_class_skeleton,
             self.search_method_in_class,
             self.search_file_skeleton,
+            self.search_callable_in_file,
             # self.search_source_code,
         ]
 
@@ -45,6 +46,35 @@ class SearchManager:
         with open(file_path, "r") as f:
             lines = f.readlines()
             return "".join(lines[start-1:end])
+
+    def _get_callable_in_file(self, file_path: str, callable: str) -> str:
+        """Get the callable definition in the file.
+
+        Args:
+            file_path (str): The file path to search.
+            callable (str): The function, class, or method name to search.
+
+        Returns:
+            str: The callable definition.
+        """
+        abs_file_path = os.path.join(self.repo_path, file_path)
+        with open(abs_file_path, "r") as f:
+            file_content = f.read()
+
+        tree = ast.parse(file_content)
+
+        # Traverse the AST to find all function definitions
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                if node.name == callable:
+                    return self.get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
+            elif isinstance(node, ast.ClassDef):
+                if node.name == callable:
+                    return self.get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
+                for subnode in node.body:
+                    if isinstance(subnode, ast.FunctionDef) and subnode.name == callable:
+                        return self.get_code_snippet(abs_file_path, subnode.lineno, subnode.end_lineno)
+        return f"Cannot find the definition of {callable} in {file_path}"
         
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
@@ -266,3 +296,15 @@ class SearchManager:
                 If not found, return the error message.
         """
         return self._search_source_code(file_path, source_code)
+    
+    def search_callable_in_file(self, file_path: str, callable: str) -> str:
+        """API to search the callable in the file.
+
+        Args:
+            file_path (str): The file path to search.
+            callable (str): The function, class, or method name to search.
+
+        Returns:
+            str: The callable definition.
+        """
+        return self._get_callable_in_file(file_path, callable)

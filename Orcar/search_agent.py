@@ -61,18 +61,36 @@ from .environment.utils import get_logger
 from .search import SearchManager
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
-from .types import SearchActionStep, SearchObservationStep
+from .types import SearchActionStep, SearchObservationStep, SearchInput, ExtractOutput
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
 
+def parse_search_input_step(input: SearchInput, task: Task) -> None:
+    extract_output = input.extract_output
+    suspicous_code_with_path = extract_output.suspicous_code_with_path
+    # for every codeinfo in suspicous_code_with_path, parse it into a action step
+
+    if len(suspicous_code_with_path) > 0:
+        for code_info in suspicous_code_with_path:
+            callable = code_info.keyword
+            file_path = code_info.file_path
+            search_step = SearchActionStep(
+                action="search_callable_in_file",
+                action_input={"file_path": file_path, "callable": callable},
+            )
+            task.extra_state["search_queue"].put(search_step)
+            task.extra_state["action_history"].append(search_step)
 
 def add_user_step_to_memory(
     step: TaskStep,
-    memory: BaseMemory,
+    search_input: SearchInput,
+    task: Task,
 ) -> None:
     """Add user step to memory."""
+    memory = task.extra_state["new_memory"]
     if "is_first" in step.step_state and step.step_state["is_first"]:
+        parse_search_input_step(search_input, task)
         # add to new memory
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         step.step_state["is_first"] = False
@@ -87,6 +105,7 @@ class SearchWorker(BaseAgentWorker):
         self,
         tools: Sequence[BaseTool],
         llm: LLM,
+        search_input: SearchInput = None,
         max_iterations: int = 10,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
@@ -95,6 +114,7 @@ class SearchWorker(BaseAgentWorker):
         tool_retriever: Optional[ObjectRetriever[BaseTool]] = None,
     ) -> None:
         self._llm = llm
+        self._search_input = search_input
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._search_formatter = search_formatter or SearchChatFormatter()
@@ -118,6 +138,7 @@ class SearchWorker(BaseAgentWorker):
         tools: Optional[Sequence[BaseTool]] = None,
         tool_retriever: Optional[ObjectRetriever[BaseTool]] = None,
         llm: Optional[LLM] = None,
+        search_input: Optional[SearchInput] = None,
         max_iterations: int = 10,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
@@ -142,6 +163,7 @@ class SearchWorker(BaseAgentWorker):
             tools=tools or [],
             tool_retriever=tool_retriever,
             llm=llm,
+            search_input=search_input,
             max_iterations=max_iterations,
             search_formatter=search_formatter,
             output_parser=output_parser,
@@ -197,17 +219,17 @@ class SearchWorker(BaseAgentWorker):
 
     def _extract_exploring_step(
         self, output: ChatResponse
-    ) -> Tuple[str, List[BaseReasoningStep]]:
+    ) -> Tuple[str, bool, List[BaseReasoningStep]]:
         """Extract search step."""
         # parse the output
         if output.message.content is None:
             raise ValueError("Got empty message.")
         message_content = output.message.content
         try:
-            obseravtion, explore_step = self._output_parser.parse_explore(message_content)
+            obseravtion, relevance, explore_step = self._output_parser.parse_explore(message_content)
         except BaseException as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
-        return obseravtion, explore_step
+        return obseravtion, relevance, explore_step
 
     def _process_search(
         self,
@@ -322,8 +344,9 @@ class SearchWorker(BaseAgentWorker):
         # TODO: see if we want to do step-based inputs
         if step.input is not None:
             add_user_step_to_memory(
-                step,
-                task.extra_state["new_memory"],
+                step=step,
+                search_input=self._search_input,
+                task=task,
             )
         tools = self.get_tools(task.input)
         # add task input to chat history
@@ -353,7 +376,7 @@ class SearchWorker(BaseAgentWorker):
                 is_done=True,
             )
         
-        observation, search_steps = self._extract_exploring_step(chat_response)
+        observation, relevance, search_steps = self._extract_exploring_step(chat_response)
         # push back search steps to the queue
         for search_step in search_steps:
             # if search_step in history, skip
@@ -389,9 +412,9 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["current_search"], task.extra_state["sources"]
         )
         
-        # is_complete = task.extra_state["search_queue"].empty()
-        # add observation feedback to new memory
-        task.extra_state["new_memory"].put(ChatMessage(content=observation, role=MessageRole.ASSISTANT))
+        # add observation feedback to new memory if relevance is True
+        if relevance:
+            task.extra_state["new_memory"].put(ChatMessage(content=observation, role=MessageRole.ASSISTANT))
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
@@ -467,6 +490,7 @@ class SearchAgent(AgentRunner):
     def __init__(
         self,
         llm: LLM,
+        search_input: SearchInput = None,
         repo_path: str = "",
         tools: Optional[List[BaseTool]] = None,
         memory: Optional[BaseMemory] = None,
@@ -485,6 +509,7 @@ class SearchAgent(AgentRunner):
         step_engine = SearchWorker.from_tools(
             tools=self._tools,
             llm=llm,
+            search_input=search_input,
             max_iterations=max_iterations,
             search_formatter=search_formatter,
             output_parser=output_parser,
