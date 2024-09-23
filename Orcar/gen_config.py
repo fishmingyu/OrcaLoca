@@ -1,6 +1,9 @@
 import os
 
 import config
+from llama_index.core.llms.llm import LLM
+from llama_index.llms.anthropic import Anthropic
+from llama_index.llms.openai import OpenAI
 
 
 class Config:
@@ -23,3 +26,20 @@ class Config:
         raise KeyError(
             f"Cannot find {index} in either cfg file '{self.file_path}' or env variables"
         )
+
+
+def get_llm(**kwargs) -> LLM:
+    err_msgs = []
+    for LLM_func in [OpenAI, Anthropic]:
+        try:
+            llm: LLM = LLM_func(**kwargs)
+            _ = llm.complete("Say 'Hi'")
+            break
+        except Exception as e:
+            err_msgs.append(str(e))
+    else:
+        raise Exception(
+            f"gen_config: Failed to get LLM. Error msgs include:\n"
+            + "\n".join(err_msgs)
+        )
+    return llm

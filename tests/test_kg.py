@@ -1,7 +1,6 @@
 from Orcar.search import RepoGraph, SearchManager
-from llama_index.llms.openai import OpenAI
 import argparse
-from Orcar.key_config import Config
+from Orcar.gen_config import Config, get_llm
 from Orcar.environment.utils import (
     get_container,
     get_logger,
@@ -73,8 +72,8 @@ def test_env_build_graph():
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
-    llm = OpenAI(
-        model=args.model, api_key=cfg["OPENAI_API_KEY"], api_base=cfg["OPENAI_API_BASE_URL"]
+    llm = get_llm(
+        model=args.model, api_key=cfg["OPENAI_API_KEY"]
     )
     ctr_name = args.container_name
     docker_ctr_subprocess = get_container(

@@ -5,7 +5,6 @@ import re
 import sys
 
 from llama_index.core.chat_engine.types import AgentChatResponse
-from llama_index.llms.openai import OpenAI
 
 from Orcar import ExtractAgent, SearchAgent
 from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
@@ -15,14 +14,15 @@ from Orcar.environment.utils import (
     get_logger,
     pause_persistent_container,
 )
-from Orcar.key_config import Config
+from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.types import ExtractOutput
 
 logger = get_logger("test_search_agent")
 
 args_dict = {
-    "model": "gpt-4o",
+    "model": "claude-3-5-sonnet-20240620",
+    # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
     "dataset": "princeton-nlp/SWE-bench_Lite",
     # "dataset": "SWE-bench_common",
@@ -32,6 +32,7 @@ args_dict = {
     # Short Issue Test
     # "filter_instance": "^(django__django-13933)$",
     "filter_instance": "^(astropy__astropy-6938)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(mwaskom__seaborn-2848)$",
     # Long Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
@@ -46,9 +47,7 @@ args_dict = {
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
-llm = OpenAI(
-    model=args.model, api_key=cfg["OPENAI_API_KEY"], api_base=cfg["OPENAI_API_BASE_URL"]
-)
+llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"], max_tokens=4096)
 
 
 def init_container():

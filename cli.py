@@ -2,7 +2,6 @@ import argparse
 import json
 
 from llama_index.core.chat_engine.types import AgentChatResponse
-from llama_index.llms.openai import OpenAI
 from termcolor import colored
 
 from Orcar import ExtractAgent, OrcarAgent
@@ -14,7 +13,7 @@ from Orcar.environment.utils import (
     get_logger,
     pause_persistent_container,
 )
-from Orcar.key_config import Config
+from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.types import ExtractOutput
 
@@ -180,10 +179,9 @@ def main():
         )
 
         ds = load_filter_hf_dataset(args)
-        llm = OpenAI(
+        llm = get_llm(
             model=args.model,
             api_key=cfg["OPENAI_API_KEY"],
-            api_base=cfg["OPENAI_API_BASE_URL"],
         )
         benchmark_env = BenchmarkEnv(args, ctr_bash)
         extractor = ExtractAgent(llm=llm, env=benchmark_env)

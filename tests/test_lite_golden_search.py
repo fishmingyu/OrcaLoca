@@ -1,9 +1,8 @@
 from Orcar import SearchAgent
 import pandas as pd
 import csv
-from llama_index.llms.openai import OpenAI
 import argparse
-from Orcar.key_config import Config
+from Orcar.gen_config import Config, get_llm
 from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.environment.utils import (
@@ -32,8 +31,8 @@ def test_search_agent(instance: str) -> str:
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
-    llm = OpenAI(
-        model=args.model, api_key=cfg["OPENAI_API_KEY"], api_base=cfg["OPENAI_API_BASE_URL"]
+    llm = get_llm(
+        model=args.model, api_key=cfg["OPENAI_API_KEY"]
     )
     ctr_name = args.container_name
     docker_ctr_subprocess = get_container(
@@ -43,7 +42,7 @@ def test_search_agent(instance: str) -> str:
 
     ds = load_filter_hf_dataset(args)
     env = BenchmarkEnv(args, ctr_bash)
-    llm = OpenAI(model="gpt-4o")
+    llm = get_llm(model="gpt-4o")
     inst = ds[0] # only one instance
     env.setup(inst)
     extract_agent = ExtractAgent(llm=llm, env=env, verbose=True)
