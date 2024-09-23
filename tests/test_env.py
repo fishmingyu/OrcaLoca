@@ -3,9 +3,6 @@ import os
 import re
 import sys
 
-from llama_index.core.chat_engine.types import AgentChatResponse
-from llama_index.llms.openai import OpenAI
-
 from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.environment.utils import (
     ContainerBash,
@@ -13,13 +10,14 @@ from Orcar.environment.utils import (
     get_logger,
     pause_persistent_container,
 )
-from Orcar.key_config import Config
+from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 
 logger = get_logger("test_env")
 
 args_dict = {
-    "model": "gpt-4o",
+    "model": "claude-3-5-sonnet-20240620",
+    # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
     "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
@@ -34,9 +32,7 @@ args_dict = {
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
-llm = OpenAI(
-    model=args.model, api_key=cfg["OPENAI_API_KEY"], api_base=cfg["OPENAI_API_BASE_URL"]
-)
+llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"], max_tokens=4096)
 ctr_name = args.container_name
 docker_ctr_subprocess = get_container(
     ctr_name=ctr_name, image_name=args.image, persistent=args.persistent

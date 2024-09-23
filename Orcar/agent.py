@@ -16,7 +16,7 @@ class OrcarAgent:
     def __init__(self, args, cfg, enable_jit: bool = True, ctr_bash: Union[ContainerBash, None] = None):
         super().__init__()
         self.ctr_bash = ctr_bash
-        self.llm = OpenAI(model=args.model, api_key=cfg['OPENAI_API_KEY'], api_base=cfg['OPENAI_API_BASE_URL'])
+        self.llm = OpenAI(model=args.model, api_key=cfg['OPENAI_API_KEY'])
         self.instructor = self.create_instructor(self.llm, enable_jit)
         
 

@@ -71,7 +71,7 @@ class ExtractWorker(BaseAgentWorker):
         self._chat_formatter = ExtractChatFormatter()
         self._output_parser = ExtractOutputParser()
         self._verbose = verbose
-        self._token_counter = TokenCounter(llm.metadata.model_name)
+        self._token_counter = TokenCounter(llm)
 
     def chat_with_count(
         self, messages: List[ChatMessage], tag: str, task: Task
@@ -443,10 +443,14 @@ class ExtractWorker(BaseAgentWorker):
                 if code_loc.keyword not in suspicous_keywords_with_path
             ]
         )
+        related_source_code = ""
+        if "source_code_parse" in task.extra_state["slices"]:
+            related_source_code = task.extra_state["slices"]["source_code_parse"]
         return ExtractOutput(
             summary=task.extra_state["summary"],
             suspicous_code=list(suspicous_code),
             suspicous_code_with_path=list(suspicous_code_with_path),
+            related_source_code=related_source_code,
         )
 
     def _run_step(self, step: TaskStep, task: Task) -> TaskStepOutput:

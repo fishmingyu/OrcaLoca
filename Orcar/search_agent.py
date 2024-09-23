@@ -99,7 +99,7 @@ class SearchWorker(BaseAgentWorker):
         self._max_iterations = max_iterations
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
-        self._token_counter = TokenCounter(llm.metadata.model_name)
+        self._token_counter = TokenCounter(llm)
         self._verbose = verbose
 
         if len(tools) > 0 and tool_retriever is not None:
@@ -335,7 +335,10 @@ class SearchWorker(BaseAgentWorker):
 
         # send prompt
         in_token_cnt = self._token_counter.count(self._llm.messages_to_prompt(input_chat))
-        chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
+        if isinstance(self._llm, OpenAI):
+            chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
+        else:
+            chat_response = self._llm.chat(input_chat)
         out_token_cnt = self._token_counter.count(chat_response.message.content)
         token_cnt = TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt)
         logger.info(token_cnt)

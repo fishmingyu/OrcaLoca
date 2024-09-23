@@ -10,13 +10,13 @@ from llama_index.core.agent.react.prompts import (
     CONTEXT_REACT_CHAT_SYSTEM_HEADER,
     REACT_CHAT_SYSTEM_HEADER,
 )
-
 from llama_index.core.agent.types import Task, TaskStep
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
-
 from llama_index.core.bridge.pydantic import BaseModel
 from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import BaseTool
+from llama_index.llms.anthropic import Anthropic
+from llama_index.llms.openai import OpenAI
 
 from .prompts import (
     EXTRACT_EXAMPLES,
@@ -28,8 +28,9 @@ from .prompts import (
     STEP_EXAMPLE,
 )
 from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
+from .environment.utils import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_react_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
@@ -55,12 +56,15 @@ class TokenCount(BaseModel, frozen=True):
 class TokenCounter:
     """Token counter based on tiktoken"""
 
-    def __init__(self, encoding_name: str) -> None:
-        self.encoding = None
-        if encoding_name in ["gpt-4o", "gpt-4"]:
-            # OpenAI Model
-            self.encoding = tiktoken.encoding_for_model(encoding_name)
-        # TBD: Anthropic Model
+    def __init__(self, llm: LLM) -> None:
+        model = llm.metadata.model_name
+        if isinstance(llm, OpenAI):
+            self.encoding = tiktoken.encoding_for_model(model)
+        elif isinstance(llm, Anthropic):
+            self.encoding = llm.tokenizer
+        else:
+            raise Exception(f"gen_config: No tokenizer for model {model}")
+        logger.info(f"Found tokenizer for model '{model}'")
 
     def count(self, string: str) -> int:
         if self.encoding == None:
@@ -77,6 +81,23 @@ class TokenCounter:
             response,
             TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt),
         )
+
+
+def replace_unicode_quotations(input: str) -> str:
+    '''
+    Claude 3.5 Sonnet sometimes fail to disguish curly quote mark with normal one,
+    which can result in json schema fail;
+    So we replace all curly quote marks in input.
+    '''
+    unicode_quotations = {
+        "“": "\\u201C",
+        "”": "\\u201D",
+        "‘": "\\u2018",
+        "’": "\\u2019",
+    }
+    for key, value in unicode_quotations.items():
+        input = input.replace(key, value)
+    return input
 
 
 # TODO: come up with better name
@@ -225,6 +246,13 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
             *chat_history,
             *searching_history,
+            ChatMessage(
+                role=MessageRole.USER,
+                content=(
+                    "Please generate next step STRICTLY following given format, "
+                    "DO NOT SPEAK any REDUNDANT words (like 'json', 'output', etc.)) or thoughts"
+                ),
+            ),
         ]
 
     @classmethod
@@ -269,7 +297,9 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "output_fields": EXTRACT_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
-                "input_description": task.extra_state["inst"]["problem_statement"],
+                "input_description": replace_unicode_quotations(
+                    task.extra_state["inst"]["problem_statement"]
+                ),
             }
             fmt_user_msg = user_msg.format(**format_args)
             return [
