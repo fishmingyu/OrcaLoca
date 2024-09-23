@@ -16,7 +16,7 @@ from Orcar.environment.utils import (
 )
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
-from Orcar.types import ExtractOutput
+from Orcar.types import ExtractOutput, SearchInput
 
 logger = get_logger("test_search_agent")
 
@@ -31,7 +31,7 @@ args_dict = {
     "split": "test",
     # Short Issue Test
     # "filter_instance": "^(django__django-13933)$",
-    "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(mwaskom__seaborn-2848)$",
     # Long Issue Test
@@ -47,7 +47,7 @@ args_dict = {
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
-llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"], max_tokens=4096)
+llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
 
 
 def init_container():
@@ -102,14 +102,12 @@ def test_search_agent():
 
             try:
                 # concat inst["problem_statement"] with the extracted output
-                search_input = (
-                    inst["problem_statement"] + "\n" + json.dumps(extract_json_obj)
-                )
+                input : SearchInput = SearchInput(problem_statement=inst["problem_statement"], extract_output=extract_output)
                 search_agent = SearchAgent(
                     repo_path=env.cache_dir, llm=llm, verbose=False
                 )
                 search_agent_chat_response: AgentChatResponse = search_agent.chat(
-                    search_input
+                    input.get_content()
                 )
                 logger.info(search_agent_chat_response.response)
                 search_output = json.loads(search_agent_chat_response.response)

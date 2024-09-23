@@ -219,7 +219,7 @@ class SearchWorker(BaseAgentWorker):
 
     def _extract_exploring_step(
         self, output: ChatResponse
-    ) -> Tuple[str, bool, List[BaseReasoningStep]]:
+    ) -> Tuple[str, bool, List[SearchActionStep]]:
         """Extract search step."""
         # parse the output
         if output.message.content is None:
@@ -288,6 +288,30 @@ class SearchWorker(BaseAgentWorker):
         for search_result in search_results:
             search_results_str += search_result.get_content() + "\n"
         return search_results_str
+
+    def _check_action_valid(self, 
+                            action : SearchActionStep,
+                            action_history: List[SearchActionStep]) -> bool:
+        """Check if the action is valid."""
+        # first check if the action is in the history
+        if action in action_history:
+            return False
+        # if we search_callable_in_file is in the history, we don't need to call search_callable or search_class or search_func
+        search_query = ""
+        if action.action == "search_callable":
+            search_query = action.action_input["callable"]
+        if action.action == "search_class":
+            search_query = action.action_input["class_name"]
+        if action.action == "search_func":
+            search_query = action.action_input["func_name"]
+        if action.action == "search_class_skeleton":
+            search_query = action.action_input["class_name"]
+        for history_action in action_history:
+            if history_action.action == "search_callable_in_file":
+                if search_query == history_action.action_input["callable"]:
+                    return False
+
+        return True
     
     def _get_response(
         self,
@@ -383,7 +407,7 @@ class SearchWorker(BaseAgentWorker):
         # push back search steps to the queue
         for search_step in search_steps:
             # if search_step in history, skip
-            if search_step in task.extra_state["action_history"]:
+            if not self._check_action_valid(search_step, task.extra_state["action_history"]):
                 continue
             task.extra_state["search_queue"].put(search_step)
             task.extra_state["action_history"].append(search_step)
@@ -421,6 +445,8 @@ class SearchWorker(BaseAgentWorker):
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
+        logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
+        logger.info(f"Searched: {search_result.get_content()}")
         # task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
         return self._get_task_step_response(agent_response, step, "explore", task.extra_state["next_step_input"], False)
