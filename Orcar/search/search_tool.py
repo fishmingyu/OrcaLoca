@@ -57,7 +57,8 @@ class SearchManager:
         Returns:
             str: The callable definition.
         """
-        abs_file_path = os.path.join(self.repo_path, file_path)
+        # print(f"self.repo_path: {self.repo_path}")
+        abs_file_path = self.repo_path + file_path
         with open(abs_file_path, "r") as f:
             file_content = f.read()
 
@@ -70,7 +71,7 @@ class SearchManager:
                     return self.get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
             elif isinstance(node, ast.ClassDef):
                 if node.name == callable:
-                    return self.get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
+                    return self.search_class_skeleton(callable) # return the class skeleton if it's a class
                 for subnode in node.body:
                     if isinstance(subnode, ast.FunctionDef) and subnode.name == callable:
                         return self.get_code_snippet(abs_file_path, subnode.lineno, subnode.end_lineno)
@@ -88,7 +89,7 @@ class SearchManager:
             str: The related function/class code snippet. 
                 If not found, return the error message.
         """
-        abs_file_path = os.path.join(self.repo_path, file_path)
+        abs_file_path = self.repo_path + file_path
         with open(abs_file_path, "r") as f:
             file_content = f.read()
 

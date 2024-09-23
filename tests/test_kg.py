@@ -121,6 +121,14 @@ def test_fitsrec_source_code():
     line_num = search_manager.search_source_code("astropy/io/fits/fitsrec.py", source_code)
     print(line_num)
 
+def test_search_callable_in_file():
+    repo_path = "~/.orcar"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    callable_name = "CompoundModel"
+    code_snippet = search_manager.search_callable_in_file("/astropy__astropy/astropy/modeling/core.py", callable_name)
+    print(code_snippet)
+
 
 if __name__ == "__main__":
     # Example usage
@@ -129,4 +137,5 @@ if __name__ == "__main__":
     # test_local_build_graph()
     # test_env_build_graph()
     # test_fitsrec()  
-    test_fitsrec_source_code()
+    # test_fitsrec_source_code()
+    test_search_callable_in_file()

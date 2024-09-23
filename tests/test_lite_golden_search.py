@@ -21,7 +21,7 @@ def load_csv_dataset(file_path):
 
 def test_search_agent(instance: str) -> str:
     args_dict = {
-        "model": "gpt-4o",
+        "model": "claude-3-5-sonnet-20240620",
         "image": "sweagent/swe-agent:latest",
         "dataset": "princeton-nlp/SWE-bench_Lite",
         "persistent": True,
@@ -32,7 +32,7 @@ def test_search_agent(instance: str) -> str:
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
     llm = get_llm(
-        model=args.model, api_key=cfg["OPENAI_API_KEY"]
+        model=args.model, api_key=cfg["ANTHROPIC_API_KEY"]
     )
     ctr_name = args.container_name
     docker_ctr_subprocess = get_container(
@@ -42,7 +42,6 @@ def test_search_agent(instance: str) -> str:
 
     ds = load_filter_hf_dataset(args)
     env = BenchmarkEnv(args, ctr_bash)
-    llm = get_llm(model="gpt-4o")
     inst = ds[0] # only one instance
     env.setup(inst)
     extract_agent = ExtractAgent(llm=llm, env=env, verbose=True)
