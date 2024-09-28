@@ -212,10 +212,10 @@ class ExtractOutput(BaseModel):
     """
     Extract agent output
     """
-    summary: str
-    suspicous_code: List[CodeInfo]
-    suspicous_code_with_path: List[CodeInfo]
-    related_source_code: str
+    summary: str = ''
+    suspicous_code: List[CodeInfo] = []
+    suspicous_code_with_path: List[CodeInfo] = []
+    related_source_code: str = ''
 
 
 class SearchInput(BaseModel):
