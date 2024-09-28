@@ -152,12 +152,15 @@ class ExtractWorker(BaseAgentWorker):
             return path_ret
 
         processed_code_info_list: List[CodeInfo] = []
-        sensitive_list = ["tests"]
-        repo_folder = inst["repo"].split("/")[-1]
+        # Senstive mechanism:
+        # Only care about paths contains certain words
+        sensitive_list = ["tests"] # "tests" should be included
+        repo_folder = inst["repo"].split("/")[-1] # for astropy/astropy, "astropy" should be included
         repo_root = "/" + get_repo_dir(inst["repo"])
         if inst["repo"] == "scikit-learn/scikit-learn":
-            repo_folder = "sklearn"
+            repo_folder = "sklearn" # scikit-learn use "sklearn" as import name / main folder name
         sensitive_list += [repo_folder]
+        self.env.run(f'cd {repo_root}')
 
         for code_info in related_code_snippets:
             if code_info.file_path == "":
@@ -174,11 +177,12 @@ class ExtractWorker(BaseAgentWorker):
                 *cut_since_last_sensitive(path.parts, sensitive_list)
             )
 
-            find_output = self.env.run(f"find {repo_root} -name {path.parts[-1]}")
+            find_output = self.env.run(f"find * -name {path.parts[-1]}")
             candidates = find_output.split("\n")
             output_paths = list(
                 filter(lambda x: x.endswith(str(relative_path_suffix)), candidates)
             )
+            # It's supposed that keyword at least must show up once in possible file
             output_paths_with_existence = []
             for x in output_paths:
                 existence = self.env.run(f"grep -cE '{code_info.keyword}' {x}")
@@ -197,6 +201,7 @@ class ExtractWorker(BaseAgentWorker):
                     )
                     processed_code_info_list.append(processed_code_info)
 
+        self.env.run(f'cd -')
         return processed_code_info_list
 
     def reproduce_issue(self, issue_reproducer: str, inst: Dict[str, Any]) -> str:
