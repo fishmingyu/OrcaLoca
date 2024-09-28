@@ -520,7 +520,8 @@ class SearchAgent(AgentRunner):
         self,
         llm: LLM,
         search_input: SearchInput = None,
-        repo_path: str = "",
+        base_path: str = "",
+        repo_name: str = "",
         tools: Optional[List[BaseTool]] = None,
         memory: Optional[BaseMemory] = None,
         max_iterations: int = 20,
@@ -532,7 +533,7 @@ class SearchAgent(AgentRunner):
         """Init params."""
         callback_manager = callback_manager or llm.callback_manager
 
-        self._search_manager = SearchManager(repo_path=repo_path)
+        self._search_manager = SearchManager(base_path=base_path, repo_name=repo_name)
         self._tools = self._setup_tools()
 
         step_engine = SearchWorker.from_tools(
