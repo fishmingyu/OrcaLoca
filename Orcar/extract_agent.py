@@ -276,16 +276,16 @@ class ExtractWorker(BaseAgentWorker):
             message_content, "parse"
         )
 
-        logger.info(f"{parse_step}")
+        logger.info(f"Before parse path: {parse_step}")
         parse_step.code_info_list = self.parse_path_in_code_info(
             task.extra_state["inst"], parse_step.code_info_list
         )
-        logger.info(f"{parse_step}")
+        logger.info(f"After parse path: {parse_step}")
         for code_info in parse_step.code_info_list:
-            if code_info.file_path:
+            if code_info.file_path and step_name == "traceback_parse":
                 task.extra_state["suspicous_code_with_path"].add(code_info)
             else:
-                task.extra_state["suspicous_code"].add(code_info)
+                task.extra_state["suspicous_code"].add(CodeInfo(keyword=code_info.keyword, file_path=''))
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -347,10 +347,7 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
-            if code_info.file_path:
-                task.extra_state["suspicous_code_with_path"].add(code_info)
-            else:
-                task.extra_state["suspicous_code"].add(code_info)
+            task.extra_state["suspicous_code"].add(CodeInfo(keyword=code_info.keyword, file_path=''))
         task.extra_state["summary"] = summarize_step.summary
 
         next_step_names = []
@@ -453,7 +450,7 @@ class ExtractWorker(BaseAgentWorker):
             related_source_code = task.extra_state["slices"]["source_code_parse"]
         return ExtractOutput(
             summary=task.extra_state["summary"],
-            suspicous_code=list(suspicous_code),
+            suspicous_code=[code_loc.keyword for code_loc in suspicous_code],
             suspicous_code_with_path=list(suspicous_code_with_path),
             related_source_code=related_source_code,
         )
