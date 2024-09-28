@@ -9,9 +9,11 @@ import re
 
 class SearchManager:
     
-    def __init__(self, repo_path: str):
+    def __init__(self, base_path: str, repo_name: str) -> None:
         self.history = []
-        self.repo_path = repo_path
+        self.base_path = base_path
+        self.repo_name = repo_name
+        self.repo_path = os.path.join(base_path, repo_name)
         self._setup_graph()
 
     def _setup_graph(self):
@@ -32,7 +34,7 @@ class SearchManager:
             # self.search_source_code,
         ]
 
-    def get_code_snippet(self, file_path: str, start: int, end: int) -> str:
+    def _get_code_snippet(self, file_path: str, start: int, end: int) -> str:
         """Get the code snippet in the range in the file, without line numbers.
 
         Args:
@@ -58,7 +60,7 @@ class SearchManager:
             str: The callable definition.
         """
         # print(f"self.repo_path: {self.repo_path}")
-        abs_file_path = self.repo_path + file_path
+        abs_file_path = self.base_path + file_path
         with open(abs_file_path, "r") as f:
             file_content = f.read()
 
@@ -68,13 +70,13 @@ class SearchManager:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 if node.name == callable:
-                    return self.get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
+                    return self._get_code_snippet(abs_file_path, node.lineno, node.end_lineno)
             elif isinstance(node, ast.ClassDef):
                 if node.name == callable:
                     return self.search_class_skeleton(callable) # return the class skeleton if it's a class
                 for subnode in node.body:
                     if isinstance(subnode, ast.FunctionDef) and subnode.name == callable:
-                        return self.get_code_snippet(abs_file_path, subnode.lineno, subnode.end_lineno)
+                        return self._get_code_snippet(abs_file_path, subnode.lineno, subnode.end_lineno)
         return f"Cannot find the definition of {callable} in {file_path}"
         
     def _search_source_code(self, file_path: str, source_code: str) -> str:
@@ -110,7 +112,7 @@ class SearchManager:
                 start_line = node.lineno
                 end_line = node.end_lineno
                 # check if the source_code is in the function body
-                func_body = self.get_code_snippet(abs_file_path, start_line, end_line)
+                func_body = self._get_code_snippet(abs_file_path, start_line, end_line)
                 normalized_func_body = normalize_code(func_body)
                 if source_code in normalized_func_body:
                     return func_body
@@ -220,7 +222,7 @@ class SearchManager:
             return ("", f"Cannot find the definition of callable:{callable}")
         # loc.file_path is relative to the repo_path
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
     
     def search_class_skeleton(self, class_name: str) -> str:
         """API to search the class skeleton in given repo.
@@ -252,7 +254,7 @@ class SearchManager:
         if loc is None:
             return ("", f"Cannot find the definition of function:{func_name}")
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
     
     def search_class(self, class_name: str) -> Tuple[str, str]:
         """API to search the class in given repo.
@@ -267,7 +269,7 @@ class SearchManager:
         if loc is None:
             return ("", f"Cannot find the definition of class:{class_name}")
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
     
     def search_method_in_class(self, class_name: str, method_name: str) -> Tuple[str, str]:
         """API to search the method in the class in given repo.
@@ -283,7 +285,7 @@ class SearchManager:
         if loc is None:
             return ("", f"Cannot find the definition of method:{method_name} in class:{class_name}")
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self.get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
         """API to search the source code in the file. If you want to search the code snippet in the file.
