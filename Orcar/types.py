@@ -213,7 +213,7 @@ class ExtractOutput(BaseModel):
     Extract agent output
     """
     summary: str = ''
-    suspicous_code: List[CodeInfo] = []
+    suspicous_code: List[str] = []
     suspicous_code_with_path: List[CodeInfo] = []
     related_source_code: str = ''
 
