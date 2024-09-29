@@ -13,10 +13,11 @@ args_dict = {
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(django__django-14999)$",
+    # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
-    # "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-12907)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$"
 }
@@ -29,9 +30,9 @@ def test_agent():
     ds = load_filter_hf_dataset(args)
 
     # final_stage = "extract"
-    final_stage = 'search'
+    final_stage = "search"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    #agent.set_redirect_log_output(True)
+    # agent.set_redirect_log_output(True)
     for i, inst in enumerate(ds):
         print(f"({i:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))

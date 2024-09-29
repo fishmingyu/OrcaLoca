@@ -98,9 +98,8 @@ class ExtractWorker(BaseAgentWorker):
             "slices": dict(),
             "parse_type": dict(),
             "suspicous_code": set(),
-            "suspicous_code_with_path": list(),
-            "suspicous_code_with_path_min_size_soft": 3,
-            "suspicous_code_with_path_max_size_soft": 10,
+            "suspicous_code_from_tracer": list(),
+            "suspicous_code_from_tracer_max_size": 10,
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
@@ -277,28 +276,14 @@ class ExtractWorker(BaseAgentWorker):
         parse_step: ExtractParseStep = self._output_parser.parse(
             message_content, "parse"
         )
-        if step_name != "traceback_parse":
-            logger.info(f"{parse_step}")
-            for code_info in parse_step.code_info_list:
-                task.extra_state["suspicous_code"].add(
-                    CodeInfo(keyword=code_info.keyword, file_path="")
-                )
-        else:
-            logger.info(f"Before parse path: {parse_step}")
-            parse_step.code_info_list = self.parse_path_in_code_info(
-                task.extra_state["inst"], parse_step.code_info_list
-            )
-            logger.info(f"After parse path: {parse_step}")
-            for code_info in parse_step.code_info_list[::-1]:
-                # Reverse: Last appeared in stack (first called function) has high priority
-                if code_info.file_path and (
-                    code_info not in task.extra_state["suspicous_code_with_path"]
-                ):
-                    task.extra_state["suspicous_code_with_path"].append(code_info)
-                else:
-                    task.extra_state["suspicous_code"].add(
-                        CodeInfo(keyword=code_info.keyword, file_path="")
-                    )
+
+        logger.info(f"Before parse path: {parse_step}")
+        parse_step.code_info_list = self.parse_path_in_code_info(
+            task.extra_state["inst"], parse_step.code_info_list
+        )
+        logger.info(f"After parse path: {parse_step}")
+        for code_info in parse_step.code_info_list:
+            task.extra_state["suspicous_code"].add(code_info)
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -360,9 +345,7 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
-            task.extra_state["suspicous_code"].add(
-                CodeInfo(keyword=code_info.keyword, file_path="")
-            )
+            task.extra_state["suspicous_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
 
         next_step_names = []
@@ -389,28 +372,27 @@ class ExtractWorker(BaseAgentWorker):
 
         # parse the result
         sensitivity_list = [
-            code_info.keyword
-            for code_info in task.extra_state["suspicous_code_with_path"]
-        ] + [code_info.keyword for code_info in task.extra_state["suspicous_code"]]
+            code_info.keyword for code_info in task.extra_state["suspicous_code"]
+        ]
         logger.info(f"sensitivity_list: {sensitivity_list}")
         function_list = read_tracer_output(
             output_path=output_host_path, sensitivity_list=sensitivity_list
         )
+        logger.info(f"function_list: {function_list}")
+
+        max_size = task.extra_state["suspicous_code_from_tracer_max_size"]
+        if len(function_list) > max_size:
+            function_list = function_list[0 : 2 * max_size]
+
         function_list = self.parse_path_in_code_info(
             task.extra_state["inst"], function_list
         )
-        logger.info(f"function_list: {function_list}")
+        function_list = [x for x in function_list if x.file_path]
+        if len(function_list) > max_size:
+            function_list = function_list[0:max_size]
+        logger.info(f"After limit size & parse: {function_list}")
 
-        max_size_soft = task.extra_state["suspicous_code_with_path_max_size_soft"]
-        min_size_soft = task.extra_state["suspicous_code_with_path_min_size_soft"]
-        initial_length = len(task.extra_state["suspicous_code_with_path"])
-        max_size = max(min_size_soft + initial_length, max_size_soft)
-        for function_item in function_list:
-            if not function_item.file_path:
-                # Unexpected, drop
-                continue
-            if len(task.extra_state["suspicous_code_with_path"]) < max_size:
-                task.extra_state["suspicous_code_with_path"].append(function_item)
+        task.extra_state["suspicous_code_from_tracer"] = function_list
 
         next_step_names = []
         os.remove(output_host_path)
@@ -446,18 +428,18 @@ class ExtractWorker(BaseAgentWorker):
             )
 
     def gen_output(self, task: Task) -> ExtractOutput:
-        suspicous_code_with_path: List[CodeInfo] = task.extra_state[
-            "suspicous_code_with_path"
+        suspicous_code_from_tracer: List[CodeInfo] = task.extra_state[
+            "suspicous_code_from_tracer"
         ]
-        suspicous_keywords_with_path = set(
-            [code_loc.keyword for code_loc in suspicous_code_with_path]
+        suspicous_keywords_from_tracer = set(
+            [code_loc.keyword for code_loc in suspicous_code_from_tracer]
         )
         suspicous_code: Set[CodeInfo] = task.extra_state["suspicous_code"]
         suspicous_code = set(
             [
                 code_loc
                 for code_loc in suspicous_code
-                if code_loc.keyword not in suspicous_keywords_with_path
+                if code_loc.keyword not in suspicous_keywords_from_tracer
             ]
         )
         related_source_code = ""
@@ -465,8 +447,8 @@ class ExtractWorker(BaseAgentWorker):
             related_source_code = task.extra_state["slices"]["source_code_parse"]
         return ExtractOutput(
             summary=task.extra_state["summary"],
-            suspicous_code=[code_loc.keyword for code_loc in suspicous_code],
-            suspicous_code_with_path=suspicous_code_with_path,
+            suspicous_code=list(suspicous_code),
+            suspicous_code_from_tracer=suspicous_code_from_tracer,
             related_source_code=related_source_code,
         )
 
