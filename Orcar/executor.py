@@ -7,26 +7,11 @@ https://github.com/SqueezeAILab/LLMCompiler
 
 import asyncio
 import uuid
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    cast,
-)
+from typing import Any, Dict, List, Optional, Sequence, cast
 
-from llama_index.core.agent.types import (
-    BaseAgentWorker,
-    Task,
-    TaskStep,
-    TaskStepOutput,
-)
+from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
-from llama_index.core.callbacks import (
-    CallbackManager,
-    trace_method,
-)
+from llama_index.core.callbacks import CallbackManager, trace_method
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
@@ -38,20 +23,11 @@ from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.core.utils import print_text
 from llama_index.llms.openai import OpenAI
 
-from .output_parser import (
-    LLMCompilerJoinerParser,
-    LLMCompilerPlanParser,
-)
+from .output_parser import LLMCompilerJoinerParser, LLMCompilerPlanParser
 from .prompts import OUTPUT_PROMPT, PLANNER_EXAMPLE_PROMPT
 from .schema import JoinerOutput
-from .task_fetching_unit import (
-    LLMCompilerTask,
-    TaskFetchingUnit,
-)
-from .utils import (
-    format_contexts,
-    generate_context_for_replanner,
-)
+from .task_fetching_unit import LLMCompilerTask, TaskFetchingUnit
+from .utils import format_contexts, generate_context_for_replanner
 
 DEFAULT_MODEL_NAME = "gpt-4o"
 

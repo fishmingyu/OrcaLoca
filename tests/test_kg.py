@@ -1,31 +1,34 @@
-from Orcar.search import RepoGraph, SearchManager
 import argparse
-from Orcar.gen_config import Config, get_llm
+import os
+
+from Orcar import ExtractAgent
+from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.environment.utils import (
+    ContainerBash,
     get_container,
     get_logger,
     pause_persistent_container,
-    ContainerBash,
 )
-from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
+from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
-
-from Orcar import ExtractAgent
+from Orcar.search import RepoGraph, SearchManager
 from Orcar.types import ExtractOutput
-import os
 
 logger = get_logger("test_env")
 
+
 def test_build_graph():
     repo_path = "../../django"
-    graph_builder = RepoGraph(repo_path=repo_path, save_log=True, log_path="log", build_kg=True)
+    graph_builder = RepoGraph(
+        repo_path=repo_path, save_log=True, log_path="log", build_kg=True
+    )
     # try to search function "add" in the graph
     kg_graph = graph_builder.graph
     root = graph_builder.root_node
     node = graph_builder.get_class_snapshot("ModelChoiceField")
     if node:
         print(f"Snapshot of class ModelChoice   Field: \n {node}")
-    else:    
+    else:
         print("Class snapshot not found")
 
 
@@ -33,12 +36,17 @@ def test_search_manager():
     repo_path = "../../django"
     search_manager = SearchManager(repo_path=repo_path)
     # try to search function "to_python" in ModelChoiceField class
-    file_path, code_snippet = search_manager.search_method_in_class("ModelChoiceField", "to_python")
+    file_path, code_snippet = search_manager.search_method_in_class(
+        "ModelChoiceField", "to_python"
+    )
     print(code_snippet)
+
 
 def test_local_build_graph():
     repo_graph = "./test_repo"
-    graph_builder = RepoGraph(repo_path=repo_graph, save_log=True, log_path="log", build_kg=True)
+    graph_builder = RepoGraph(
+        repo_path=repo_graph, save_log=True, log_path="log", build_kg=True
+    )
     # try to search function "add" in the graph
     kg_graph = graph_builder.graph
     root = graph_builder.root_node
@@ -58,6 +66,7 @@ def test_local_build_graph():
     else:
         print("File content not found")
 
+
 def test_env_build_graph():
     logger = get_logger("test_env")
 
@@ -72,9 +81,7 @@ def test_env_build_graph():
     }
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
-    llm = get_llm(
-        model=args.model, api_key=cfg["OPENAI_API_KEY"]
-    )
+    llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"])
     ctr_name = args.container_name
     docker_ctr_subprocess = get_container(
         ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
@@ -85,18 +92,23 @@ def test_env_build_graph():
     env = BenchmarkEnv(args, ctr_bash)
     for inst in ds:
         env.setup(inst)
-        graph_builder = RepoGraph(repo_path=env.cache_dir, save_log=True, log_path="log", build_kg=True)
+        graph_builder = RepoGraph(
+            repo_path=env.cache_dir, save_log=True, log_path="log", build_kg=True
+        )
         node = graph_builder.get_class_snapshot("ModelChoiceField")
         if node:
             print(f"Snapshot of class ModelChoice   Field: \n {node}")
         else:
             print("Class snapshot not found")
 
+
 def test_fitsrec():
     repo_path = "~/.orcar/astropy__astropy"
     # convert the path to absolute
     repo_path = os.path.expanduser(repo_path)
-    graph_builder = RepoGraph(repo_path=repo_path, save_log=True, log_path="log", build_kg=True)
+    graph_builder = RepoGraph(
+        repo_path=repo_path, save_log=True, log_path="log", build_kg=True
+    )
     node = graph_builder.dfs_search_file_skeleton("fitsrec.py")
     if node:
         print(f"Contents of fitsrec.py: \n {node}")
@@ -105,34 +117,44 @@ def test_fitsrec():
 
     class_ = graph_builder.get_class_snapshot("FITS_rec")
     if class_:
-        print(f"Snapshot of class FITS_rec: \
-            \n {class_}")
+        print(
+            f"Snapshot of class FITS_rec: \
+            \n {class_}"
+        )
     else:
         print("Class snapshot not found")
+
 
 def test_fitsrec_source_code():
     repo_path = "~/.orcar/astropy__astropy"
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
     source_code = """
-    output_field.replace(encode_ascii('E'),               
+    output_field.replace(encode_ascii('E'),
          encode_ascii('D'))
     """
-    line_num = search_manager.search_source_code("astropy/io/fits/fitsrec.py", source_code)
+    line_num = search_manager.search_source_code(
+        "astropy/io/fits/fitsrec.py", source_code
+    )
     print(line_num)
+
 
 def test_search_callable_in_file():
     repo_path = "~/.orcar/astropy__astropy/"
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
     callable_name = "CompoundModel"
-    code_snippet = search_manager.search_callable_in_file("astropy/modeling/core.py", callable_name)
+    code_snippet = search_manager.search_callable_in_file(
+        "astropy/modeling/core.py", callable_name
+    )
     print(code_snippet)
+
 
 def print_search_priority():
     repo_path = "./test_repo"
     search_m = SearchManager(repo_path=repo_path)
     print(search_m.search_tool_priority)
+
 
 if __name__ == "__main__":
     # Example usage
@@ -140,7 +162,7 @@ if __name__ == "__main__":
     # test_search_manager()
     # test_local_build_graph()
     # test_env_build_graph()
-    # test_fitsrec()  
+    # test_fitsrec()
     # test_fitsrec_source_code()
     # test_search_callable_in_file()
     print_search_priority()

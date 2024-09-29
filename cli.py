@@ -36,7 +36,7 @@ def exit_with_help_message(parser):
     # but better save than sorry
     for subparsers_action in subparsers_actions:
         # get all subparsers and print help
-        for choice, subparser in subparsers_action.choices.items():
+        for _, subparser in subparsers_action.choices.items():
             print(subparser.format_help())
 
     print(green("To perform other Orcar operations", ["bold"]))
@@ -46,7 +46,6 @@ def exit_with_help_message(parser):
 
 
 class ArgumentParser(argparse.ArgumentParser):
-
     def __init__(self, *args, **kwargs):
         super(ArgumentParser, self).__init__(*args, **kwargs)
         self.error = self.error
@@ -191,7 +190,9 @@ def main():
             agent_chat_response: AgentChatResponse = extractor.chat(
                 json.dumps(dict(inst))
             )
-            extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
+            extract_output = ExtractOutput.model_validate_json(
+                agent_chat_response.response
+            )
             logger.debug(extract_output)
 
         # Run Test on Benchmark

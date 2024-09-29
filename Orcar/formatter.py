@@ -18,18 +18,18 @@ from llama_index.core.tools import BaseTool
 from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.openai import OpenAI
 
+from .environment.utils import get_logger
 from .prompts import (
+    BUG_OUTPUT,
     EXTRACT_EXAMPLES,
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
-    BUG_OUTPUT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
-from .environment.utils import get_logger
 from .search.search_tool import SearchManager
+from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
 
 logger = get_logger(__name__)
 
@@ -85,11 +85,11 @@ class TokenCounter:
 
 
 def replace_unicode_quotations(input: str) -> str:
-    '''
+    """
     Claude 3.5 Sonnet sometimes fail to disguish curly quote mark with normal one,
     which can result in json schema fail;
     So we replace all curly quote marks in input.
-    '''
+    """
     unicode_quotations = {
         "“": "\\u201C",
         "”": "\\u201D",

@@ -1,6 +1,7 @@
 """Utils for LLM Compiler.
 Revised from https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/agent/llama-index-agent-llm-compiler/llama_index/agent/llm_compiler/utils.py
 """
+
 import ast
 import re
 from typing import Any, Dict, List, Sequence, Tuple, Union
@@ -8,10 +9,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 from llama_index.core.tools.function_tool import FunctionTool
 from llama_index.core.tools.types import BaseTool, adapt_to_async_tool
 
-from .schema import (
-    LLMCompilerParseResult,
-    LLMCompilerTask,
-)
+from .schema import LLMCompilerParseResult, LLMCompilerTask
 
 # $1 or ${1} -> 1
 ID_PATTERN = r"\$\{?(\d+)\}?"

@@ -15,15 +15,15 @@ tasks = [coro(i) for i in range(1, 11)]
 
 print("Get first result:")
 finished, unfinished = loop.run_until_complete(
-    asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED))
+    asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+)
 
 for task in finished:
     print(task.result())
 print("unfinished:", len(unfinished))
 
 print("Get more results in 2 seconds:")
-finished2, unfinished2 = loop.run_until_complete(
-    asyncio.wait(unfinished, timeout=2))
+finished2, unfinished2 = loop.run_until_complete(asyncio.wait(unfinished, timeout=2))
 
 for task in finished2:
     print(task.result())

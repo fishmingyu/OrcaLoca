@@ -1,11 +1,11 @@
 import argparse
+import json
 import os
 import subprocess
-import json
 from typing import Any, Dict
-import yaml
 
 import unidiff
+import yaml
 
 from Orcar.environment.utils import get_logger
 from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
@@ -35,71 +35,78 @@ def examine_experiment_dir(
     inst: Dict[str, Any], experiment_dir: str, dataset: str, verbose: int
 ) -> None:
     dataset_dir_dict = {
-        'princeton-nlp/SWE-bench': 'test',
-        'princeton-nlp/SWE-bench_Lite': 'lite',
-        'princeton-nlp/SWE-bench_Verified': 'verified',
+        "princeton-nlp/SWE-bench": "test",
+        "princeton-nlp/SWE-bench_Lite": "lite",
+        "princeton-nlp/SWE-bench_Verified": "verified",
     }
     assert dataset in dataset_dir_dict, "Error: Unknown dataset {dataset}"
     dataset_dir = f"{experiment_dir}/evaluation/{dataset_dir_dict[dataset]}"
     assert os.path.isdir(dataset_dir), "Error: Invalid dataset dir {dataset_dir}"
-    subprocess.run('git reset --hard main', shell=True, check=True, cwd=experiment_dir)
-    subprocess.run('git pull', shell=True, check=True, cwd=experiment_dir)
+    subprocess.run("git reset --hard main", shell=True, check=True, cwd=experiment_dir)
+    subprocess.run("git pull", shell=True, check=True, cwd=experiment_dir)
     models = sorted(os.listdir(dataset_dir))
     for model in models:
-        date = model.split('_')[0]
-        model_path = f'{dataset_dir}/{model}'
-        results_path = f'{model_path}/results/results.json'
+        date = model.split("_")[0]
+        model_path = f"{dataset_dir}/{model}"
+        results_path = f"{model_path}/results/results.json"
         if not os.path.exists(results_path):
             logger.error(f"Cannot find {results_path}")
             continue
-        with open(results_path, 'r') as file:
+        with open(results_path, "r") as file:
             results_json = json.load(file)
-        
-        metadata_path = f'{model_path}/metadata.yaml'
+
+        metadata_path = f"{model_path}/metadata.yaml"
         assert os.path.exists(metadata_path)
         with open(metadata_path) as stream:
             try:
                 metadata = yaml.safe_load(stream)
-                model_name = metadata['name']
+                model_name = metadata["name"]
             except yaml.YAMLError as exc:
                 print(exc)
-        
-        if inst['instance_id'] not in results_json['resolved']:
+
+        if inst["instance_id"] not in results_json["resolved"]:
             continue
 
-        logger.info(f'{model_name} \n    Solved ✓ on {date}')
+        logger.info(f"{model_name} \n    Solved ✓ on {date}")
 
-        preds_path = f'{model_path}/all_preds.jsonl'
+        preds_path = f"{model_path}/all_preds.jsonl"
         assert os.path.exists(preds_path)
         model_inst = dict()
-        with open(preds_path, 'r') as file:
+        with open(preds_path, "r") as file:
             for line in file:
                 issue_json = json.loads(line)
-                if issue_json['instance_id'] == inst['instance_id']:
+                if issue_json["instance_id"] == inst["instance_id"]:
                     model_inst = issue_json
                     break
         if not model_inst:
-            logger.warning(f"Cannot find {inst['instance_id']} in {model_name}, skipping")
-        
+            logger.warning(
+                f"Cannot find {inst['instance_id']} in {model_name}, skipping"
+            )
+
         if verbose > 0:
-            logger.info('Model Patch:')
-            logger.info(model_inst['model_patch'])
+            logger.info("Model Patch:")
+            logger.info(model_inst["model_patch"])
             continue
 
         try:
-            model_patch = unidiff.PatchSet(model_inst['model_patch'])
+            model_patch = unidiff.PatchSet(model_inst["model_patch"])
         except Exception as e:
-            logger.warning((f"Returning empty patch,",
-                            f" as patch for {model_inst['instance_id']}",
-                            f" is corrupted with msg '{repr(e)}'"))
+            logger.warning(
+                (
+                    f"Returning empty patch,",
+                    f" as patch for {model_inst['instance_id']}",
+                    f" is corrupted with msg '{repr(e)}'",
+                )
+            )
             continue
-        abs_patch = [" " * 4 + 'Model Patch:']
+        abs_patch = []
+        abs_patch.append(" " * 4 + "Model Patch:")
         for file in model_patch:
+            assert isinstance(file, unidiff.PatchedFile)
             abs_patch.append(" " * 4 + str(file.patch_info).split("\n")[0].strip())
             for hunk in file:
                 abs_patch.append(" " * 4 + str(hunk).split("\n")[0])
         logger.info("\n".join(abs_patch))
-    
 
 
 def main():

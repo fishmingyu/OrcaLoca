@@ -1,30 +1,31 @@
-import docker
-from docker.models.containers import Container
-import subprocess
-import time
-import shlex
-from subprocess import PIPE, STDOUT
-import logging
-import os
-import platform
 import datetime
 import hashlib
-import tempfile
+import logging
+import os
+import shlex
+import subprocess
 import tarfile
+import tempfile
+import time
 import traceback
 from io import BytesIO
+from subprocess import PIPE, STDOUT
+from typing import Callable, List, Union
+
+from docker.models.containers import Container
 from rich.logging import RichHandler
-from typing import Any, Callable, Union
+
+import docker
 
 _SET_UP_LOGGERS = set()
-_ADDITIONAL_HANDLERS = []
+_ADDITIONAL_HANDLERS: List[logging.Handler] = []
 
 logging.TRACE = 5  # type: ignore
 logging.addLevelName(logging.TRACE, "TRACE")  # type: ignore
 DOCKER_START_UP_DELAY = 1
 
 _STREAM_LEVEL = logging.DEBUG
-_FILE_LEVEL = logging.TRACE
+_FILE_LEVEL = logging.TRACE  # type: ignore
 
 
 class ContainerBash:
@@ -248,7 +249,8 @@ def _get_persistent_container(
 
 
 def read_with_timeout(
-    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]) -> str:
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]
+) -> str:
     """
     Read data from a subprocess with a timeout.
     This function uses a file descriptor to read data from the subprocess in a non-blocking way.
@@ -265,6 +267,7 @@ def read_with_timeout(
         TimeoutError: If the timeout duration is reached while reading from the subprocess.
     """
     buffer = b""
+    assert container.stdout is not None
     fd = container.stdout.fileno()
     end_time = time.time() + timeout_duration
 
@@ -296,8 +299,11 @@ def read_with_timeout(
         raise TimeoutError(msg)
     return buffer.decode()
 
+
 def read_generator_with_timeout(
-    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]):
+    container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]
+):
+    assert container.stdout is not None
     fd = container.stdout.fileno()
     end_time = time.time() + timeout_duration
 
@@ -309,7 +315,6 @@ def read_generator_with_timeout(
     execution_finished = False
     pids = []
     while time.time() < end_time:
-        
         while ready_to_read(fd):
             data = os.read(fd, 4096)
             if data:
@@ -323,17 +328,16 @@ def read_generator_with_timeout(
             break
         for i in range(3):
             # Issue 3 consecutive PID check within 0.1s to make sure we really finished
-            # E.g. If we run 'cmd A && cmd B', 
+            # E.g. If we run 'cmd A && cmd B',
             # There will be a short no-PID interval between finishing A and starting B
             if i != 0:
                 # Don't waste time sleeping before 1st trial
                 time.sleep(0.05)
             pids = pid_func()
-            execution_finished = (len(pids) == 0)
+            execution_finished = len(pids) == 0
             if not execution_finished:
-                 # Don't waste time sleeping if not finished
-                 break
-            
+                # Don't waste time sleeping if not finished
+                break
 
     if container.poll() is not None:
         msg = f"Subprocess exited unexpectedly.\n"
@@ -384,7 +388,7 @@ def run_command_in_container(
     Raises:
         TimeoutError: If the command times out.
     """
-
+    assert ctr_bash.ctr_subprocess.stdin is not None
     ctr_bash.ctr_subprocess.stdin.write(f"{command}\n")
     ctr_bash.ctr_subprocess.stdin.flush()
     if output_log:
@@ -415,9 +419,9 @@ def run_command_in_container(
 
     return output
 
-def get_exit_code(
-    ctr_bash: ContainerBash, timeout: int = 5
-) -> str:
+
+def get_exit_code(ctr_bash: ContainerBash, timeout: int = 5) -> int:
+    assert ctr_bash.ctr_subprocess.stdin is not None
     ctr_bash.ctr_subprocess.stdin.write(f"echo $?\n")
     ctr_bash.ctr_subprocess.stdin.flush()
     output = read_with_timeout(
@@ -465,6 +469,7 @@ def run_bash_in_ctr(ctr_bash: ContainerBash, command: str) -> str:
         f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started bash process {ctr_new_bash_pid} in container {ctr_name}"
     )
     # start = time.time()
+    assert ctr_new_subprocess.stdin is not None
     ctr_new_subprocess.stdin.write(f"{command}\n")
     ctr_new_subprocess.stdin.flush()
     output = read_with_timeout(
@@ -505,16 +510,19 @@ def pause_persistent_container(ctr_bash: ContainerBash):
 
 
 def get_bash_pid_in_docker(ctr_subprocess: subprocess.Popen) -> int:
+    assert ctr_subprocess.stdin is not None
     ctr_subprocess.stdin.write(f"echo $$\n")
     ctr_subprocess.stdin.flush()
     output = ""
     while output == "":
         output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
         time.sleep(0.05)
-    return output.split("\n")[0]
+    return int(output.split("\n")[0])
 
 
-def copy_file_to_container(container: Container, contents: str, container_path: str) -> None:
+def copy_file_to_container(
+    container: Container, contents: str, container_path: str
+) -> None:
     """
     Copies a given string into a Docker container at a specified path.
 
@@ -543,12 +551,16 @@ def copy_file_to_container(container: Container, contents: str, container_path: 
                 # Prepare the TAR archive
                 with BytesIO() as tar_stream:
                     with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-                        tar_info = tarfile.TarInfo(name=os.path.basename(container_path))
+                        tar_info = tarfile.TarInfo(
+                            name=os.path.basename(container_path)
+                        )
                         tar_info.size = os.path.getsize(temp_file_name)
                         tar.addfile(tarinfo=tar_info, fileobj=temp_file)
                     tar_stream.seek(0)
                     # Copy the TAR stream to the container
-                    container.put_archive(path=os.path.dirname(container_path), data=tar_stream.read())
+                    container.put_archive(
+                        path=os.path.dirname(container_path), data=tar_stream.read()
+                    )
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")

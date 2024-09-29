@@ -186,41 +186,33 @@ STEP_EXAMPLE = {
     "obversation_feedback": "observation",
     "relevance": "True",
     "new_search_actions": [
-        {
-            "action": "search_func",
-            "action_input": {
-            "func_name": "str"
-            }
-        },
+        {"action": "search_func", "action_input": {"func_name": "str"}},
         {
             "action": "search_method_in_class",
-            "action_input": {
-            "class_name": "str",
-            "method_name": "str"
-            }
+            "action_input": {"class_name": "str", "method_name": "str"},
         },
-    ]
+    ],
 }
 
 BUG_OUTPUT = {
     "bug_locations": [
-    {
-        "file": "path/to/file",
-        "class": "class_name",
-        "method": "function_name",
-    },
-    {
-        "file": "path/to/file",
-        "class": "class_name",
-        "method": "function_name",
-    }
+        {
+            "file": "path/to/file",
+            "class": "class_name",
+            "method": "function_name",
+        },
+        {
+            "file": "path/to/file",
+            "class": "class_name",
+            "method": "function_name",
+        },
     ]
 }
 
 SEARCH_SYSTEM_HEADER = r"""
 You are a helpful assistant that use API calls to report bug code snippets from a text into json format.
 You need to extract where are the bug locations by analyzing the text.
-The given text will give you suspicous_code containing keyword. Make sure to search for the keyword in the codebase. 
+The given text will give you suspicous_code containing keyword. Make sure to search for the keyword in the codebase.
 There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
@@ -230,8 +222,8 @@ You also need to keep in ind the priority of these API calls.
 
 Everytime you will do the following things:
 
-Provide the observation based on given input. Check whether it contains any class, method or function you need to further search. 
-Notice that you should put new classes, methods or functions related to your current code snippets. Don't put any class, method or function we currently haven't searched. 
+Provide the observation based on given input. Check whether it contains any class, method or function you need to further search.
+Notice that you should put new classes, methods or functions related to your current code snippets. Don't put any class, method or function we currently haven't searched.
 You can put multiple classes, methods or functions in the new_search_actions list.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 
@@ -239,56 +231,42 @@ Conclusion is a final standalone step to provide the final bug locations when no
 
 ## Output format
 1. Regular Step Format:
-    Provide your answer in a clear JSON structure like this, 
+    Provide your answer in a clear JSON structure like this,
     {step_format}
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
     In relevance, set to True if the given context is relevant to the bug location, otherwise set to False.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
-    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this, 
+    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this,
     DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
     {bug_locations}
 
 """
 
 EXTRACT_FORMATS = {
-"slice": {
-    "traceback_warning_log_slice": "log_slice_string",
-    "issue_reproducer_slice": "code_slice_string",
-    "source_code_slice": "code_slice_string",
-},
-"parse": {
-    "code_info_list": [
-        {
-            'keyword': 'class_or_function_name_1',
-            'file_path': ''
-        },
-        {
-            'keyword': 'class_or_function_name_2',
-            'file_path': 'file_path_2'
-        }
-    ]
-},
-"judge": {
-    "is_successful": True
-},
-"summarize": {
-    "summary": "summary_string",
-    "code_info_list": [
-        {
-            'keyword': 'class_or_function_name_1',
-            'file_path': ''
-        },
-        {
-            'keyword': 'class_or_function_name_2',
-            'file_path': 'file_path_2'
-        }
-    ]
-}
+    "slice": {
+        "traceback_warning_log_slice": "log_slice_string",
+        "issue_reproducer_slice": "code_slice_string",
+        "source_code_slice": "code_slice_string",
+    },
+    "parse": {
+        "code_info_list": [
+            {"keyword": "class_or_function_name_1", "file_path": ""},
+            {"keyword": "class_or_function_name_2", "file_path": "file_path_2"},
+        ]
+    },
+    "judge": {"is_successful": True},
+    "summarize": {
+        "summary": "summary_string",
+        "code_info_list": [
+            {"keyword": "class_or_function_name_1", "file_path": ""},
+            {"keyword": "class_or_function_name_2", "file_path": "file_path_2"},
+        ],
+    },
 }
 
 EXTRACT_FIELDS = {
-"slice": """
+    "slice": """
 <field>
     traceback_warning_log_slice: Traceback or warning log. Set to '' if not found.
 </field>
@@ -308,7 +286,7 @@ EXTRACT_FIELDS = {
             Set to '' if no code satisfies this requirement.
 </field>
 """,
-"parse": """
+    "parse": """
 <field>
     keyword: the name of the class or function where the suspicious code lies in.
             Should be a single word, not spliced with dot.
@@ -326,7 +304,7 @@ EXTRACT_FIELDS = {
     code_info_list: list of (keyword, file_path). All keywords mentioned should be extracted to the list.
 </field>
 """,
-"judge": """
+    "judge": """
 <field>
     is_successful: whether the reproduce_snippet successfully reproduced the issue, based on the reproducer_log it generated.
             Note that 'successfully reproduce' means the similar phenomenon is observed;
@@ -334,7 +312,7 @@ EXTRACT_FIELDS = {
             (Getting the same error reported in issue means reproduction is successful)
 </field>
 """,
-"summarize": """
+    "summarize": """
 <field>
     summary: Summary in natural language. Requirements include:
             1. Describe the issue;
@@ -342,7 +320,7 @@ EXTRACT_FIELDS = {
             3. Be within 50 words.
 </field>
 <field>
-    code_info_list: list of (keyword, file_path). 
+    code_info_list: list of (keyword, file_path).
             All keywords mentioned in natural language (not code snippet or traceback) should be extracted to the list.
 </field>
 <field>
@@ -358,16 +336,16 @@ EXTRACT_FIELDS = {
             For example, "pvlib.bifacial.pvfactors" should be interpreted as "pvlib/bifacial/pvfactors.py"
             Set to '' if cannot find path.
 </field>
-"""
+""",
 }
 
 EXTRACT_EXAMPLES = {
-"slice": {
-"repo_name": "marshmallow-code/marshmallow",
-"input_description": """
+    "slice": {
+        "repo_name": "marshmallow-code/marshmallow",
+        "input_description": """
 3.0: DateTime fields cannot be used as inner field for List or Tuple fields
 
-`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`.
 
 ```python
 from marshmallow import fields, Schema
@@ -390,8 +368,8 @@ AttributeError: 'List' object has no attribute 'opts'
 
 It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
 """,
-"example_output": {
-"traceback_warning_log_slice": """
+        "example_output": {
+            "traceback_warning_log_slice": """
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
     s = MySchema()
@@ -399,7 +377,7 @@ Traceback (most recent call last):
     self.fields = self._init_fields()
 AttributeError: 'List' object has no attribute 'opts'
 """,
-"issue_reproducer_slice": """
+            "issue_reproducer_slice": """
 from marshmallow import fields, Schema
 
 class MySchema(Schema):
@@ -407,13 +385,13 @@ class MySchema(Schema):
 
 s = MySchema()
 """,
-"source_code_slice": "",
-}
-},
-"parse":{
-"traceback":{
-"repo_name": "marshmallow-code/marshmallow",
-"input_description": """
+            "source_code_slice": "",
+        },
+    },
+    "parse": {
+        "traceback": {
+            "repo_name": "marshmallow-code/marshmallow",
+            "input_description": """
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
     s = MySchema()
@@ -423,26 +401,23 @@ Traceback (most recent call last):
     self.inner._bind_to_schema(field_name, self)
 AttributeError: 'List' object has no attribute 'opts'
 """,
-"example_output": {
-    "code_info_list": [
-        {
-            'keyword': '<module>',
-            'file_path': 'test-mm.py'
+            "example_output": {
+                "code_info_list": [
+                    {"keyword": "<module>", "file_path": "test-mm.py"},
+                    {
+                        "keyword": "__init__",
+                        "file_path": "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py",
+                    },
+                    {
+                        "keyword": "_bind_to_schema",
+                        "file_path": "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py",
+                    },
+                ]
+            },
         },
-        {
-            'keyword': '__init__',
-            'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py'
-        },
-        {
-            'keyword': '_bind_to_schema',
-            'file_path': '/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py'
-        },
-    ]
-}
-},
-"code":{
-"repo_name": "marshmallow-code/marshmallow",
-"input_description": """
+        "code": {
+            "repo_name": "marshmallow-code/marshmallow",
+            "input_description": """
 from marshmallow import fields, Schema
 
 class MySchema(Schema):
@@ -450,26 +425,20 @@ class MySchema(Schema):
 
 s = MySchema()
 """,
-"example_output": {
-    "code_info_list": [
-        {
-            'keyword': 'fields',
-            'file_path': ''
+            "example_output": {
+                "code_info_list": [
+                    {"keyword": "fields", "file_path": ""},
+                    {"keyword": "Schema", "file_path": ""},
+                ]
+            },
         },
-        {
-            'keyword': 'Schema',
-            'file_path': ''
-        },
-    ]
-}
-},
-},
-"summarize":{
-"repo_name": "marshmallow-code/marshmallow",
-"input_description": """
+    },
+    "summarize": {
+        "repo_name": "marshmallow-code/marshmallow",
+        "input_description": """
 3.0: DateTime fields cannot be used as inner field for List or Tuple fields
 
-`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`. 
+`DateTime` fields have started throwing an error when being instantiated as inner fields of container fields like `List` or `Tuple`.
 
 ```python
 from marshmallow import fields, Schema
@@ -492,35 +461,26 @@ AttributeError: 'List' object has no attribute 'opts'
 
 It seems like it's treating the parent field as a Schema without checking that it is indeed a schema.
 """,
-"example_output": {
-"summarize": """
+        "example_output": {
+            "summarize": """
 In marshmallow 3.0, using DateTime fields as inner fields in List or Tuple containers triggers an AttributeError.
 The error occurs because List is mistakenly treated as a schema.
 Examine the fields.List, fields.DateTime, and _init_fields methods in schema.py for debugging.
 """,
-"code_info_list": [
-        {
-            'keyword': 'DateTime',
-            'file_path': ''
+            "code_info_list": [
+                {"keyword": "DateTime", "file_path": ""},
+                {"keyword": "Schema", "file_path": ""},
+                {"keyword": "opts", "file_path": ""},
+            ],
         },
-        {
-            'keyword': 'Schema',
-            'file_path': ''
-        },
-        {
-            'keyword': 'opts',
-            'file_path': ''
-        }
-    ]
-}
-}
+    },
 }
 
 EXTRACT_PROMPTS = {
-"header": """
+    "header": """
 You are an expert python developer, mastering at summarizing and extracting from github issues.
 """,
-"example": r"""
+    "example": r"""
 <repo_name>{example_repo_name}<repo_name>
 <example_input_description>
 {example_input_description}
@@ -529,7 +489,7 @@ You are an expert python developer, mastering at summarizing and extracting from
 {example_output}
 </example_output>
 """,
-"slice": r"""
+    "slice": r"""
 Your task is to slice strings from human reported github issue.
 Every slice shouldn't overlap with another slice. Non-existanct slice should be set to ''.
 
@@ -547,7 +507,7 @@ Below is the real task for you to solve:
 <repo_name>{repo_name}</repo_name>
 {input_description}
 """,
-"parse": r"""
+    "parse": r"""
 Your task is to extract python code keywords and the filepath they belong to (if exist) from human reported github issue.
 Non-existanct filepath should be set to ''.
 
@@ -567,7 +527,7 @@ Below is the real task for you to solve:
 {input_description}
 </input_description>
 """,
-"judge": r"""
+    "judge": r"""
 Your task is to judge whether an input github issue is successfully reproduced by a reproduce_snippet based on the reproducer_log it generated.
 Non-existanct filepath should be set to ''.
 
@@ -590,7 +550,7 @@ Below is the real task for you to solve:
 {reproducer_log}
 </reproducer_log>
 """,
-"summarize": r"""
+    "summarize": r"""
 Your task is to summarize a human reported github issue in natural language.
 
 Your output should strictly follow the format below.
@@ -610,4 +570,3 @@ Below is the issue for you to summarize:
 </input_description>
 """,
 }
-
