@@ -1,7 +1,8 @@
 import argparse
 import json
+import os
 import re
-from contextlib import nullcontext, redirect_stdout
+from contextlib import redirect_stdout
 from enum import IntEnum
 from typing import Any, Dict
 import os
@@ -80,12 +81,6 @@ class OrcarAgent:
     def set_redirect_log_output(self, new_value: bool) -> None:
         self.redirect_log_output = new_value
 
-    def setup_env(self, instance: Dict[str, Any]) -> None:
-        self.inst = instance
-        self.inst_id = self.inst["instance_id"]
-        self.log_dir = f"./log/{self.inst_id}"
-        self.env.setup(self.inst)
-
     def run_extract_agent(self) -> ExtractOutput:
         """Run the extract agent."""
         response: AgentChatResponse = self.extract_agent.chat(
@@ -127,21 +122,19 @@ class OrcarAgent:
         return search_output
 
     def run(self, instance: Dict[str, Any]) -> str:
-        """Setup env for inst & config the output redirection Run the agent."""
-        try:
-            self.setup_env(instance)
-        except Exception as e:
-            print(f"Error: {e}")
-            return ""
-        # if self.redirect_log_output: log redirected to file
-        # else: log printed to normal stdout
-        with (
-            open(f"{self.log_dir}/orcar_{self.inst_id}.log", "w")
-            if self.redirect_log_output
-            else nullcontext()
-        ) as f:
-            with redirect_stdout(f) if self.redirect_log_output else nullcontext():
-                response = self.run_agents()
+        """Config the output redirection to run agents."""
+        self.inst = instance
+        self.inst_id = self.inst["instance_id"]
+        self.log_dir = f"./log/{self.inst_id}"
+
+        if self.redirect_log_output:
+            os.makedirs(self.log_dir, exist_ok=True)
+            with open(f"{self.log_dir}/orcar_{self.inst_id}.log", "w") as f:
+                with redirect_stdout(f):
+                    response = self.run_agents()
+        else:
+            response = self.run_agents()
+
         # Redirect log contains format with rich text.
         # Provide a rich-free version for log parsing or less viewing.
         if self.redirect_log_output:
@@ -153,7 +146,13 @@ class OrcarAgent:
         return response
 
     def run_agents(self) -> str:
-        """Run agents."""
+        """Setup env and run agents."""
+        try:
+            self.env.setup(self.inst)
+        except Exception as e:
+            print(f"Error: {e}")
+            return ""
+
         try:
             extract_output = self.run_extract_agent()
         except Exception as e:
