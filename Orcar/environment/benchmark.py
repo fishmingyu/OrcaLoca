@@ -108,7 +108,7 @@ class BenchmarkEnv:
     ) -> str:
         try:
             output = self.run(cmd, timeout, output_log)
-        except:
+        except Exception:
             raise RuntimeError(err_msg)
         exit_code = get_exit_code(self.ctr_bash, timeout)
         if exit_code != 0:

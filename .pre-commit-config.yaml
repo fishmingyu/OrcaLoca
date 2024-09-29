@@ -57,3 +57,4 @@ repos:
           "--ignore-missing-imports",
           "--follow-imports=skip",
         ]
+        additional_dependencies: ['types-PyYAML']

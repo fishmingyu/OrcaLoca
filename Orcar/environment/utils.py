@@ -2,7 +2,6 @@ import datetime
 import hashlib
 import logging
 import os
-import platform
 import shlex
 import subprocess
 import tarfile
@@ -11,7 +10,7 @@ import time
 import traceback
 from io import BytesIO
 from subprocess import PIPE, STDOUT
-from typing import Any, Callable, Union
+from typing import Callable, List, Union
 
 from docker.models.containers import Container
 from rich.logging import RichHandler
@@ -19,14 +18,14 @@ from rich.logging import RichHandler
 import docker
 
 _SET_UP_LOGGERS = set()
-_ADDITIONAL_HANDLERS = []
+_ADDITIONAL_HANDLERS: List[logging.Handler] = []
 
 logging.TRACE = 5  # type: ignore
 logging.addLevelName(logging.TRACE, "TRACE")  # type: ignore
 DOCKER_START_UP_DELAY = 1
 
 _STREAM_LEVEL = logging.DEBUG
-_FILE_LEVEL = logging.TRACE
+_FILE_LEVEL = logging.TRACE  # type: ignore
 
 
 class ContainerBash:
@@ -268,6 +267,7 @@ def read_with_timeout(
         TimeoutError: If the timeout duration is reached while reading from the subprocess.
     """
     buffer = b""
+    assert container.stdout is not None
     fd = container.stdout.fileno()
     end_time = time.time() + timeout_duration
 
@@ -303,6 +303,7 @@ def read_with_timeout(
 def read_generator_with_timeout(
     container: subprocess.Popen, pid_func: Callable, timeout_duration: Union[int, float]
 ):
+    assert container.stdout is not None
     fd = container.stdout.fileno()
     end_time = time.time() + timeout_duration
 
@@ -387,7 +388,7 @@ def run_command_in_container(
     Raises:
         TimeoutError: If the command times out.
     """
-
+    assert ctr_bash.ctr_subprocess.stdin is not None
     ctr_bash.ctr_subprocess.stdin.write(f"{command}\n")
     ctr_bash.ctr_subprocess.stdin.flush()
     if output_log:
@@ -419,7 +420,8 @@ def run_command_in_container(
     return output
 
 
-def get_exit_code(ctr_bash: ContainerBash, timeout: int = 5) -> str:
+def get_exit_code(ctr_bash: ContainerBash, timeout: int = 5) -> int:
+    assert ctr_bash.ctr_subprocess.stdin is not None
     ctr_bash.ctr_subprocess.stdin.write(f"echo $?\n")
     ctr_bash.ctr_subprocess.stdin.flush()
     output = read_with_timeout(
@@ -467,6 +469,7 @@ def run_bash_in_ctr(ctr_bash: ContainerBash, command: str) -> str:
         f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}: Started bash process {ctr_new_bash_pid} in container {ctr_name}"
     )
     # start = time.time()
+    assert ctr_new_subprocess.stdin is not None
     ctr_new_subprocess.stdin.write(f"{command}\n")
     ctr_new_subprocess.stdin.flush()
     output = read_with_timeout(
@@ -507,13 +510,14 @@ def pause_persistent_container(ctr_bash: ContainerBash):
 
 
 def get_bash_pid_in_docker(ctr_subprocess: subprocess.Popen) -> int:
+    assert ctr_subprocess.stdin is not None
     ctr_subprocess.stdin.write(f"echo $$\n")
     ctr_subprocess.stdin.flush()
     output = ""
     while output == "":
         output = read_with_timeout(ctr_subprocess, lambda: list(), 5)
         time.sleep(0.05)
-    return output.split("\n")[0]
+    return int(output.split("\n")[0])
 
 
 def copy_file_to_container(

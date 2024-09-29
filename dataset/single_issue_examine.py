@@ -99,8 +99,10 @@ def examine_experiment_dir(
                 )
             )
             continue
-        abs_patch = [" " * 4 + "Model Patch:"]
+        abs_patch = []
+        abs_patch.append(" " * 4 + "Model Patch:")
         for file in model_patch:
+            assert isinstance(file, unidiff.PatchedFile)
             abs_patch.append(" " * 4 + str(file.patch_info).split("\n")[0].strip())
             for hunk in file:
                 abs_patch.append(" " * 4 + str(hunk).split("\n")[0])

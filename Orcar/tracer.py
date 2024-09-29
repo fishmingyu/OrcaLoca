@@ -158,11 +158,14 @@ def gen_tracer_cmd(input_path: str, output_path: str) -> str:
     return cmd
 
 
-class FuncItem(BaseModel, arbitrary_types_allowed=True):
+class FuncItem(BaseModel):
     "Function call item in tracer log"
     node: FuncTreeNode
     layer: int
     should_care: bool
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[CodeInfo]:
@@ -199,7 +202,11 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
     while lst:
         ret = lst.pop()
         should_care = ret.should_care
-        if ret.node.funcname in sensitivity_list:
+        if (
+            ret.node.funcname
+            and ret.node.funcname in sensitivity_list
+            and ret.node.filename
+        ):
             should_care = True
             file_sensitivity_set.add(ret.node.filename)
         lst.extend(

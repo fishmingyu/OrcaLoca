@@ -1,7 +1,8 @@
 import ast
 import os
 import subprocess
-from typing import Any, Dict, List, Set, Tuple
+from ast import ClassDef, FunctionDef, Module
+from typing import List
 
 import pandas as pd
 import unidiff
@@ -11,21 +12,27 @@ from tqdm import tqdm
 from unidiff import PatchSet
 
 
-class DiffNode(BaseModel, frozen=True):
+class DiffNode(BaseModel):
     node_name: str
     node_type: str
     lineno: int
     end_lineno: int
 
+    class Config:
+        frozen = True
+
     def __repr__(self):
         return f"{self.node_type}:{self.node_name} {self.lineno}:{self.end_lineno}"
 
 
-class SrcRange(BaseModel, frozen=True):
+class SrcRange(BaseModel):
     lineno: int
     end_lineno: int
     is_pure_addition: bool
     is_global_addition: bool
+
+    class Config:
+        frozen = True
 
 
 def get_diff_nodes_from_file(
@@ -36,13 +43,19 @@ def get_diff_nodes_from_file(
     with open(filename, "r") as file:
         source_code = file.read()
 
-    node = ast.parse(source_code)
+    node: Module | ClassDef | FunctionDef = ast.parse(source_code)
     ret = []
     while True:
         for child in ast.iter_child_nodes(node):
-            if child.__class__.__name__ not in ["FunctionDef", "ClassDef"]:
+            if (not isinstance(child, FunctionDef)) and (
+                not isinstance(child, ClassDef)
+            ):
                 continue
-            if (child.lineno <= lineno) and (child.end_lineno >= end_lineno):
+            if (
+                (child.lineno <= lineno)
+                and child.end_lineno
+                and (child.end_lineno >= end_lineno)
+            ):
                 ret.append(
                     DiffNode(
                         node_name=child.name,
@@ -76,11 +89,14 @@ def get_diff_nodes_from_file(
     return ret
 
 
-class DiffLoc(BaseModel, frozen=True):
+class DiffLoc(BaseModel):
     file: str
     diff_nodes: List[DiffNode]
     lineno: int
     end_lineno: int
+
+    class Config:
+        frozen = True
 
     def __repr__(self):
         return f"{self.file} {self.lineno}:{self.end_lineno}\n" + "\n".join(
@@ -149,7 +165,6 @@ def get_src_range_from_hunk(
             found_removal = False
             is_global_addition = False
             got_first_addition = False
-            level = 0
 
         idx += 1
     return src_ranges
@@ -213,7 +228,7 @@ def parse_patch(
                         end_lineno=src_range.end_lineno,
                     )
                     diff_locs.append(diff_loc)
-            except:
+            except Exception:
                 raise ValueError(f"{instance_id:}, {hunk:}")
     return ParsedPatch(diff_locs=diff_locs).model_dump_json()
 

@@ -22,8 +22,6 @@ from Orcar.extract_agent import ExtractAgent
 from Orcar.search_agent import SearchAgent
 from Orcar.types import ExtractOutput, SearchInput
 
-from .environment.utils import ContainerBash
-
 
 class Stage(IntEnum):
     EXTRACT = 1
@@ -75,7 +73,8 @@ class OrcarAgent:
 
     def __del__(self) -> None:
         """Pause the container."""
-        self.ctr_bash.ctr_subprocess.stdin.close()
+        if self.ctr_bash.ctr_subprocess.stdin is not None:
+            self.ctr_bash.ctr_subprocess.stdin.close()
         if self.persistent:
             pause_persistent_container(self.ctr_bash)
 

@@ -141,7 +141,7 @@ class ExtractWorker(BaseAgentWorker):
             # Distinguish file system: Windows or Posix
             path_posix_expression = PurePosixPath(path_str)
             path_windows_expression = PureWindowsPath(path_str)
-            path_ret = path_posix_expression
+            path_ret: PurePath = path_posix_expression
             if (
                 len(path_posix_expression.parts) < len(path_windows_expression.parts)
                 or path_windows_expression.is_absolute()
@@ -283,7 +283,7 @@ class ExtractWorker(BaseAgentWorker):
         logger.info(f"After parse path: {parse_step}")
         for code_info in parse_step.code_info_list:
             task.extra_state["suspicous_code"].add(code_info)
-        next_step_names = []
+        next_step_names: list[str] = []
         return self.gen_next_steps(step, next_step_names)
 
     def handle_step_judge(self, step: TaskStep, task: Task) -> List[TaskStep]:
@@ -347,7 +347,7 @@ class ExtractWorker(BaseAgentWorker):
             task.extra_state["suspicous_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
 
-        next_step_names = []
+        next_step_names: list[str] = []
         return self.gen_next_steps(step, next_step_names)
 
     def handle_step_trace(self, step: TaskStep, task: Task) -> List[TaskStep]:
@@ -393,7 +393,7 @@ class ExtractWorker(BaseAgentWorker):
 
         task.extra_state["suspicous_code_from_tracer"] = function_list
 
-        next_step_names = []
+        next_step_names: list[str] = []
         os.remove(output_host_path)
         return self.gen_next_steps(step, next_step_names)
 
@@ -454,7 +454,7 @@ class ExtractWorker(BaseAgentWorker):
     def _run_step(self, step: TaskStep, task: Task) -> TaskStepOutput:
         task.extra_state["step_done"].remove(step.step_id)
 
-        if step.step_state.get("is_first", False) == True:
+        if step.step_state.get("is_first", False) is True:
             self.handle_first_step(step, task)
 
         new_steps = self.handle_step(step, task)

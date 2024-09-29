@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import networkx as nx
-import PIL
 
 # gnp_random_graph(n, p, seed=None, directed=False)
 

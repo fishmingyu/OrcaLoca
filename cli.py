@@ -36,7 +36,7 @@ def exit_with_help_message(parser):
     # but better save than sorry
     for subparsers_action in subparsers_actions:
         # get all subparsers and print help
-        for choice, subparser in subparsers_action.choices.items():
+        for _, subparser in subparsers_action.choices.items():
             print(subparser.format_help())
 
     print(green("To perform other Orcar operations", ["bold"]))
