@@ -4,6 +4,7 @@ import re
 from contextlib import nullcontext, redirect_stdout
 from enum import IntEnum
 from typing import Any, Dict
+import os
 
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
@@ -107,9 +108,10 @@ class OrcarAgent:
             problem_statement=self.inst["problem_statement"],
             extract_output=extract_output,
         )
+        self.repo_name = get_repo_dir(self.inst["repo"])
+        self.repo_path = os.path.join(self.base_path, self.repo_name)
         self.search_agent = SearchAgent(
-            base_path=self.base_path,
-            repo_name=get_repo_dir(self.inst["repo"]),
+            repo_path=self.repo_path,
             llm=self.llm,
             search_input=search_input,
             verbose=False,

@@ -27,10 +27,11 @@ def test_search_agent(instance: str) -> str:
     )
     ds = load_filter_hf_dataset(args)
     inst = ds[0] # only one instance
-    agent = OrcarAgent(args, llm, inst)
+    final_stage = 'search'
+    agent = OrcarAgent(args, llm, final_stage)
     agent.run(inst)
 
 
 if __name__ == "__main__":
-    instance = "astropy__astropy-12907"
+    instance = "astropy__astropy-6938"
     response = test_search_agent(instance)

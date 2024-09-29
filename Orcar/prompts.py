@@ -202,19 +202,17 @@ STEP_EXAMPLE = {
     ]
 }
 
-SEARCH_RESULT = {
+BUG_OUTPUT = {
     "bug_locations": [
     {
         "file": "path/to/file",
         "class": "class_name",
         "method": "function_name",
-        "content": "code_snippet",
     },
     {
         "file": "path/to/file",
         "class": "class_name",
         "method": "function_name",
-        "content": "code_snippet",
     }
     ]
 }
@@ -226,6 +224,9 @@ The given text will give you suspicous_code containing keyword. Make sure to sea
 There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
+
+You also need to keep in ind the priority of these API calls.
+{priority_desc}
 
 Everytime you will do the following things:
 

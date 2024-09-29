@@ -10,7 +10,19 @@ from ..environment.benchmark import BenchmarkEnv, get_repo_dir
 
 Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
-
+class LocInfo:
+    def __init__(self, loc: Loc, type: str):
+        if not isinstance(loc, Loc):
+            raise TypeError(f"loc must be of type Loc, not {type(loc)}")
+        if not isinstance(type, str):
+            raise TypeError(f"type must be a string, not {type(type)}")
+        
+        self.loc = loc
+        self.type = type
+    
+    def __repr__(self):
+        return f"LocInfo(loc={self.loc}, type={self.type})"
+    
 exclude_patterns = [
         "pytest-dev__pytest/doc",  # Discovered this issue in 'pytest-dev__pytest'
         "psf__requests/requests/packages",  # Workaround for issue in 'psf__requests'
@@ -257,6 +269,36 @@ class RepoGraph:
                 if docstring:
                     snapshot += f"Docstring: {docstring}\n"
             return snapshot
+        return None
+    
+    # dfs search for query in a given file
+    def dfs_search_query_in_file(self, file_path, query) -> LocInfo | None:
+        root = self.root_node
+        stack = [root]
+        visited = set()
+
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                extracted_file_path = node.split("::")[0]
+                # first check if the node is a file
+                type_of_node = self.graph.nodes[node]['type']
+                if type_of_node == 'file':
+                    if extracted_file_path == file_path:
+                        print(file_path)
+                        # this is file node                        
+                        # get all neighbors of this node means all methods
+                        for childs in self.graph.neighbors(node):
+                            child_name = childs.split("::")[-1]
+                            # check if the child name is the query
+                            if child_name == query:
+                                locinfo = LocInfo(loc=self.graph.nodes[childs]['loc'], type=self.graph.nodes[childs]['type'])
+                                return locinfo
+                # only add neighbors that are files or directories
+                for neighbor in self.graph.neighbors(node):
+                    if self.graph.nodes[neighbor]['type'] in ['file', 'directory']:
+                        stack.append(neighbor)
         return None
         
     # build the graph from the repository

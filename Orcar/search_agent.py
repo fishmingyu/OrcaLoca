@@ -73,11 +73,11 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
 
     if len(suspicous_code_with_path) > 0:
         for code_info in suspicous_code_with_path:
-            callable = code_info.keyword
+            query = code_info.keyword
             file_path = code_info.file_path
             search_step = SearchActionStep(
                 action="search_callable_in_file",
-                action_input={"file_path": file_path, "callable": callable},
+                action_input={"file_path": file_path, "query": query},
             )
             task.extra_state["search_queue"].put(search_step)
             task.extra_state["action_history"].append(search_step)
@@ -308,7 +308,7 @@ class SearchWorker(BaseAgentWorker):
             search_query = action.action_input["class_name"]
         for history_action in action_history:
             if history_action.action == "search_callable_in_file":
-                if search_query == history_action.action_input["callable"]:
+                if search_query == history_action.action_input["query"]:
                     return False
 
         return True
@@ -338,7 +338,7 @@ class SearchWorker(BaseAgentWorker):
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    input="Now let's come to a conclusion. \n"
+                    input="Now let's come to a conclusion. Please produce the bug locations. \n"
                     , # this step is conclusion
                 )
             ]
@@ -445,8 +445,8 @@ class SearchWorker(BaseAgentWorker):
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
-        logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
-        logger.info(f"Searched: {search_result.get_content()}")
+        # logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
+        # logger.info(f"Searched: {search_result.get_content()}")
         # task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
         return self._get_task_step_response(agent_response, step, "explore", task.extra_state["next_step_input"], False)
@@ -520,8 +520,7 @@ class SearchAgent(AgentRunner):
         self,
         llm: LLM,
         search_input: SearchInput = None,
-        base_path: str = "",
-        repo_name: str = "",
+        repo_path: str = "",
         tools: Optional[List[BaseTool]] = None,
         memory: Optional[BaseMemory] = None,
         max_iterations: int = 20,
@@ -533,7 +532,7 @@ class SearchAgent(AgentRunner):
         """Init params."""
         callback_manager = callback_manager or llm.callback_manager
 
-        self._search_manager = SearchManager(base_path=base_path, repo_name=repo_name)
+        self._search_manager = SearchManager(repo_path=repo_path)
         self._tools = self._setup_tools()
 
         step_engine = SearchWorker.from_tools(
