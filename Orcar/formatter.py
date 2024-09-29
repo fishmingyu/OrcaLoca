@@ -23,12 +23,13 @@ from .prompts import (
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
-    SEARCH_RESULT,
+    BUG_OUTPUT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
 from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
 from .environment.utils import get_logger
+from .search.search_tool import SearchManager
 
 logger = get_logger(__name__)
 
@@ -226,8 +227,9 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
+            "priority_desc": "\n".join(str(SearchManager.search_tool_priority)),
             "step_format": "".join(json.dumps(STEP_EXAMPLE, indent=4)),
-            "bug_locations": "".join(json.dumps(SEARCH_RESULT, indent=4)),
+            "bug_locations": "".join(json.dumps(BUG_OUTPUT, indent=4)),
         }
 
         fmt_sys_header = self.system_header.format(**format_args)

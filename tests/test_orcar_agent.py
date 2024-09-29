@@ -15,7 +15,7 @@ args_dict = {
     # Short Issue Test
     # "filter_instance": "^(django__django-14999)$",
     # Long Issue Test
-    "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$"
 }
@@ -23,7 +23,7 @@ args_dict = {
 def test_agent():
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
-    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"])
     ds = load_filter_hf_dataset(args)
 
     #final_stage = 'extract'
