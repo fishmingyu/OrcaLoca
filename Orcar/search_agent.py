@@ -68,11 +68,11 @@ dispatcher = get_dispatcher(__name__)
 
 def parse_search_input_step(input: SearchInput, task: Task) -> None:
     extract_output = input.extract_output
-    suspicous_code_with_path = extract_output.suspicous_code_with_path
-    # for every codeinfo in suspicous_code_with_path, parse it into a action step
+    suspicous_code_from_tracer = extract_output.suspicous_code_from_tracer
+    # for every codeinfo in suspicous_code_from_tracer, parse it into a action step
 
-    if len(suspicous_code_with_path) > 0:
-        for code_info in suspicous_code_with_path:
+    if len(suspicous_code_from_tracer) > 0:
+        for code_info in suspicous_code_from_tracer:
             query = code_info.keyword
             file_path = code_info.file_path
             search_step = SearchActionStep(

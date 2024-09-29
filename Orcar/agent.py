@@ -2,10 +2,11 @@ import argparse
 import json
 import os
 import re
+import sys
+import traceback
 from contextlib import redirect_stdout
 from enum import IntEnum
 from typing import Any, Dict
-import os
 
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
@@ -89,7 +90,7 @@ class OrcarAgent:
         extract_output = ExtractOutput.parse_raw(response.response)
         self.logger.info(extract_output)
 
-        extract_json_obj = json.loads(extract_output.json())
+        extract_json_obj = json.loads(extract_output.model_dump_json())
         with open(f"{self.log_dir}/extractor_{self.inst_id}.json", "w") as handle:
             json.dump(extract_json_obj, handle, indent=4)
 
@@ -149,22 +150,25 @@ class OrcarAgent:
         """Setup env and run agents."""
         try:
             self.env.setup(self.inst)
-        except Exception as e:
-            print(f"Error: {e}")
+        except Exception:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
             return ""
 
         try:
             extract_output = self.run_extract_agent()
-        except Exception as e:
-            print(f"Error: {e}")
+        except Exception:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
             extract_output = ExtractOutput()
         if self.final_stage <= Stage.EXTRACT:
-            return extract_output.json(indent=4)
+            return extract_output.model_dump_json(indent=4)
 
         try:
             search_output = self.run_search_agent(extract_output)
-        except Exception as e:
-            print(f"Error: {e}")
+        except Exception:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
             search_output = {}
         if self.final_stage <= Stage.SEARCH:
             return json.dumps(search_output, indent=4)

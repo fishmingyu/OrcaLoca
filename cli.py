@@ -191,7 +191,7 @@ def main():
             agent_chat_response: AgentChatResponse = extractor.chat(
                 json.dumps(dict(inst))
             )
-            extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
+            extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
             logger.debug(extract_output)
 
         # Run Test on Benchmark
