@@ -28,10 +28,10 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    final_stage = "extract"
-    # final_stage = 'search'
+    # final_stage = "extract"
+    final_stage = 'search'
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    agent.set_redirect_log_output(True)
+    #agent.set_redirect_log_output(True)
     for i, inst in enumerate(ds):
         print(f"({i:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))

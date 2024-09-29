@@ -3,7 +3,7 @@ llama-index-core
 llama-index-embeddings-openai 
 llama-index-agent-llm-compiler
 llama-index-llms-openai
-llama-index-llms-anthropic
+llama-index-llms-anthropic<=0.3.1
 httpx
 termcolor
 config

@@ -182,7 +182,7 @@ def parse_patch(
         print(
             f"Warning: returning empty patch, as patch for {instance_id:} is corrupted with msg '{repr(e)}'"
         )
-        return ParsedPatch(diff_locs=diff_locs).json()
+        return ParsedPatch(diff_locs=diff_locs).model_dump_json()
         # raise ValueError(f'{instance_id:}, {patch:}')
     if dbg:
         print(patch_set)

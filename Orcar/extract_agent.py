@@ -483,7 +483,7 @@ class ExtractWorker(BaseAgentWorker):
         is_done = len(task.extra_state["step_done"]) == 0
         if is_done:
             response = self.gen_output(task)
-            agent_response = AgentChatResponse(response=response.json())
+            agent_response = AgentChatResponse(response=response.model_dump_json())
         else:
             agent_response = AgentChatResponse(response="")
 
@@ -547,7 +547,7 @@ class ExtractAgent(AgentRunner):
     agent_chat_response: AgentChatResponse = agent.chat(input)
 
     Response parse:
-    extract_output = ExtractOutput.parse_raw(agent_chat_response.response)
+    extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
     """
 
     def __init__(

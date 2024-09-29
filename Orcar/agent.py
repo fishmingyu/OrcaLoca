@@ -89,7 +89,7 @@ class OrcarAgent:
         extract_output = ExtractOutput.parse_raw(response.response)
         self.logger.info(extract_output)
 
-        extract_json_obj = json.loads(extract_output.json())
+        extract_json_obj = json.loads(extract_output.model_dump_json())
         with open(f"{self.log_dir}/extractor_{self.inst_id}.json", "w") as handle:
             json.dump(extract_json_obj, handle, indent=4)
 
@@ -159,7 +159,7 @@ class OrcarAgent:
             print(f"Error: {e}")
             extract_output = ExtractOutput()
         if self.final_stage <= Stage.EXTRACT:
-            return extract_output.json(indent=4)
+            return extract_output.model_dump_json(indent=4)
 
         try:
             search_output = self.run_search_agent(extract_output)
