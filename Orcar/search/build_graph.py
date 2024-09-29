@@ -24,11 +24,11 @@ class LocInfo:
         return f"LocInfo(loc={self.loc}, type={self.type})"
     
 exclude_patterns = [
-        "pytest-dev__pytest/doc",  # Discovered this issue in 'pytest-dev__pytest'
-        "psf__requests/requests/packages",  # Workaround for issue in 'psf__requests'
-        "pylint-dev__pylint/tests/regrtest_data", "pylint-dev__pylint/tests/input", "pylint-dev__pylint/tests/functional",  # Workaround for issue in 'pylint-dev__pylint'
-        "sphinx-doc__sphinx/tests/roots", "sphinx-doc__sphinx/sphinx/templates/latex",  # Workaround for issue in 'sphinx-doc__sphinx'
-        "django__django/tests/test_runner_apps/tagged/", "django__django/django/conf/app_template/"  # Workaround for issue in 'django__django'
+        "doc",  # Discovered this issue in 'pytest-dev__pytest'
+        "requests/packages",  # Workaround for issue in 'psf__requests'
+        "tests/regrtest_data", "tests/input", "tests/functional",  # Workaround for issue in 'pylint-dev__pylint'
+        "tests/roots", "sphinx/templates/latex",  # Workaround for issue in 'sphinx-doc__sphinx'
+        "tests/test_runner_apps/tagged/", "django/conf/app_template/"  # Workaround for issue in 'django__django'
     ]
 
 # we use knowledge graph for faster retrieval of information
