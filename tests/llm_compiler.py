@@ -1,10 +1,10 @@
 import json
-from typing import Sequence, List
+from typing import List, Sequence
 
-from llama_index.llms.openai import OpenAI
+from llama_index.agent.llm_compiler import LLMCompilerAgentWorker
 from llama_index.core.llms import ChatMessage
 from llama_index.core.tools import BaseTool, FunctionTool
-from llama_index.agent.llm_compiler import LLMCompilerAgentWorker
+from llama_index.llms.openai import OpenAI
 
 
 def multiply(a: int, b: int) -> int:

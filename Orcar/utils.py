@@ -8,10 +8,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 from llama_index.core.tools.function_tool import FunctionTool
 from llama_index.core.tools.types import BaseTool, adapt_to_async_tool
 
-from .schema import (
-    LLMCompilerParseResult,
-    LLMCompilerTask,
-)
+from .schema import LLMCompilerParseResult, LLMCompilerTask
 
 # $1 or ${1} -> 1
 ID_PATTERN = r"\$\{?(\d+)\}?"

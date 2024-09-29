@@ -1,6 +1,5 @@
 import numpy
 
-
 ops = numpy.random.rand(1000, 1000)
 
 
@@ -8,6 +7,7 @@ ops = numpy.random.rand(1000, 1000)
 def add(a, b):
     d = a * a
     return a + b + c + d
+
 
 # calculate the difference of two numbers
 def subtract(a, b):

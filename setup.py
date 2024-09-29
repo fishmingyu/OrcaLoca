@@ -1,6 +1,6 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
-with open('requirements.txt') as f:
+with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
 
@@ -16,7 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(),
     package_data={
-        '': ['templates/*'],
+        "": ["templates/*"],
     },
     py_modules=["cli"],
     classifiers=[
@@ -24,11 +24,11 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.7',
+    python_requires=">=3.7",
     install_requires=requirements,
     entry_points={
-        'console_scripts': [
-            'orcar=cli:main',
+        "console_scripts": [
+            "orcar=cli:main",
         ],
     },
 )

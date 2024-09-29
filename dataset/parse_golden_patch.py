@@ -1,13 +1,14 @@
-from datasets import load_dataset
-import pandas as pd
-from pydantic import BaseModel
-from typing import List, Dict, Any, Tuple, Set
-import subprocess
 import ast
-import unidiff
-from unidiff import PatchSet
 import os
+import subprocess
+from typing import Any, Dict, List, Set, Tuple
+
+import pandas as pd
+import unidiff
+from datasets import load_dataset
+from pydantic import BaseModel
 from tqdm import tqdm
+from unidiff import PatchSet
 
 
 class DiffNode(BaseModel, frozen=True):
@@ -226,7 +227,7 @@ def main():
 
     If not cloned, run python dataset/repo_clone.py first
     """
-    
+
     BASE = "../swe_bench_repos"
     OUTPUT_PATH = "./dataset/lite_golden_stats.csv"
 

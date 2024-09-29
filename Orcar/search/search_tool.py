@@ -1,14 +1,16 @@
-import networkx as nx
-from .build_graph import RepoGraph, Loc, LocInfo
-from typing import Tuple
-from collections.abc import MutableMapping
-import os
 import ast
-import subprocess
+import os
 import re
+import subprocess
+from collections.abc import MutableMapping
+from typing import Tuple
+
+import networkx as nx
+
+from .build_graph import Loc, LocInfo, RepoGraph
+
 
 class SearchManager:
-    
     def __init__(self, repo_path) -> None:
         self.history = []
         self.repo_path = repo_path
@@ -17,7 +19,6 @@ class SearchManager:
     def _setup_graph(self):
         graph_builder = RepoGraph(repo_path=self.repo_path)
         self.kg = graph_builder
-
 
     def get_search_functions(self) -> list:
         """Return a list of search functions."""
@@ -31,24 +32,26 @@ class SearchManager:
             self.search_callable_in_file,
             self.search_source_code,
         ]
-    
+
     @property
     def search_tool_priority(self) -> str:
         """Return the search tool priority."""
         # The search tool priority is the order of the search functions in the list below
-        list = [self.search_file_skeleton, 
-                self.search_class_skeleton, 
-                self.search_func,
-                self.search_method_in_class,
-                self.search_callable_in_file, 
-                self.search_source_code]
+        list = [
+            self.search_file_skeleton,
+            self.search_class_skeleton,
+            self.search_func,
+            self.search_method_in_class,
+            self.search_callable_in_file,
+            self.search_source_code,
+        ]
         # convert the list to a description string, use the name of the function
         return f"""
         Please follow the search tool priority below:
         1. {list[0].__name__}
         2. {list[1].__name__} or {list[2].__name__}
         3. {list[3].__name__}: use this after you have already tried {list[1].__name__},
-        4. {list[4].__name__}, 
+        4. {list[4].__name__},
         5. {list[5].__name__}: only use source code search when you can't find the query in the file.
         """
 
@@ -65,7 +68,7 @@ class SearchManager:
         """
         with open(file_path, "r") as f:
             lines = f.readlines()
-            return "".join(lines[start-1:end])
+            return "".join(lines[start - 1 : end])
 
     def _get_query_in_file(self, file_path: str, query: str) -> LocInfo | None:
         """Get the query definition in the file. Search the query in KG.
@@ -78,7 +81,7 @@ class SearchManager:
             LocInfo | None: The locinfo of the query.
         """
         return self.kg.dfs_search_query_in_file(file_path, query)
-        
+
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
         Do not use this method to search the file skeleton.
@@ -88,7 +91,7 @@ class SearchManager:
             source_code (str): The source code to search.
 
         Returns:
-            str: The related function/class code snippet. 
+            str: The related function/class code snippet.
                 If not found, return the error message.
         """
         abs_file_path = os.path.join(self.repo_path, file_path)
@@ -100,13 +103,13 @@ class SearchManager:
             # Remove leading and trailing whitespace
             code = code.strip()
             # Replace all sequences of whitespace (space, tab, newline) with a single space
-            code = re.sub(r'\s+', ' ', code)
+            code = re.sub(r"\s+", " ", code)
             return code
 
         source_code = normalize_code(source_code)
         tree = ast.parse(file_content)
 
-            # Traverse the AST to find all function definitions
+        # Traverse the AST to find all function definitions
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 start_line = node.lineno
@@ -117,7 +120,7 @@ class SearchManager:
                 if source_code in normalized_func_body:
                     return func_body
         return f"Cannot find the context of {source_code} in {file_path}"
-    
+
     def _get_file_skeleton(self, file_name: str) -> str | None:
         """Get the skeleton of the file, including class and function definitions.
 
@@ -140,7 +143,7 @@ class SearchManager:
             Loc: The location of the function/class definition.
         """
         return self.kg.dfs_search_callable_def(callable)
-    
+
     def _get_class_skeleton(self, class_name: str) -> str | None:
         """Search the class in the knowledge graph.
 
@@ -151,7 +154,7 @@ class SearchManager:
             str | None: The skeleton of the class or None if not found.
         """
         return self.kg.get_class_snapshot(class_name)
-    
+
     def _search_func_kg(self, func_name: str) -> Loc:
         """Search the function in the knowledge graph.
 
@@ -162,7 +165,7 @@ class SearchManager:
             Loc: The location of the function definition.
         """
         return self.kg.dfs_search_func_def(func_name)
-    
+
     def _search_class_kg(self, class_name: str) -> Loc:
         """Search the class in the knowledge graph.
 
@@ -173,19 +176,18 @@ class SearchManager:
             Loc: The location of the class definition.
         """
         return self.kg.dfs_search_class_def(class_name)
-    
+
     def _search_method_in_class_kg(self, class_name: str, method_name: str) -> Loc:
         """Search the method in the knowledge graph.
 
         Args:
             class_name (str): The class name to search.
-            method_name (str): The method name to search. 
+            method_name (str): The method name to search.
                 It should be the method name without the class name.
         Returns:
             Loc: The location of the method definition.
         """
         return self.kg.dfs_search_method_in_class(class_name, method_name)
-
 
     #################
     # Interface methods
@@ -223,8 +225,11 @@ class SearchManager:
             return ("", f"Cannot find the definition of callable:{callable}")
         # loc.file_path is relative to the repo_path
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
-    
+        return (
+            loc.file_name,
+            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
+        )
+
     def search_class_skeleton(self, class_name: str) -> str:
         """API to search the class skeleton in given repo.
 
@@ -240,7 +245,7 @@ class SearchManager:
         if snapshot is None:
             return f"Cannot find the class:{class_name}"
         return snapshot
-    
+
     def search_func(self, func_name: str) -> Tuple[str, str]:
         """API to search the standalone function in given repo.
         NEVER use this API to search the method in the class. Use search_method_in_class instead.
@@ -255,8 +260,11 @@ class SearchManager:
         if loc is None:
             return ("", f"Cannot find the definition of function:{func_name}")
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
-    
+        return (
+            loc.file_name,
+            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
+        )
+
     def search_class(self, class_name: str) -> Tuple[str, str]:
         """API to search the class in given repo.
 
@@ -270,13 +278,18 @@ class SearchManager:
         if loc is None:
             return ("", f"Cannot find the definition of class:{class_name}")
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
-    
-    def search_method_in_class(self, class_name: str, method_name: str) -> Tuple[str, str]:
-        """API to search the method in the class in given repo. 
+        return (
+            loc.file_name,
+            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
+        )
+
+    def search_method_in_class(
+        self, class_name: str, method_name: str
+    ) -> Tuple[str, str]:
+        """API to search the method in the class in given repo.
         Don't try to use this API until you have already tried search_class_skeleton to get the class skeleton.
         If you know the class name and method name.
-        
+
         Args:
             class_name (str): The class name to search.
             method_name (str): The method name within the class.
@@ -286,9 +299,15 @@ class SearchManager:
         """
         loc = self._search_method_in_class_kg(class_name, method_name)
         if loc is None:
-            return ("", f"Cannot find the definition of method:{method_name} in class:{class_name}")
+            return (
+                "",
+                f"Cannot find the definition of method:{method_name} in class:{class_name}",
+            )
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (loc.file_name, self._get_code_snippet(joined_path, loc.start_line, loc.end_line))
+        return (
+            loc.file_name,
+            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
+        )
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
         """API to search the source code in the file. If you want to search the code snippet in the file.
@@ -298,11 +317,11 @@ class SearchManager:
             source_code (str): The source code to search.
 
         Returns:
-            str: The related function/method code snippet. 
+            str: The related function/method code snippet.
                 If not found, return the error message.
         """
         return self._search_source_code(file_path, source_code)
-    
+
     def search_callable_in_file(self, file_path: str, query: str) -> str:
         """API to search the query definition in the file.
         The query can be a function, class, method or global variable.
@@ -315,7 +334,7 @@ class SearchManager:
         Returns:
             str: The code snippet of the query. If query type is class, return the class skeleton.
         """
-        locinfo : LocInfo = self._get_query_in_file(file_path, query)
+        locinfo: LocInfo = self._get_query_in_file(file_path, query)
         if locinfo is None:
             return f"Cannot find the definition of {query} in {file_path}"
         loc = locinfo.loc
@@ -325,4 +344,3 @@ class SearchManager:
         if type == "class":
             return self._get_class_skeleton(query)
         return self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
-    

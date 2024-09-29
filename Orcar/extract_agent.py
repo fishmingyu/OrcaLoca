@@ -46,7 +46,7 @@ Partial tasks:
 """
 
 """
-1. slice 
+1. slice
 2. reproduce & judge (if has reproduce snippet)
 3. parse each part
 4. summarize
@@ -129,7 +129,6 @@ class ExtractWorker(BaseAgentWorker):
     def parse_path_in_code_info(
         self, inst: Dict[str, Any], related_code_snippets: List[CodeInfo]
     ) -> List[CodeInfo]:
-
         def cut_since_last_sensitive(target, sensitive):
             # Find the last occurrence of any element from sensitive in target
             for i in range(len(target) - 1, -1, -1):

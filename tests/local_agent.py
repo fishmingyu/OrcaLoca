@@ -1,12 +1,14 @@
 import json
-from typing import Sequence, List
+import os
+import subprocess
+from typing import List, Sequence
 
-from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 from llama_index.core.tools import BaseTool, FunctionTool
+from llama_index.llms.openai import OpenAI
+
 from Orcar import OrcarAgent
-import subprocess
-import os
+from Orcar.environment.env import EnvironmentSetup
 
 # tool bindings
 # orcar_agent = OrcarAgent()
@@ -14,8 +16,6 @@ import os
 
 # print(response)
 
-
-from Orcar.environment.env import EnvironmentSetup
 
 image_name = "orcar/x86_64:latest"
 

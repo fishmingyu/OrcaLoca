@@ -1,8 +1,9 @@
 """Base types for ReAct agent."""
 
 from abc import abstractmethod
-from typing import Dict, List, Tuple
 from collections import namedtuple
+from typing import Dict, List, Tuple
+
 from llama_index.core.bridge.pydantic import BaseModel
 
 
@@ -76,7 +77,7 @@ class ResponseReasoningStep(BaseReasoningStep):
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return True
-    
+
 
 class SearchActionStep(BaseReasoningStep):
     """Search action reasoning step."""
@@ -90,7 +91,7 @@ class SearchActionStep(BaseReasoningStep):
             f"Search Action: {self.action}\n"
             f"Search Action Input: {self.action_input}"
         )
-    
+
     @property
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
@@ -117,6 +118,7 @@ class SearchResult(BaseReasoningStep):
         """Is the reasoning step the last one."""
         return True
 
+
 class SearchObservationStep(BaseReasoningStep):
     """Search observation reasoning step."""
 
@@ -125,20 +127,24 @@ class SearchObservationStep(BaseReasoningStep):
 
     def get_content(self) -> str:
         """Get content."""
-        search_items = ", ".join(f"{key}: {value}" for item in self.search_new for key, value in item.items())
+        search_items = ", ".join(
+            f"{key}: {value}" for item in self.search_new for key, value in item.items()
+        )
         if not search_items:
             return f"Observation Feedback: {self.observation} Nothing new to search"
         return f"Observation Feedback: {self.observation}, What new to search: {search_items}"
 
     @property
     def is_done(self) -> bool:
-        """ search_new is empty"""
+        """search_new is empty"""
         if len(self.search_new) == 0:
             return True
         return False
-    
+
+
 class ExtractSliceStep(BaseReasoningStep):
     """Extract slice step"""
+
     traceback_warning_log_slice: str
     issue_reproducer_slice: str
     source_code_slice: str
@@ -155,79 +161,85 @@ class ExtractSliceStep(BaseReasoningStep):
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return False
-    
+
+
 class CodeInfo(BaseModel, frozen=True):
     """Code keyword and location info"""
+
     keyword: str
     file_path: str
 
+
 class ExtractParseStep(BaseReasoningStep):
     """Extract parse step"""
+
     code_info_list: List[CodeInfo]
 
     def get_content(self) -> str:
         """Get content."""
-        return (
-            f"code_info_list: {self.code_info_list}\n"
-        )
+        return f"code_info_list: {self.code_info_list}\n"
 
     @property
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return False
-    
+
+
 class ExtractJudgeStep(BaseReasoningStep):
     """Extract summarize step"""
+
     is_successful: bool
 
     def get_content(self) -> str:
         """Get content."""
-        return (
-            f"is_successful: {self.is_successful}\n"
-        )
+        return f"is_successful: {self.is_successful}\n"
 
     @property
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return False
-    
+
+
 class ExtractSummarizeStep(BaseReasoningStep):
     """Extract summarize step"""
+
     summary: str
     code_info_list: List[CodeInfo]
 
     def get_content(self) -> str:
         """Get content."""
-        return (
-            f"summary: {self.summary}\n"
-            f"code_info_list: {self.code_info_list}\n"
-        )
+        return f"summary: {self.summary}\n" f"code_info_list: {self.code_info_list}\n"
 
     @property
     def is_done(self) -> bool:
         """Is the reasoning step the last one."""
         return False
-    
+
+
 class ExtractOutput(BaseModel):
     """
     Extract agent output
     """
-    summary: str = ''
+
+    summary: str = ""
     suspicous_code: List[CodeInfo] = []
     suspicous_code_from_tracer: List[CodeInfo] = []
-    related_source_code: str = ''
+    related_source_code: str = ""
 
 
 class SearchInput(BaseModel):
     """
     Search input
     """
+
     problem_statement: str
     extract_output: ExtractOutput
 
     def get_content(self) -> str:
         """Get content."""
-        suspicous_code = ", ".join(f"{code.keyword}" for code in self.extract_output.suspicous_code)
+        suspicous_code = ", ".join(
+            f"{code.keyword}" for code in self.extract_output.suspicous_code
+        )
         summary = self.extract_output.summary
         return (
             f"Problem Statement: {self.problem_statement}\n"

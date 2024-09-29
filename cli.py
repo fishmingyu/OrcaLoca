@@ -46,7 +46,6 @@ def exit_with_help_message(parser):
 
 
 class ArgumentParser(argparse.ArgumentParser):
-
     def __init__(self, *args, **kwargs):
         super(ArgumentParser, self).__init__(*args, **kwargs)
         self.error = self.error
@@ -191,7 +190,9 @@ def main():
             agent_chat_response: AgentChatResponse = extractor.chat(
                 json.dumps(dict(inst))
             )
-            extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
+            extract_output = ExtractOutput.model_validate_json(
+                agent_chat_response.response
+            )
             logger.debug(extract_output)
 
         # Run Test on Benchmark

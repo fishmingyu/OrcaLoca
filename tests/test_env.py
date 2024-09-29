@@ -44,7 +44,6 @@ env = BenchmarkEnv(args, ctr_bash)
 
 
 def main():
-
     # Open the file in write mode
     log_dir = "./log"
     os.makedirs(log_dir, exist_ok=True)

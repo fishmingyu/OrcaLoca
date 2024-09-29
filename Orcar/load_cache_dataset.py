@@ -18,17 +18,21 @@ def load_filter_hf_dataset(args) -> datasets.arrow_dataset.Dataset:
 def load_filter_hf_dataset_explicit(
     dataset: str, filter_instance: str, split: str
 ) -> datasets.arrow_dataset.Dataset:
-    cache_dir = str(Path.home()) + '/.cache/orcar'
+    cache_dir = str(Path.home()) + "/.cache/orcar"
     subprocess.run(f"mkdir -p {cache_dir}", shell=True, check=True)
     dataset_file = f'{dataset.replace("/", "__")}_{split}.json'
     dataset_path = f"{cache_dir}/{dataset_file}"
     if not os.path.exists(dataset_path):
-        if (dataset == 'SWE-bench_common'):
-            ds_lite: datasets.arrow_dataset.Dataset = datasets.load_dataset('princeton-nlp/SWE-bench_Lite', split=split)
-            ds_verified: datasets.arrow_dataset.Dataset = datasets.load_dataset('princeton-nlp/SWE-bench_Verified', split=split)
+        if dataset == "SWE-bench_common":
+            ds_lite: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Lite", split=split
+            )
+            ds_verified: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Verified", split=split
+            )
             ds = ds_verified.filter(
                 input_columns=["instance_id"],
-                function=lambda x: x in ds_lite['instance_id'],
+                function=lambda x: x in ds_lite["instance_id"],
             )
         else:
             ds = datasets.load_dataset(dataset, split=split)
@@ -51,7 +55,9 @@ def load_filter_hf_dataset_explicit(
                 "environment_setup_commit": Value("string"),
             }
         )
-        ds = datasets.load_dataset("json", data_files=data_files, split=split, features=ft)
+        ds = datasets.load_dataset(
+            "json", data_files=data_files, split=split, features=ft
+        )
     return ds.filter(
         input_columns=["instance_id"],
         function=lambda x: bool(re.match(filter_instance, x)),

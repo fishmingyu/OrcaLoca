@@ -2,69 +2,59 @@
 A search agent. Process raw response into json format.
 """
 
-import uuid
 import json
+import logging
 import queue
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    cast,
-)
+import uuid
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
-from llama_index.core.llms.llm import LLM
-from llama_index.llms.openai import OpenAI
-from llama_index.core.program import FunctionCallingProgram
-from llama_index.core.tools.types import AsyncBaseTool
-from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.agent.runner.base import AgentRunner
-from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
-from openai.types.chat import ChatCompletionMessageToolCall
-from .types import (
-    ActionReasoningStep,
-    BaseReasoningStep,
-    ObservationReasoningStep,
-    ResponseReasoningStep,
-    SearchResult
-)
-from llama_index.core.chat_engine.types import (
-    AGENT_CHAT_RESPONSE_TYPE,
-    AgentChatResponse,
-)
-from llama_index.core.base.llms.types import ChatMessage, MessageRole, ChatResponse
+from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
 from llama_index.core.callbacks import (
     CallbackManager,
     CBEventType,
     EventPayload,
     trace_method,
 )
-from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
-from llama_index.core.memory.types import BaseMemory
-from llama_index.core.agent.types import (
-    BaseAgentWorker,
-    Task,
-    TaskStep,
-    TaskStepOutput,
+from llama_index.core.chat_engine.types import (
+    AGENT_CHAT_RESPONSE_TYPE,
+    AgentChatResponse,
 )
 from llama_index.core.instrumentation import get_dispatcher
-from llama_index.core.objects.base import ObjectRetriever
-from llama_index.core.settings import Settings
-from llama_index.core.prompts.mixin import PromptMixinType, PromptDictType
 from llama_index.core.instrumentation.events.agent import AgentToolCallEvent
+from llama_index.core.llms.llm import LLM
+from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
+from llama_index.core.memory.types import BaseMemory
+from llama_index.core.objects.base import ObjectRetriever
+from llama_index.core.program import FunctionCallingProgram
+from llama_index.core.prompts.base import PromptTemplate
+from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
+from llama_index.core.settings import Settings
+from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
+from llama_index.core.tools.types import AsyncBaseTool
+from llama_index.llms.openai import OpenAI
+from openai.types.chat import ChatCompletionMessageToolCall
 
-
-import logging
 from .environment.utils import get_logger
-from .search import SearchManager
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
-from .types import SearchActionStep, SearchObservationStep, SearchInput, ExtractOutput
+from .search import SearchManager
+from .types import (
+    ActionReasoningStep,
+    BaseReasoningStep,
+    ExtractOutput,
+    ObservationReasoningStep,
+    ResponseReasoningStep,
+    SearchActionStep,
+    SearchInput,
+    SearchObservationStep,
+    SearchResult,
+)
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
+
 
 def parse_search_input_step(input: SearchInput, task: Task) -> None:
     extract_output = input.extract_output
@@ -82,6 +72,7 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
             task.extra_state["search_queue"].put(search_step)
             task.extra_state["action_history"].append(search_step)
 
+
 def add_user_step_to_memory(
     step: TaskStep,
     search_input: SearchInput,
@@ -94,9 +85,10 @@ def add_user_step_to_memory(
         # add to new memory
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         step.step_state["is_first"] = False
-    else:   # conclusion
+    else:  # conclusion
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         # logger.info(f"Add user input to memory: {step.input}")
+
 
 class SearchWorker(BaseAgentWorker):
     """OpenAI Agent worker."""
@@ -226,7 +218,9 @@ class SearchWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = output.message.content
         try:
-            obseravtion, relevance, explore_step = self._output_parser.parse_explore(message_content)
+            obseravtion, relevance, explore_step = self._output_parser.parse_explore(
+                message_content
+            )
         except BaseException as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, relevance, explore_step
@@ -266,9 +260,7 @@ class SearchWorker(BaseAgentWorker):
                         raw_output=e,
                         is_error=True,
                     )
-                event.on_end(
-                    payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)}
-                )
+                event.on_end(payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)})
         else:
             tool_output = ToolOutput(
                 content=f"Error: Tool {search_step.action} not found.",
@@ -277,11 +269,15 @@ class SearchWorker(BaseAgentWorker):
                 raw_output=None,
                 is_error=True,
             )
-        search_result = SearchResult(search_action=search_step.action, search_input=search_step.action_input, search_content=tool_output.content)
+        search_result = SearchResult(
+            search_action=search_step.action,
+            search_input=search_step.action_input,
+            search_content=tool_output.content,
+        )
         task.extra_state["sources"].append(tool_output)
 
-        return search_result 
-    
+        return search_result
+
     def _concat_search_results(self, search_results: List[SearchResult]) -> str:
         """Join and Concatenate search results."""
         search_results_str = ""
@@ -289,9 +285,9 @@ class SearchWorker(BaseAgentWorker):
             search_results_str += search_result.get_content() + "\n"
         return search_results_str
 
-    def _check_action_valid(self, 
-                            action : SearchActionStep,
-                            action_history: List[SearchActionStep]) -> bool:
+    def _check_action_valid(
+        self, action: SearchActionStep, action_history: List[SearchActionStep]
+    ) -> bool:
         """Check if the action is valid."""
         # first check if the action is in the history
         if action in action_history:
@@ -312,7 +308,7 @@ class SearchWorker(BaseAgentWorker):
                     return False
 
         return True
-    
+
     def _get_response(
         self,
         current_res: List[BaseReasoningStep],
@@ -329,7 +325,12 @@ class SearchWorker(BaseAgentWorker):
         return AgentChatResponse(response=response_str, sources=sources)
 
     def _get_task_step_response(
-        self, agent_response: AGENT_CHAT_RESPONSE_TYPE, step: TaskStep, next_step: str, next_step_input: str, is_done: bool = False
+        self,
+        agent_response: AGENT_CHAT_RESPONSE_TYPE,
+        step: TaskStep,
+        next_step: str,
+        next_step_input: str,
+        is_done: bool = False,
     ) -> TaskStepOutput:
         """Get task step response."""
         if is_done:
@@ -338,8 +339,7 @@ class SearchWorker(BaseAgentWorker):
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    input="Now let's come to a conclusion. Please produce the bug locations. \n"
-                    , # this step is conclusion
+                    input="Now let's come to a conclusion. Please produce the bug locations. \n",  # this step is conclusion
                 )
             ]
         elif next_step == "explore":
@@ -347,8 +347,7 @@ class SearchWorker(BaseAgentWorker):
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
                     input="Please provide observation feedback and new_search_actions on the search results below. \n"
-                    + next_step_input
-                    , # this step is observation
+                    + next_step_input,  # this step is observation
                 )
             ]
 
@@ -376,20 +375,25 @@ class SearchWorker(BaseAgentWorker):
         # add task input to chat history
         input_chat = self._search_formatter.format(
             tools,
-            chat_history=task.memory.get(input=task.input) + task.extra_state["new_memory"].get_all(),
+            chat_history=task.memory.get(input=task.input)
+            + task.extra_state["new_memory"].get_all(),
             current_search=task.extra_state["current_search"],
         )
 
         # send prompt
-        in_token_cnt = self._token_counter.count(self._llm.messages_to_prompt(input_chat))
+        in_token_cnt = self._token_counter.count(
+            self._llm.messages_to_prompt(input_chat)
+        )
         if isinstance(self._llm, OpenAI):
-            chat_response = self._llm.chat(input_chat, response_format={"type": "json_object"})
+            chat_response = self._llm.chat(
+                input_chat, response_format={"type": "json_object"}
+            )
         else:
             chat_response = self._llm.chat(input_chat)
         out_token_cnt = self._token_counter.count(chat_response.message.content)
         token_cnt = TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt)
         logger.info(token_cnt)
-        task.extra_state["token_cnts"].append(('Searcher step', token_cnt))
+        task.extra_state["token_cnts"].append(("Searcher step", token_cnt))
 
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
@@ -402,17 +406,23 @@ class SearchWorker(BaseAgentWorker):
                 None,
                 is_done=True,
             )
-        
-        observation, relevance, search_steps = self._extract_exploring_step(chat_response)
+
+        observation, relevance, search_steps = self._extract_exploring_step(
+            chat_response
+        )
         # push back search steps to the queue
         for search_step in search_steps:
             # if search_step in history, skip
-            if not self._check_action_valid(search_step, task.extra_state["action_history"]):
+            if not self._check_action_valid(
+                search_step, task.extra_state["action_history"]
+            ):
                 continue
             task.extra_state["search_queue"].put(search_step)
             task.extra_state["action_history"].append(search_step)
         # print current queue size
-        logger.info(f"Current search queue size: {task.extra_state['search_queue'].qsize()}")
+        logger.info(
+            f"Current search queue size: {task.extra_state['search_queue'].qsize()}"
+        )
         is_complete = task.extra_state["search_queue"].empty()
         if is_complete:
             task.extra_state["is_done"] = True
@@ -426,9 +436,7 @@ class SearchWorker(BaseAgentWorker):
         # only process the head of the queue
         head_search_step = task.extra_state["search_queue"].get()
         search_step = cast(SearchActionStep, head_search_step)
-        search_result = self._process_search(
-            task, tools, search_step
-        )
+        search_result = self._process_search(task, tools, search_step)
         # logger.info(f"Search result: {search_result}")
         # pop the head of the queue after processing
         task.extra_state["search_queue"].task_done()
@@ -438,10 +446,12 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(
             task.extra_state["current_search"], task.extra_state["sources"]
         )
-        
+
         # add observation feedback to new memory if relevance is True
         if relevance:
-            task.extra_state["new_memory"].put(ChatMessage(content=observation, role=MessageRole.ASSISTANT))
+            task.extra_state["new_memory"].put(
+                ChatMessage(content=observation, role=MessageRole.ASSISTANT)
+            )
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
@@ -449,26 +459,27 @@ class SearchWorker(BaseAgentWorker):
         # logger.info(f"Searched: {search_result.get_content()}")
         # task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
-        return self._get_task_step_response(agent_response, step, "explore", task.extra_state["next_step_input"], False)
-    
+        return self._get_task_step_response(
+            agent_response, step, "explore", task.extra_state["next_step_input"], False
+        )
 
     @trace_method("run_step")
     def run_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
         """Run step."""
         return self._run_step(step, task)
-    
+
     def arun_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
         return super().arun_step(step, task, **kwargs)
-    
+
     def stream_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
         """Run step (stream)."""
-        pass 
+        pass
 
     async def astream_step(
         self, step: TaskStep, task: Task, **kwargs: Any
     ) -> TaskStepOutput:
         pass
-    
+
     def finalize_task(self, task: Task, **kwargs: Any) -> None:
         """Finalize task, after all the steps are completed."""
         task.memory.set(
@@ -554,6 +565,7 @@ class SearchAgent(AgentRunner):
             callback_manager=callback_manager,
             verbose=verbose,
         )
+
     def _setup_tools(self) -> List[BaseTool]:
         """Set up tools."""
         tools = []
