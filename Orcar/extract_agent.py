@@ -98,7 +98,7 @@ class ExtractWorker(BaseAgentWorker):
             "slices": dict(),
             "parse_type": dict(),
             "suspicous_code": set(),
-            "suspicous_code_with_path": set(),
+            "suspicous_code_with_path": list(),
             "suspicous_code_with_path_min_size_soft": 3,
             "suspicous_code_with_path_max_size_soft": 10,
             "summary": "",
@@ -154,13 +154,15 @@ class ExtractWorker(BaseAgentWorker):
         processed_code_info_list: List[CodeInfo] = []
         # Senstive mechanism:
         # Only care about paths contains certain words
-        sensitive_list = ["tests"] # "tests" should be included
-        repo_folder = inst["repo"].split("/")[-1] # for astropy/astropy, "astropy" should be included
+        sensitive_list = ["tests"]  # "tests" should be included
+        repo_folder = inst["repo"].split("/")[
+            -1
+        ]  # for astropy/astropy, "astropy" should be included
         repo_root = "/" + get_repo_dir(inst["repo"])
         if inst["repo"] == "scikit-learn/scikit-learn":
-            repo_folder = "sklearn" # scikit-learn use "sklearn" as import name / main folder name
+            repo_folder = "sklearn"  # scikit-learn use "sklearn" as import name / main folder name
         sensitive_list += [repo_folder]
-        self.env.run(f'cd {repo_root}')
+        self.env.run(f"cd {repo_root}")
 
         for code_info in related_code_snippets:
             if code_info.file_path == "":
@@ -201,7 +203,7 @@ class ExtractWorker(BaseAgentWorker):
                     )
                     processed_code_info_list.append(processed_code_info)
 
-        self.env.run(f'cd -')
+        self.env.run(f"cd -")
         return processed_code_info_list
 
     def reproduce_issue(self, issue_reproducer: str, inst: Dict[str, Any]) -> str:
@@ -275,17 +277,28 @@ class ExtractWorker(BaseAgentWorker):
         parse_step: ExtractParseStep = self._output_parser.parse(
             message_content, "parse"
         )
-
-        logger.info(f"Before parse path: {parse_step}")
-        parse_step.code_info_list = self.parse_path_in_code_info(
-            task.extra_state["inst"], parse_step.code_info_list
-        )
-        logger.info(f"After parse path: {parse_step}")
-        for code_info in parse_step.code_info_list:
-            if code_info.file_path and step_name == "traceback_parse":
-                task.extra_state["suspicous_code_with_path"].add(code_info)
-            else:
-                task.extra_state["suspicous_code"].add(CodeInfo(keyword=code_info.keyword, file_path=''))
+        if step_name != "traceback_parse":
+            logger.info(f"{parse_step}")
+            for code_info in parse_step.code_info_list:
+                task.extra_state["suspicous_code"].add(
+                    CodeInfo(keyword=code_info.keyword, file_path="")
+                )
+        else:
+            logger.info(f"Before parse path: {parse_step}")
+            parse_step.code_info_list = self.parse_path_in_code_info(
+                task.extra_state["inst"], parse_step.code_info_list
+            )
+            logger.info(f"After parse path: {parse_step}")
+            for code_info in parse_step.code_info_list[::-1]:
+                # Reverse: Last appeared in stack (first called function) has high priority
+                if code_info.file_path and (
+                    code_info not in task.extra_state["suspicous_code_with_path"]
+                ):
+                    task.extra_state["suspicous_code_with_path"].append(code_info)
+                else:
+                    task.extra_state["suspicous_code"].add(
+                        CodeInfo(keyword=code_info.keyword, file_path="")
+                    )
         next_step_names = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -347,7 +360,9 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
-            task.extra_state["suspicous_code"].add(CodeInfo(keyword=code_info.keyword, file_path=''))
+            task.extra_state["suspicous_code"].add(
+                CodeInfo(keyword=code_info.keyword, file_path="")
+            )
         task.extra_state["summary"] = summarize_step.summary
 
         next_step_names = []
@@ -395,7 +410,7 @@ class ExtractWorker(BaseAgentWorker):
                 # Unexpected, drop
                 continue
             if len(task.extra_state["suspicous_code_with_path"]) < max_size:
-                task.extra_state["suspicous_code_with_path"].add(function_item)
+                task.extra_state["suspicous_code_with_path"].append(function_item)
 
         next_step_names = []
         os.remove(output_host_path)
@@ -431,7 +446,7 @@ class ExtractWorker(BaseAgentWorker):
             )
 
     def gen_output(self, task: Task) -> ExtractOutput:
-        suspicous_code_with_path: Set[CodeInfo] = task.extra_state[
+        suspicous_code_with_path: List[CodeInfo] = task.extra_state[
             "suspicous_code_with_path"
         ]
         suspicous_keywords_with_path = set(
@@ -451,7 +466,7 @@ class ExtractWorker(BaseAgentWorker):
         return ExtractOutput(
             summary=task.extra_state["summary"],
             suspicous_code=[code_loc.keyword for code_loc in suspicous_code],
-            suspicous_code_with_path=list(suspicous_code_with_path),
+            suspicous_code_with_path=suspicous_code_with_path,
             related_source_code=related_source_code,
         )
 
