@@ -252,11 +252,7 @@ class SearchWorker(BaseAgentWorker):
                         )
                     )
                     tool_output = tool.call(**search_step.action_input)
-                    file_path, search_content = tool_output
-                    search_result = SearchResult(
-                        search_file=file_path,
-                        search_content=search_content,
-                    )
+
                 except Exception as e:
                     tool_output = ToolOutput(
                         content=f"Error: {e!s}",
@@ -264,10 +260,6 @@ class SearchWorker(BaseAgentWorker):
                         raw_input={"kwargs": search_step.action_input},
                         raw_output=e,
                         is_error=True,
-                    )
-                    search_result = SearchResult(
-                        search_file="Not found",
-                        search_content=tool_output.content,
                     )
                 event.on_end(payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)})
         else:
@@ -278,10 +270,11 @@ class SearchWorker(BaseAgentWorker):
                 raw_output=None,
                 is_error=True,
             )
-            search_result = SearchResult(
-                search_file="Not found",
-                search_content=tool_output.content,
-            )
+        search_result = SearchResult(
+            search_action=search_step.action,
+            search_action_input=search_step.action_input,
+            search_content=tool_output.content,
+        )
         task.extra_state["sources"].append(tool_output)
 
         return search_result
@@ -448,6 +441,7 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(
             task.extra_state["current_search"], task.extra_state["sources"]
         )
+        # logger.info(f"Agent response: {agent_response.response}")
 
         # add observation feedback to new memory if relevance is True
         if relevance:

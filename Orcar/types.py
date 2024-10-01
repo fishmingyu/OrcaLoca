@@ -101,14 +101,16 @@ class SearchActionStep(BaseReasoningStep):
 class SearchResult(BaseReasoningStep):
     """Search result reasoning step."""
 
-    search_file: str
+    search_action: str
+    search_action_input: Dict
     search_content: str
 
     def get_content(self) -> str:
         """Get content."""
         return (
-            f"The searched content is in file: {self.search_file}\n"
-            f"Related code snippet is below: \n {self.search_content}"
+            f"Search Action: {self.search_action}\n"
+            f"Search Action Input: {self.search_action_input}\n"
+            f"\n {self.search_content}"
         )
 
     @property

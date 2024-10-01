@@ -345,7 +345,8 @@ class RepoGraph:
             # Skip directories that match any exclude pattern
             if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
                 continue
-            self.add_node(dir_node_name, "directory")
+            loc = Loc(file_name=dir_node_name, start_line=0, end_line=0)
+            self.add_node(dir_node_name, "directory", loc=loc)
 
             dirs[:] = [
                 sub_dir
@@ -362,7 +363,10 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
-                self.add_node(sub_dir_node_name, "directory")
+                loc = Loc(
+                    file_name=sub_dir_node_name, start_line=0, end_line=0
+                )
+                self.add_node(sub_dir_node_name, "directory", loc=loc)
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
             for file in files:
@@ -379,7 +383,10 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    self.add_node(file_node_name, "file")
+                    loc = Loc(
+                        file_name=file_node_name, start_line=0, end_line=0
+                    )
+                    self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 
                     # Build the graph for the file's content
@@ -392,7 +399,8 @@ class RepoGraph:
         for root, dirs, files in self.swe_env.walk(repo_path):
             # Add a node for the directory
             dir_node_name = os.path.relpath(root, repo_path)
-            self.add_node(dir_node_name, "directory")
+            loc = Loc(file_name=dir_node_name, start_line=0, end_line=0)
+            self.add_node(dir_node_name, "directory", loc=loc)
 
             # Skip directories that match any exclude pattern
             if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
@@ -413,6 +421,9 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
+                loc = Loc(
+                    file_name=sub_dir_node_name, start_line=0, end_line=0
+                )
                 self.add_node(sub_dir_node_name, "directory")
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
@@ -430,7 +441,10 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    self.add_node(file_node_name, "file")
+                    loc = Loc(
+                        file_name=file_node_name, start_line=0, end_line=0
+                    )
+                    self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 
                     # Build the graph for the file's content

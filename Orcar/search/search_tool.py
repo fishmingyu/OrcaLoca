@@ -163,7 +163,7 @@ class SearchManager:
     # Interface methods
     #################
 
-    def search_file_skeleton(self, file_name: str) -> Tuple[str, str]:
+    def search_file_skeleton(self, file_name: str) -> str:
         """API to search the file skeleton
             If you want to see the structure of the file, including class and function signatures.
             Be sure to call search_class_skeleton and search_func to get detailed information in the file.
@@ -173,33 +173,41 @@ class SearchManager:
             Do not include the path, only the file name.
 
         Returns:
-            Tuple[str, str]: The file path and the file skeleton.
+           str: A string that contains the file path and the file skeleton.
         """
 
         loc, res = self._get_file_skeleton(file_name)
         if loc is None:
-            return "", f"Cannot find the file skeleton of {file_name}"
-        return loc.file_name, res
+            return f"Cannot find the file skeleton of {file_name}"
+        return f"""
+        File Path: {loc.file_name} \n
+        File Skeleton: \n
+        {res}
+        """
 
-    def search_class_skeleton(self, class_name: str) -> Tuple[str, str]:
+    def search_class_skeleton(self, class_name: str) -> str:
         """API to search the class skeleton in given repo.
 
         Args:
             class_name (str): The class name to search.
 
         Returns:
-            Tuple[str, str]: The file path and the class skeleton.
+            str: The file path and the class skeleton.
             Please call search_method_in_class to get detailed information of the method after skeleton search.
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
         loc, snapshot = self._get_class_skeleton(class_name)
         if loc is None:
-            return "", f"Cannot find the class skeleton of {class_name}"
-        return loc.file_name, snapshot
+            return f"Cannot find the class skeleton of {class_name}"
+        return f"""
+        File Path: {loc.file_name} \n
+        Class Skeleton: \n
+        {snapshot}
+        """
 
     def search_method_in_class(
         self, class_name: str, method_name: str
-    ) -> Tuple[str, str]:
+    ) -> str:
         """API to search the method in the class in given repo.
         Don't try to use this API until you have already tried search_class_skeleton to get the class skeleton.
         If you know the class name and method name.
@@ -209,21 +217,20 @@ class SearchManager:
             method_name (str): The method name within the class.
 
             Returns:
-                Tuple[str, str]: The file path and the code_snippet of the method definition.
+                str: The file path and the method code snippet.
+                If not found, return the error message.
         """
         loc = self._search_method_in_class_kg(class_name, method_name)
         if loc is None:
-            return (
-                "",
-                f"Cannot find the definition of method:{method_name} in class:{class_name}",
-            )
+            return f"Cannot find the definition of method:{method_name} in class:{class_name}",
         joined_path = os.path.join(self.repo_path, loc.file_name)
-        return (
-            loc.file_name,
-            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
-        )
+        return f"""
+        File Path: {loc.file_name} \n
+        Method Code Snippet: \n
+        {self._get_code_snippet(joined_path, loc.start_line, loc.end_line)}
+        """
 
-    def search_source_code(self, file_path: str, source_code: str) -> Tuple[str, str]:
+    def search_source_code(self, file_path: str, source_code: str) -> str:
         """API to search the source code in the file. If you want to search the code snippet in the file.
 
         Args:
@@ -231,12 +238,16 @@ class SearchManager:
             source_code (str): The source code to search.
 
         Returns:
-            Tuple[str, str]: The related function/method code snippet.
+            str: The file path and the related function/class code snippet.
                 If not found, return the error message.
         """
-        return file_path, self._search_source_code(file_path, source_code)
+        return f"""
+        File Path: {file_path} \n
+        Code Snippet: \n 
+        {self._search_source_code(file_path, source_code)}
+        """
 
-    def search_callable(self, query: str, **kwargs) -> Tuple[str, str]:
+    def search_callable(self, query: str, **kwargs) -> str:
         """API to search the callable definition in the file.
         The query can be a function, class, method or global variable. Don't use this API to search source code in the file.
 
@@ -247,7 +258,7 @@ class SearchManager:
             file_path (str): The file path to search. If not provided, search in the whole repo.
 
         Returns:
-            Tuple[str, str]: The file path and the code snippet of the query. If query type is class, return the class skeleton.
+            str: The file path and the code snippet of the query. If query type is class, return the class skeleton.
         """
         if "file_path" in kwargs:
             file_path = kwargs["file_path"]
@@ -255,14 +266,17 @@ class SearchManager:
         else:
             locinfo: LocInfo = self._search_callable_kg(query)
         if locinfo is None:
-            return "", f"Cannot find the definition of {query}"
+            return f"Cannot find the definition of {query}"
         loc = locinfo.loc
         type = locinfo.type
         joined_path = os.path.join(self.repo_path, loc.file_name)
         # if type is class, we use the class snapshot
         if type == "class":
             return self.search_class_skeleton(query)
-        return (
-            loc.file_name,
-            self._get_code_snippet(joined_path, loc.start_line, loc.end_line),
-        )
+        
+        return f"""
+        File Path: {loc.file_name} \n
+        Code Snippet or Skeleton (if class): \n
+        {self._get_code_snippet(joined_path, loc.start_line, loc.end_line)}
+        """
+    
