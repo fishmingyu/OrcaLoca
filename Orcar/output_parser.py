@@ -1,7 +1,6 @@
 """LLM Compiler Output Parser."""
 
 import json
-import logging
 import re
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -21,7 +20,6 @@ from .types import (
     ExtractSummarizeStep,
     ResponseReasoningStep,
     SearchActionStep,
-    SearchObservationStep,
 )
 from .utils import get_graph_dict
 
@@ -75,7 +73,7 @@ class LLMCompilerPlanParser(BaseOutputParser):
         return get_graph_dict(results, self.tools)
 
 
-### Helper functions
+# Helper functions
 
 
 class LLMCompilerJoinerParser(BaseOutputParser):
@@ -277,7 +275,7 @@ class SearchOutputParser(BaseOutputParser):
         """
         if "bug_locations" in output:
             # cast the output to SearchResult
-            search_result = escape_newlines_in_json_strings(search_result)
+            search_result = escape_newlines_in_json_strings(output)
             search_result = json.loads(search_result)
 
             return search_result

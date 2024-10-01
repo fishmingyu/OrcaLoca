@@ -1,16 +1,13 @@
 import argparse
-import csv
 
 import pandas as pd
 
-from Orcar import OrcarAgent, SearchAgent
+from Orcar import OrcarAgent
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 
 
 def load_csv_dataset(file_path):
-    import pandas as pd
-
     return pd.read_csv(file_path)
 
 

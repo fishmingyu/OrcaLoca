@@ -1,7 +1,6 @@
 # ReAct agent formatter
 
 import json
-import logging
 from abc import abstractmethod
 from typing import List, Optional, Sequence, Tuple
 
@@ -68,7 +67,7 @@ class TokenCounter:
         logger.info(f"Found tokenizer for model '{model}'")
 
     def count(self, string: str) -> int:
-        if self.encoding == None:
+        if self.encoding is None:
             return 0
         return len(self.encoding.encode(string))
 

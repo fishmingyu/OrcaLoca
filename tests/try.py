@@ -1,6 +1,5 @@
 from abc import abstractmethod
-from collections import namedtuple
-from typing import Dict, List
+from typing import List
 
 from llama_index.core.bridge.pydantic import BaseModel
 

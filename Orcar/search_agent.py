@@ -3,7 +3,6 @@ A search agent. Process raw response into json format.
 """
 
 import json
-import logging
 import queue
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
@@ -27,30 +26,18 @@ from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
 from llama_index.core.memory.types import BaseMemory
 from llama_index.core.objects.base import ObjectRetriever
-from llama_index.core.program import FunctionCallingProgram
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
 from llama_index.core.settings import Settings
 from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.llms.openai import OpenAI
-from openai.types.chat import ChatCompletionMessageToolCall
 
 from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import (
-    ActionReasoningStep,
-    BaseReasoningStep,
-    ExtractOutput,
-    ObservationReasoningStep,
-    ResponseReasoningStep,
-    SearchActionStep,
-    SearchInput,
-    SearchObservationStep,
-    SearchResult,
-)
+from .types import BaseReasoningStep, SearchActionStep, SearchInput, SearchResult
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
@@ -66,8 +53,8 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
             query = code_info.keyword
             file_path = code_info.file_path
             search_step = SearchActionStep(
-                action="search_callable_in_file",
-                action_input={"file_path": file_path, "query": query},
+                action="search_callable",
+                action_input={"query": query, "file_path": file_path},
             )
             task.extra_state["search_queue"].put(search_step)
             task.extra_state["action_history"].append(search_step)
@@ -221,7 +208,7 @@ class SearchWorker(BaseAgentWorker):
             obseravtion, relevance, explore_step = self._output_parser.parse_explore(
                 message_content
             )
-        except BaseException as exc:
+        except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, relevance, explore_step
 
@@ -252,6 +239,7 @@ class SearchWorker(BaseAgentWorker):
                         )
                     )
                     tool_output = tool.call(**search_step.action_input)
+
                 except Exception as e:
                     tool_output = ToolOutput(
                         content=f"Error: {e!s}",
@@ -271,7 +259,7 @@ class SearchWorker(BaseAgentWorker):
             )
         search_result = SearchResult(
             search_action=search_step.action,
-            search_input=search_step.action_input,
+            search_action_input=search_step.action_input,
             search_content=tool_output.content,
         )
         task.extra_state["sources"].append(tool_output)
@@ -292,18 +280,12 @@ class SearchWorker(BaseAgentWorker):
         # first check if the action is in the history
         if action in action_history:
             return False
-        # if we search_callable_in_file is in the history, we don't need to call search_callable or search_class or search_func
+        # if we search_query is in the history, we don't need to call search_callable or search_class or search_func
         search_query = ""
-        if action.action == "search_callable":
-            search_query = action.action_input["callable"]
-        if action.action == "search_class":
-            search_query = action.action_input["class_name"]
-        if action.action == "search_func":
-            search_query = action.action_input["func_name"]
         if action.action == "search_class_skeleton":
             search_query = action.action_input["class_name"]
         for history_action in action_history:
-            if history_action.action == "search_callable_in_file":
+            if history_action.action == "search_callable":
                 if search_query == history_action.action_input["query"]:
                     return False
 
@@ -446,6 +428,7 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(
             task.extra_state["current_search"], task.extra_state["sources"]
         )
+        # logger.info(f"Agent response: {agent_response.response}")
 
         # add observation feedback to new memory if relevance is True
         if relevance:
