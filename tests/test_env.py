@@ -47,7 +47,7 @@ def main():
     # Open the file in write mode
     log_dir = "./log"
     os.makedirs(log_dir, exist_ok=True)
-    for i, inst in enumerate(ds):
+    for _, inst in enumerate(ds):
         # create a new log subdirectory for each instance
         instance_id = inst["instance_id"]
         sub_dir = f"{log_dir}/{instance_id}"
@@ -57,7 +57,7 @@ def main():
             env.setup(inst)
 
     sys.stdout = sys.__stdout__
-    for i, inst in enumerate(ds):
+    for _, inst in enumerate(ds):
         instance_id = inst["instance_id"]
         sub_dir = f"{log_dir}/{instance_id}"
         with open(f"{sub_dir}/test_env_{instance_id}.log", "r") as f:

@@ -1,18 +1,10 @@
 import argparse
 import os
 
-from Orcar import ExtractAgent
-from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
-from Orcar.environment.utils import (
-    ContainerBash,
-    get_container,
-    get_logger,
-    pause_persistent_container,
-)
-from Orcar.gen_config import Config, get_llm
+from Orcar.environment.benchmark import BenchmarkEnv
+from Orcar.environment.utils import ContainerBash, get_container, get_logger
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.search import RepoGraph, SearchManager
-from Orcar.types import ExtractOutput
 
 logger = get_logger("test_env")
 
@@ -23,8 +15,6 @@ def test_build_graph():
         repo_path=repo_path, save_log=True, log_path="log", build_kg=True
     )
     # try to search function "add" in the graph
-    kg_graph = graph_builder.graph
-    root = graph_builder.root_node
     node = graph_builder.get_class_snapshot("ModelChoiceField")
     if node:
         print(f"Snapshot of class ModelChoice   Field: \n {node}")
@@ -48,8 +38,6 @@ def test_local_build_graph():
         repo_path=repo_graph, save_log=True, log_path="log", build_kg=True
     )
     # try to search function "add" in the graph
-    kg_graph = graph_builder.graph
-    root = graph_builder.root_node
     node = graph_builder.get_class_snapshot("B")
     if node:
         print(f"Snapshot of class B: \n {node}")
@@ -68,7 +56,6 @@ def test_local_build_graph():
 
 
 def test_env_build_graph():
-    logger = get_logger("test_env")
 
     args_dict = {
         "model": "gpt-4o",
@@ -80,8 +67,6 @@ def test_env_build_graph():
         "filter_instance": "^(django__django-13933)$",
     }
     args = argparse.Namespace(**args_dict)
-    cfg = Config("./key.cfg")
-    llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"])
     ctr_name = args.container_name
     docker_ctr_subprocess = get_container(
         ctr_name=ctr_name, image_name=args.image, persistent=args.persistent

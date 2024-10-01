@@ -75,6 +75,7 @@ class LLMCompilerPlanParser(BaseOutputParser):
 
 # Helper functions
 
+
 class LLMCompilerJoinerParser(BaseOutputParser):
     """LLM Compiler output parser for the join step.
 
@@ -274,7 +275,7 @@ class SearchOutputParser(BaseOutputParser):
         """
         if "bug_locations" in output:
             # cast the output to SearchResult
-            search_result = escape_newlines_in_json_strings(search_result)
+            search_result = escape_newlines_in_json_strings(output)
             search_result = json.loads(search_result)
 
             return search_result

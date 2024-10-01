@@ -1,13 +1,11 @@
-import datetime
 import subprocess
-import time
 from typing import List, Union
 
 from llama_index.core.agent import AgentRunner
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 
-from .environment.utils import ContainerBash, get_ctr_from_name, run_bash_in_ctr
+from .environment.utils import ContainerBash, run_bash_in_ctr
 from .executor import LLMCompilerAgentWorker
 
 

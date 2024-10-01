@@ -205,9 +205,7 @@ class SearchManager:
         {snapshot}
         """
 
-    def search_method_in_class(
-        self, class_name: str, method_name: str
-    ) -> str:
+    def search_method_in_class(self, class_name: str, method_name: str) -> str:
         """API to search the method in the class in given repo.
         Don't try to use this API until you have already tried search_class_skeleton to get the class skeleton.
         If you know the class name and method name.
@@ -222,7 +220,9 @@ class SearchManager:
         """
         loc = self._search_method_in_class_kg(class_name, method_name)
         if loc is None:
-            return f"Cannot find the definition of method:{method_name} in class:{class_name}",
+            return (
+                f"Cannot find the definition of method:{method_name} in class:{class_name}",
+            )
         joined_path = os.path.join(self.repo_path, loc.file_name)
         return f"""
         File Path: {loc.file_name} \n
@@ -243,7 +243,7 @@ class SearchManager:
         """
         return f"""
         File Path: {file_path} \n
-        Code Snippet: \n 
+        Code Snippet: \n
         {self._search_source_code(file_path, source_code)}
         """
 
@@ -273,10 +273,9 @@ class SearchManager:
         # if type is class, we use the class snapshot
         if type == "class":
             return self.search_class_skeleton(query)
-        
+
         return f"""
         File Path: {loc.file_name} \n
         Code Snippet or Skeleton (if class): \n
         {self._get_code_snippet(joined_path, loc.start_line, loc.end_line)}
         """
-    

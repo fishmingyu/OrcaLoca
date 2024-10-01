@@ -363,9 +363,7 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
-                loc = Loc(
-                    file_name=sub_dir_node_name, start_line=0, end_line=0
-                )
+                loc = Loc(file_name=sub_dir_node_name, start_line=0, end_line=0)
                 self.add_node(sub_dir_node_name, "directory", loc=loc)
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
@@ -383,9 +381,7 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    loc = Loc(
-                        file_name=file_node_name, start_line=0, end_line=0
-                    )
+                    loc = Loc(file_name=file_node_name, start_line=0, end_line=0)
                     self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 
@@ -421,9 +417,7 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
-                loc = Loc(
-                    file_name=sub_dir_node_name, start_line=0, end_line=0
-                )
+                loc = Loc(file_name=sub_dir_node_name, start_line=0, end_line=0)
                 self.add_node(sub_dir_node_name, "directory")
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
@@ -441,9 +435,7 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    loc = Loc(
-                        file_name=file_node_name, start_line=0, end_line=0
-                    )
+                    loc = Loc(file_name=file_node_name, start_line=0, end_line=0)
                     self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 

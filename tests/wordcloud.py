@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import wordcloud
 from datasets import load_dataset
 

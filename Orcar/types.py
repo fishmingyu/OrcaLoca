@@ -1,8 +1,7 @@
 """Base types for ReAct agent."""
 
 from abc import abstractmethod
-from collections import namedtuple
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from llama_index.core.bridge.pydantic import BaseModel
 

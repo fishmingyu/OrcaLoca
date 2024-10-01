@@ -3,7 +3,6 @@ A search agent. Process raw response into json format.
 """
 
 import json
-import logging
 import queue
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
@@ -27,30 +26,18 @@ from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
 from llama_index.core.memory.types import BaseMemory
 from llama_index.core.objects.base import ObjectRetriever
-from llama_index.core.program import FunctionCallingProgram
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
 from llama_index.core.settings import Settings
 from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.llms.openai import OpenAI
-from openai.types.chat import ChatCompletionMessageToolCall
 
 from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import (
-    ActionReasoningStep,
-    BaseReasoningStep,
-    ExtractOutput,
-    ObservationReasoningStep,
-    ResponseReasoningStep,
-    SearchActionStep,
-    SearchInput,
-    SearchObservationStep,
-    SearchResult,
-)
+from .types import BaseReasoningStep, SearchActionStep, SearchInput, SearchResult
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
