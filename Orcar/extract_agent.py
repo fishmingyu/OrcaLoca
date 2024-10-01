@@ -99,7 +99,7 @@ class ExtractWorker(BaseAgentWorker):
             "parse_type": dict(),
             "suspicous_code": set(),
             "suspicous_code_from_tracer": list(),
-            "suspicous_code_from_tracer_max_size": 10,
+            "suspicous_code_from_tracer_max_size": 5,
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
@@ -291,24 +291,28 @@ class ExtractWorker(BaseAgentWorker):
         if step_name != "reproduce_judge":
             raise NotImplementedError
         logger.info(f"Current step: {step_name} in handle_step_judge")
-        task.extra_state["slices"]["reproduce_log_parse"] = self.reproduce_issue(
+        reproduce_log: str = self.reproduce_issue(
             issue_reproducer=task.extra_state["slices"]["reproduce_code_parse"],
             inst=task.extra_state["inst"],
         )
+        task.extra_state["slices"]["reproduce_log_parse"] = reproduce_log
         task.extra_state["parse_type"]["reproduce_log_parse"] = "traceback"
 
-        messages = self._chat_formatter.format(step, task, "judge")
-        logger.info(f"{messages}")
-        chat_response = self.chat_with_count(
-            messages=messages, tag=step_name, task=task
-        )
-        if chat_response.message.content is None:
-            raise ValueError("Got empty message.")
-        message_content = chat_response.message.content
-        logger.info(f"Chat response: {message_content}")
-        judge_step: ExtractJudgeStep = self._output_parser.parse(
-            message_content, "judge"
-        )
+        if not reproduce_log:
+            judge_step = ExtractJudgeStep(is_successful=False)
+        else:
+            messages = self._chat_formatter.format(step, task, "judge")
+            logger.info(f"{messages}")
+            chat_response = self.chat_with_count(
+                messages=messages, tag=step_name, task=task
+            )
+            if chat_response.message.content is None:
+                raise ValueError("Got empty message.")
+            message_content = chat_response.message.content
+            logger.info(f"Chat response: {message_content}")
+            judge_step: ExtractJudgeStep = self._output_parser.parse(
+                message_content, "judge"
+            )
         logger.info(f"{judge_step}")
 
         next_step_names = []

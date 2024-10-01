@@ -196,6 +196,11 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
     func_tree = list(func_trees.values())[0]
     logger.info("Successfully parsed tracer output into func_tree")
 
+    # TODO:
+    # Ranking with:
+    # 1. layer diff to ancestor sensitive node (smaller has priority)
+    # 2. absolute layer (smaller has priority)
+
     lst: List[FuncItem] = [FuncItem(node=func_tree.root, layer=0, should_care=False)]
     list_with_layer_order: List[CodeInfo] = []
     file_sensitivity_set: Set[str] = set()

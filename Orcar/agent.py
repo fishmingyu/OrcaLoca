@@ -89,9 +89,10 @@ class OrcarAgent:
         extract_output = ExtractOutput.parse_raw(response.response)
         self.logger.info(extract_output)
 
-        extract_json_obj = json.loads(extract_output.model_dump_json())
-        with open(f"{self.log_dir}/extractor_{self.inst_id}.json", "w") as handle:
-            json.dump(extract_json_obj, handle, indent=4)
+        if self.redirect_log_output:
+            extract_json_obj = json.loads(extract_output.model_dump_json())
+            with open(f"{self.log_dir}/extractor_{self.inst_id}.json", "w") as handle:
+                json.dump(extract_json_obj, handle, indent=4)
 
         return extract_output
 
@@ -117,8 +118,9 @@ class OrcarAgent:
         self.logger.info(search_agent_chat_response.response)
         search_output = json.loads(search_agent_chat_response.response)
         search_json_obj = search_output
-        with open(f"{self.log_dir}/searcher_{self.inst_id}.json", "w") as handle:
-            json.dump(search_json_obj, handle, indent=4)
+        if self.redirect_log_output:
+            with open(f"{self.log_dir}/searcher_{self.inst_id}.json", "w") as handle:
+                json.dump(search_json_obj, handle, indent=4)
         return search_output
 
     def run(self, instance: Dict[str, Any]) -> str:
