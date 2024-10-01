@@ -1,7 +1,6 @@
 """LLM Compiler Output Parser."""
 
 import json
-import logging
 import re
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -21,7 +20,6 @@ from .types import (
     ExtractSummarizeStep,
     ResponseReasoningStep,
     SearchActionStep,
-    SearchObservationStep,
 )
 from .utils import get_graph_dict
 
@@ -75,8 +73,7 @@ class LLMCompilerPlanParser(BaseOutputParser):
         return get_graph_dict(results, self.tools)
 
 
-### Helper functions
-
+# Helper functions
 
 class LLMCompilerJoinerParser(BaseOutputParser):
     """LLM Compiler output parser for the join step.

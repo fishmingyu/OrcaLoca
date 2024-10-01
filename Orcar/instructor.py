@@ -237,7 +237,7 @@ class ReActAgentWorker(BaseAgentWorker):
         current_reasoning = []
         try:
             reasoning_step = self._output_parser.parse(message_content, is_streaming)
-        except BaseException as exc:
+        except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         if self._verbose:
             print_text(f"{reasoning_step.get_content()}\n", color="pink")
