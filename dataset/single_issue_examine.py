@@ -45,6 +45,7 @@ def examine_experiment_dir(
     subprocess.run("git reset --hard main", shell=True, check=True, cwd=experiment_dir)
     subprocess.run("git pull", shell=True, check=True, cwd=experiment_dir)
     models = sorted(os.listdir(dataset_dir))
+    solved_cnt = 0
     for model in models:
         date = model.split("_")[0]
         model_path = f"{dataset_dir}/{model}"
@@ -68,6 +69,7 @@ def examine_experiment_dir(
             continue
 
         logger.info(f"{model_name} \n    Solved ✓ on {date}")
+        solved_cnt += 1
 
         preds_path = f"{model_path}/all_preds.jsonl"
         assert os.path.exists(preds_path)
@@ -107,6 +109,9 @@ def examine_experiment_dir(
             for hunk in file:
                 abs_patch.append(" " * 4 + str(hunk).split("\n")[0])
         logger.info("\n".join(abs_patch))
+    logger.info(
+        f"Issue {inst['instance_id']} is solved by {solved_cnt}/{len(models)} models"
+    )
 
 
 def main():

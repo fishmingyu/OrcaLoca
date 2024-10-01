@@ -28,8 +28,8 @@ args_dict = {
     # Short Issue Test
     # "filter_instance": "^(django__django-14999)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-12907)$",
-    "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(astropy__astropy-12907)$",
+    # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(django__django-13933)$",
     # "filter_instance": "^(pylint-dev__pylint-7080)$",
     # "filter_instance": "^(matplotlib__matplotlib-26020)$",
@@ -40,7 +40,7 @@ args_dict = {
 }
 args = argparse.Namespace(**args_dict)
 cfg = Config("./key.cfg")
-llm = get_llm(model=args.model, api_key=cfg["OPENAI_API_KEY"], max_tokens=4096)
+llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
 
 
 def init_container():
