@@ -2,6 +2,7 @@ import ast
 import json
 import os
 from collections import namedtuple
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -159,7 +160,7 @@ class RepoGraph:
         return self.graph.number_of_nodes()
 
     # high level search for the callable function or class definition in the graph
-    def dfs_search_callable_def(self, query, constraint=None):
+    def dfs_search_callable_def(self, query) -> LocInfo | None:
         root = self.root_node
         stack = [root]
         visited = set()
@@ -172,27 +173,12 @@ class RepoGraph:
                 if current_prefix is not None:
                     kg_query_name = current_prefix + "::" + query
                 if node == kg_query_name:
-                    if constraint == "function":
-                        if self.graph.nodes[node]["type"] == "function":
-                            return self.graph.nodes[node]["loc"]
-                    elif constraint == "class":
-                        if self.graph.nodes[node]["type"] == "class":
-                            return self.graph.nodes[node]["loc"]
-                    elif constraint == "method":
-                        if self.graph.nodes[node]["type"] == "method":
-                            return self.graph.nodes[node]["loc"]
-                    else:  # no constraint
-                        return self.graph.nodes[node]["loc"]
+                    return LocInfo(
+                        loc=self.graph.nodes[node]["loc"],
+                        type=self.graph.nodes[node]["type"],
+                    )
                 stack.extend(self.graph.neighbors(node))
         return None
-
-    # constrained search for class definition in the graph
-    def dfs_search_class_def(self, query):
-        return self.dfs_search_callable_def(query, "class")
-
-    # constrained search for function definition in the graph
-    def dfs_search_func_def(self, query):
-        return self.dfs_search_callable_def(query, "function")
 
     # constrained search for method definition in the graph (method is a function inside a class)
     def dfs_search_method_in_class(self, class_name, method_name) -> Loc | None:
@@ -215,13 +201,14 @@ class RepoGraph:
         return None
 
     # dfs search for the methods in a class and its docstring
-    def get_class_snapshot(self, class_name) -> str | None:
+    def get_class_snapshot(self, class_name) -> Tuple[Loc, str] | None:
         root = self.root_node
         stack = [root]
         visited = set()
         methods = {}
         class_snapshot = Snapshot("", "")
         kg_query_name = class_name
+        loc = None
 
         while stack:
             node = stack.pop()
@@ -244,10 +231,11 @@ class RepoGraph:
                         self.graph.nodes[node]["docstring"],
                         self.graph.nodes[node]["signature"],
                     )
+                    loc = self.graph.nodes[node]["loc"]
                 stack.extend(self.graph.neighbors(node))
         # setup the snapshot
         snapshot = ""
-        if class_snapshot.signature:
+        if loc:
             snapshot += f"Class Signature: {class_snapshot.signature}\n"
             snapshot += f"Docstring: {class_snapshot.docstring}\n"
         else:
@@ -257,14 +245,15 @@ class RepoGraph:
             snapshot += f"Method Signature: {method_snapshot.signature}\n"
             snapshot += f"Docstring: {method_snapshot.docstring}\n"
 
-        return snapshot
+        return loc, snapshot
 
     # dfs search for contents in a file
-    def dfs_search_file_skeleton(self, file_name) -> str | None:
+    def dfs_search_file_skeleton(self, file_name) -> Tuple[Loc, str] | None:
         root = self.root_node
         stack = [root]
         visited = set()
         contents = {}
+        loc = None
 
         while stack:
             node = stack.pop()
@@ -277,6 +266,7 @@ class RepoGraph:
                     if extracted_file == file_name:
                         # this is file node
                         # get all neighbors of this node means all methods
+                        loc = self.graph.nodes[node]["loc"]
                         for childs in self.graph.neighbors(node):
                             child_name = childs.split("::")[-1]
                             # child could be class/function or global variable
@@ -310,7 +300,7 @@ class RepoGraph:
                     snapshot += f"Signature: {signature}\n"
                 if docstring:
                     snapshot += f"Docstring: {docstring}\n"
-            return snapshot
+            return loc, snapshot
         return None
 
     # dfs search for query in a given file
