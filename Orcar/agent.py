@@ -86,7 +86,7 @@ class OrcarAgent:
         response: AgentChatResponse = self.extract_agent.chat(
             json.dumps(dict(self.inst))
         )
-        extract_output = ExtractOutput.parse_raw(response.response)
+        extract_output = ExtractOutput.model_validate_json(response.response)
         self.logger.info(extract_output)
 
         if self.redirect_log_output:
