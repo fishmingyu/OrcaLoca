@@ -4,7 +4,6 @@ import os
 import re
 import sys
 import traceback
-from contextlib import redirect_stdout
 from enum import IntEnum
 from typing import Any, Dict
 
@@ -132,8 +131,11 @@ class OrcarAgent:
         if self.redirect_log_output:
             os.makedirs(self.log_dir, exist_ok=True)
             with open(f"{self.log_dir}/orcar_{self.inst_id}.log", "w") as f:
-                with redirect_stdout(f):
-                    response = self.run_agents()
+                sys.stdout = f
+                sys.stderr = f
+                response = self.run_agents()
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
         else:
             response = self.run_agents()
 
