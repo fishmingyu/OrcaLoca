@@ -5,6 +5,7 @@ dist/
 log/
 build/
 __pycache__/
+.mypy_cache/
 key.cfg
 # unignore a file
 !requirements.txt
