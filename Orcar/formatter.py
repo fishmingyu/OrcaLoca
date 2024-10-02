@@ -28,7 +28,12 @@ from .prompts import (
     STEP_EXAMPLE,
 )
 from .search.search_tool import SearchManager
-from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult
+from .types import (
+    BaseReasoningStep,
+    ObservationReasoningStep,
+    SearchActionStep,
+    SearchResult,
+)
 
 logger = get_logger(__name__)
 
@@ -221,6 +226,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
         current_search: Optional[List[SearchResult]] = None,
+        current_queue: Optional[List[SearchActionStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         current_search = current_search or []
@@ -243,10 +249,28 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             )
             searching_history.append(message)
 
+        # format queue
+        # convert queue to list of messages
+        status_string = f"""
+            Search Queue Status:
+            - Queue Length: {len(current_queue)}\n
+        """
+        for queue_step in current_queue:
+            # Search Queue status
+            status_string += f"""
+                - {queue_step.get_content()}\n
+            """
+        # logger.info(f"Formatted queue: {status_string}")
+        queue_message = ChatMessage(
+            role=MessageRole.ASSISTANT,
+            content=status_string,
+        )
+
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
             *chat_history,
             *searching_history,
+            queue_message,
             ChatMessage(
                 role=MessageRole.USER,
                 content=(

@@ -3,8 +3,8 @@ A search agent. Process raw response into json format.
 """
 
 import json
-import queue
 import uuid
+from collections import deque
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from llama_index.core.agent.runner.base import AgentRunner
@@ -24,7 +24,6 @@ from llama_index.core.instrumentation import get_dispatcher
 from llama_index.core.instrumentation.events.agent import AgentToolCallEvent
 from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
-from llama_index.core.memory.types import BaseMemory
 from llama_index.core.objects.base import ObjectRetriever
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
@@ -37,7 +36,7 @@ from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import BaseReasoningStep, SearchActionStep, SearchInput, SearchResult
+from .types import SearchActionStep, SearchInput, SearchResult
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
@@ -56,7 +55,7 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
                 action="search_callable",
                 action_input={"query": query, "file_path": file_path},
             )
-            task.extra_state["search_queue"].put(search_step)
+            task.extra_state["search_queue"].append(search_step)
             task.extra_state["action_history"].append(search_step)
 
 
@@ -166,7 +165,7 @@ class SearchWorker(BaseAgentWorker):
         is_done = False
         next_step_input: str = ""
         sources: List[ToolOutput] = []
-        search_queue: queue.Queue = queue.Queue()
+        search_queue: deque = deque()
         action_history: List[SearchActionStep] = []
         current_search: List[SearchResult] = []
         # temporary memory for new messages
@@ -211,6 +210,24 @@ class SearchWorker(BaseAgentWorker):
         except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, relevance, explore_step
+
+    def _bug_location_calibrate(self, output_str: str) -> str:
+        """Calibrate bug location."""
+        data = self._output_parser.parse_bug_report(output_str)
+        for bug in data["bug_locations"]:
+            file_path = bug["file"]
+            # check each "file" in bug_location whether is a valid file path
+            # for example the correct file should be like "astropy/io/fits/fitsrec.py",
+            # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
+            # if the file is wrong, we should remove the first "/" and the first word before the first "/"
+            # if the file is correct, we should keep it
+            file_path = bug["file"]
+            if file_path[0] == "/":
+                file_path = file_path[1:]
+                file_path = file_path[file_path.find("/") + 1 :]
+                bug["file"] = file_path
+        # logger.info(f"Bug location: {data}")
+        return json.dumps(data)
 
     def _process_search(
         self,
@@ -293,18 +310,10 @@ class SearchWorker(BaseAgentWorker):
 
     def _get_response(
         self,
-        current_res: List[BaseReasoningStep],
-        sources: List[ToolOutput],
+        current_res: SearchResult,
     ) -> AgentChatResponse:
-        """Get response from reasoning steps."""
-        if len(current_res) == 0:
-            raise ValueError("No searching steps were taken.")
-        elif len(current_res) == self._max_iterations:
-            raise ValueError("Reached max iterations.")
-        response_str = current_res[-1].get_content()
-
-        # TODO: add sources from reasoning steps
-        return AgentChatResponse(response=response_str, sources=sources)
+        response_str = current_res.get_content()
+        return AgentChatResponse(response=response_str)
 
     def _get_task_step_response(
         self,
@@ -360,6 +369,7 @@ class SearchWorker(BaseAgentWorker):
             chat_history=task.memory.get(input=task.input)
             + task.extra_state["new_memory"].get_all(),
             current_search=task.extra_state["current_search"],
+            current_queue=task.extra_state["search_queue"],
         )
 
         # send prompt
@@ -380,9 +390,9 @@ class SearchWorker(BaseAgentWorker):
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
             # convert the chat response to str
-            # chat_response = str(chat_response)
+            cali_str = self._bug_location_calibrate(chat_response.message.content)
             return self._get_task_step_response(
-                AgentChatResponse(response=chat_response.message.content, sources=[]),
+                AgentChatResponse(response=cali_str, sources=[]),
                 step,
                 None,
                 None,
@@ -399,13 +409,13 @@ class SearchWorker(BaseAgentWorker):
                 search_step, task.extra_state["action_history"]
             ):
                 continue
-            task.extra_state["search_queue"].put(search_step)
+            task.extra_state["search_queue"].append(search_step)
             task.extra_state["action_history"].append(search_step)
         # print current queue size
         logger.info(
-            f"Current search queue size: {task.extra_state['search_queue'].qsize()}"
+            f"Current search queue size: {len(task.extra_state['search_queue'])}"
         )
-        is_complete = task.extra_state["search_queue"].empty()
+        is_complete = len(task.extra_state["search_queue"]) == 0
         if is_complete:
             task.extra_state["is_done"] = True
             return self._get_task_step_response(
@@ -415,19 +425,13 @@ class SearchWorker(BaseAgentWorker):
                 None,
                 is_done=False,
             )
-        # only process the head of the queue
-        head_search_step = task.extra_state["search_queue"].get()
+        # pop the head of the queue
+        head_search_step = task.extra_state["search_queue"].popleft()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(task, tools, search_step)
         # logger.info(f"Search result: {search_result}")
-        # pop the head of the queue after processing
-        task.extra_state["search_queue"].task_done()
 
-        # add search steps to task state
-        task.extra_state["current_search"].append(search_result)
-        agent_response = self._get_response(
-            task.extra_state["current_search"], task.extra_state["sources"]
-        )
+        agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
         # add observation feedback to new memory if relevance is True
@@ -435,6 +439,8 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["new_memory"].put(
                 ChatMessage(content=observation, role=MessageRole.ASSISTANT)
             )
+            # add search steps to task state
+            task.extra_state["current_search"].append(search_result)
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
@@ -515,8 +521,6 @@ class SearchAgent(AgentRunner):
         llm: LLM,
         search_input: SearchInput = None,
         repo_path: str = "",
-        tools: Optional[List[BaseTool]] = None,
-        memory: Optional[BaseMemory] = None,
         max_iterations: int = 20,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,

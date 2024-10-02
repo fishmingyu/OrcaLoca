@@ -53,7 +53,7 @@ Conclusion is a final standalone step to provide the final bug locations when no
     In relevance, set to True if the given context is relevant to the bug location, otherwise set to False.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
-    After confirming you have enough context to answer the question, provide the final bug locations in JSON structure like this,
+    After no input actions in search queue, provide the final bug locations in JSON structure like this,
     DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
     {bug_locations}
 

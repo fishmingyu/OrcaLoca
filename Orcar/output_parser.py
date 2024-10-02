@@ -263,21 +263,19 @@ class SearchOutputParser(BaseOutputParser):
         "bug_locations": [
                 {
                     "file": "path/to/file",
-                    "function": "function_name",
-                    "content": "code_snippet"
+                    "class": "class_name",
+                    "method": "function_name",
                 },
                 {
                     "file": "path/to/file",
-                    "function": "function_name",
-                    "content": "code_snippet"
-                }
+                    "class": "class_name",
+                    "method": "function_name",
+                },
             ]
         """
         if "bug_locations" in output:
             # cast the output to SearchResult
-            search_result = escape_newlines_in_json_strings(output)
-            search_result = json.loads(search_result)
-
+            search_result = json.loads(output)
             return search_result
         else:
             # raise an error if the output is not in the expected format
