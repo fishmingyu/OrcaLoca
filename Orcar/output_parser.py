@@ -275,8 +275,7 @@ class SearchOutputParser(BaseOutputParser):
         """
         if "bug_locations" in output:
             # cast the output to SearchResult
-            search_result = json.loads(search_result)
-
+            search_result = json.loads(output)
             return search_result
         else:
             # raise an error if the output is not in the expected format

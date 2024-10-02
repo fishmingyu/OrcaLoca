@@ -211,7 +211,25 @@ class SearchWorker(BaseAgentWorker):
         except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, relevance, explore_step
-
+    
+    def _bug_location_calibrate(self, output_str: str) -> str:
+        """Calibrate bug location."""
+        data = self._output_parser.parse_bug_report(output_str)
+        for bug in data["bug_locations"]:
+            file_path = bug["file"]
+            # check each "file" in bug_location whether is a valid file path
+            # for example the correct file should be like "astropy/io/fits/fitsrec.py", 
+            # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
+            # if the file is wrong, we should remove the first "/" and the first word before the first "/"
+            # if the file is correct, we should keep it
+            file_path = bug["file"]
+            if file_path[0] == "/":
+                file_path = file_path[1:]
+                file_path = file_path[file_path.find("/") + 1:]
+                bug["file"] = file_path
+        # logger.info(f"Bug location: {data}")
+        return json.dumps(data)
+    
     def _process_search(
         self,
         task: Task,
@@ -373,9 +391,9 @@ class SearchWorker(BaseAgentWorker):
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
             # convert the chat response to str
-            # chat_response = str(chat_response)
+            cali_str = self._bug_location_calibrate(chat_response.message.content)
             return self._get_task_step_response(
-                AgentChatResponse(response=chat_response.message.content, sources=[]),
+                AgentChatResponse(response=cali_str, sources=[]),
                 step,
                 None,
                 None,
@@ -506,8 +524,6 @@ class SearchAgent(AgentRunner):
         llm: LLM,
         search_input: SearchInput = None,
         repo_path: str = "",
-        tools: Optional[List[BaseTool]] = None,
-        memory: Optional[BaseMemory] = None,
         max_iterations: int = 20,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,

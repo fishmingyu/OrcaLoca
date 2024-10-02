@@ -8,7 +8,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20240620",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    "dataset": "SWE-bench_common",
+    # "dataset": "SWE-bench_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
@@ -16,8 +17,8 @@ args_dict = {
     # "filter_instance": "^(django__django-14999)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-6938)$",
-    "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$"
 }
