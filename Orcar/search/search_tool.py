@@ -253,6 +253,8 @@ class SearchManager:
 
         Args:
             query (str): The query to search. It can be a function, class, method or global variable.
+            The format should be only the name.
+            E.g. search_callable("function_name")
 
         KwArgs: (Optional)
             file_path (str): The file path to search. If not provided, search in the whole repo.
