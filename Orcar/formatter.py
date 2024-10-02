@@ -28,7 +28,12 @@ from .prompts import (
     STEP_EXAMPLE,
 )
 from .search.search_tool import SearchManager
-from .types import BaseReasoningStep, ObservationReasoningStep, SearchResult, SearchActionStep
+from .types import (
+    BaseReasoningStep,
+    ObservationReasoningStep,
+    SearchActionStep,
+    SearchResult,
+)
 
 logger = get_logger(__name__)
 

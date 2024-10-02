@@ -24,7 +24,6 @@ from llama_index.core.instrumentation import get_dispatcher
 from llama_index.core.instrumentation.events.agent import AgentToolCallEvent
 from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
-from llama_index.core.memory.types import BaseMemory
 from llama_index.core.objects.base import ObjectRetriever
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
@@ -37,7 +36,7 @@ from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import BaseReasoningStep, SearchActionStep, SearchInput, SearchResult
+from .types import SearchActionStep, SearchInput, SearchResult
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
@@ -211,25 +210,25 @@ class SearchWorker(BaseAgentWorker):
         except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, relevance, explore_step
-    
+
     def _bug_location_calibrate(self, output_str: str) -> str:
         """Calibrate bug location."""
         data = self._output_parser.parse_bug_report(output_str)
         for bug in data["bug_locations"]:
             file_path = bug["file"]
             # check each "file" in bug_location whether is a valid file path
-            # for example the correct file should be like "astropy/io/fits/fitsrec.py", 
+            # for example the correct file should be like "astropy/io/fits/fitsrec.py",
             # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
             # if the file is wrong, we should remove the first "/" and the first word before the first "/"
             # if the file is correct, we should keep it
             file_path = bug["file"]
             if file_path[0] == "/":
                 file_path = file_path[1:]
-                file_path = file_path[file_path.find("/") + 1:]
+                file_path = file_path[file_path.find("/") + 1 :]
                 bug["file"] = file_path
         # logger.info(f"Bug location: {data}")
         return json.dumps(data)
-    
+
     def _process_search(
         self,
         task: Task,
@@ -311,7 +310,7 @@ class SearchWorker(BaseAgentWorker):
 
     def _get_response(
         self,
-        current_res : SearchResult,
+        current_res: SearchResult,
     ) -> AgentChatResponse:
         response_str = current_res.get_content()
         return AgentChatResponse(response=response_str)
@@ -432,9 +431,7 @@ class SearchWorker(BaseAgentWorker):
         search_result = self._process_search(task, tools, search_step)
         # logger.info(f"Search result: {search_result}")
 
-        agent_response = self._get_response(
-            search_result
-        )
+        agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
         # add observation feedback to new memory if relevance is True
