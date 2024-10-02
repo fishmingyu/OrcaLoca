@@ -240,13 +240,13 @@ class SearchOutputParser(BaseOutputParser):
                 },
             ]
         """
-        if "obversation_feedback" in output:
+        if "observation_feedback" in output:
             action_list: List[SearchActionStep] = []
             # cast the output to SearchActionStep
             json_str = json.loads(output)
-            observation = json_str["obversation_feedback"]
+            observation = json_str["observation_feedback"]
             # convert the string to boolean
-            relevance = json_str["relevance"] == "True"
+            relevance = json_str["relevance"]
             for action in json_str["new_search_actions"]:
                 action_list.append(
                     SearchActionStep(

@@ -1,6 +1,6 @@
 STEP_EXAMPLE = {
-    "obversation_feedback": "observation",
-    "relevance": "True",
+    "observation_feedback": "observation",
+    "relevance": True,
     "new_search_actions": [
         {"action": "search_func", "action_input": {"func_name": "str"}},
         {
