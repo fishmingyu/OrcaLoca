@@ -104,7 +104,7 @@ EXTRACT_FIELDS = {
 """,
     "parse": """
 <field>
-    keyword: the name of the class or function where the suspicious code lies in.
+    keyword: the name of the class, function, method or global variable where the suspicious code lies in.
             Should be a single word, not spliced with dot.
 </field>
 <field>
