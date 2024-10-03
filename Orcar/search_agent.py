@@ -374,6 +374,7 @@ class SearchWorker(BaseAgentWorker):
         tools = self.get_tools(task.input)
         # add task input to chat history
         input_chat = self._search_formatter.format(
+            "CONCLUSION" if task.extra_state["is_done"] else "REGULAR",
             tools,
             chat_history=task.extra_state["instruct_memory"].get_all()
             + task.memory.get(input=task.input)

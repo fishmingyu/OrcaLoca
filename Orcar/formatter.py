@@ -222,12 +222,17 @@ class SearchChatFormatter(BaseAgentChatFormatter):
 
     def format(
         self,
+        step_type: str,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
         current_search: Optional[List[SearchResult]] = None,
         current_queue: Optional[List[SearchActionStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
+        assert step_type in [
+            "REGULAR",
+            "CONCLUSION",
+        ], f"format: Unknown step type {step_type}"
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
@@ -264,18 +269,28 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             content=status_string,
         )
 
+        output_format: str = "".join(
+            json.dumps(
+                BUG_OUTPUT if step_type == "CONCLUSION" else STEP_EXAMPLE, indent=4
+            )
+        )
+        fmt_control_msg = ChatMessage(
+            role=MessageRole.USER,
+            content=(
+                f"Please generate next {step_type} step STRICTLY following given format:"
+                "<output_format>"
+                f"{output_format}"
+                "</output_format>"
+                "DO NOT SPEAK any REDUNDANT words (like 'json', 'output', etc.)) or thoughts"
+            ),
+        )
+
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
             *chat_history,
             *searching_history,
             queue_message,
-            ChatMessage(
-                role=MessageRole.USER,
-                content=(
-                    "Please generate next step STRICTLY following given format, "
-                    "DO NOT SPEAK any REDUNDANT words (like 'json', 'output', etc.)) or thoughts"
-                ),
-            ),
+            fmt_control_msg,
         ]
 
     @classmethod
