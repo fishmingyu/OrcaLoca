@@ -65,13 +65,16 @@ def add_user_step_to_memory(
     task: Task,
 ) -> None:
     """Add user step to memory."""
-    memory = task.extra_state["new_memory"]
     if "is_first" in step.step_state and step.step_state["is_first"]:
+        memory = task.extra_state["new_memory"]
         parse_search_input_step(search_input, task)
         # add to new memory
+        # logger.info("step input: \n" + step.input)
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         step.step_state["is_first"] = False
-    else:  # conclusion
+    else:
+        # logger.info("step input: \n" + step.input)
+        memory = task.extra_state["instruct_memory"]
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         # logger.info(f"Add user input to memory: {step.input}")
 
@@ -164,22 +167,22 @@ class SearchWorker(BaseAgentWorker):
         """Initialize step from task."""
         is_done = False
         next_step_input: str = ""
-        sources: List[ToolOutput] = []
         search_queue: deque = deque()
         action_history: List[SearchActionStep] = []
         current_search: List[SearchResult] = []
         # temporary memory for new messages
         new_memory = ChatMemoryBuffer.from_defaults()
+        instruct_memory = ChatMemoryBuffer.from_defaults()
 
         # initialize task state
         task_state = {
             "is_done": is_done,
             "next_step_input": next_step_input,
-            "sources": sources,
             "search_queue": search_queue,
             "action_history": action_history,
             "current_search": current_search,
             "new_memory": new_memory,
+            "instruct_memory": instruct_memory,
             "token_cnts": list(),
         }
         task.extra_state.update(task_state)
@@ -279,7 +282,6 @@ class SearchWorker(BaseAgentWorker):
             search_action_input=search_step.action_input,
             search_content=tool_output.content,
         )
-        task.extra_state["sources"].append(tool_output)
 
         return search_result
 
@@ -307,6 +309,10 @@ class SearchWorker(BaseAgentWorker):
                     return False
 
         return True
+
+    def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
+        """previous user instruction in chat message will affect the future result, so we need to delete them"""
+        memory.reset()
 
     def _get_response(
         self,
@@ -366,12 +372,15 @@ class SearchWorker(BaseAgentWorker):
         # add task input to chat history
         input_chat = self._search_formatter.format(
             tools,
-            chat_history=task.memory.get(input=task.input)
+            chat_history=task.extra_state["instruct_memory"].get_all()
+            + task.memory.get(input=task.input)
             + task.extra_state["new_memory"].get_all(),
             current_search=task.extra_state["current_search"],
             current_queue=task.extra_state["search_queue"],
         )
-
+        # if task.extra_state["is_done"]:
+        #     logger.info(input_chat)
+        self._del_previous_inst_input(task.extra_state["instruct_memory"])
         # send prompt
         in_token_cnt = self._token_counter.count(
             self._llm.messages_to_prompt(input_chat)
@@ -416,6 +425,11 @@ class SearchWorker(BaseAgentWorker):
             f"Current search queue size: {len(task.extra_state['search_queue'])}"
         )
         is_complete = len(task.extra_state["search_queue"]) == 0
+        # add observation feedback to new memory if relevance is True
+        if relevance:
+            task.extra_state["new_memory"].put(
+                ChatMessage(content=observation, role=MessageRole.ASSISTANT)
+            )
         if is_complete:
             task.extra_state["is_done"] = True
             return self._get_task_step_response(
@@ -434,11 +448,8 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
-        # add observation feedback to new memory if relevance is True
+        # add search result to history
         if relevance:
-            task.extra_state["new_memory"].put(
-                ChatMessage(content=observation, role=MessageRole.ASSISTANT)
-            )
             # add search steps to task state
             task.extra_state["current_search"].append(search_result)
 

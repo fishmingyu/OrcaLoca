@@ -14,10 +14,10 @@ args_dict = {
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    # "filter_instance": "^(django__django-14999)$",
+    "filter_instance": "^(django__django-11848)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    "filter_instance": "^(astropy__astropy-6938)$",
+    # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$"

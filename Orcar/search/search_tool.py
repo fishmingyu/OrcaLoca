@@ -26,27 +26,6 @@ class SearchManager:
             self.search_source_code,
         ]
 
-    @property
-    def search_tool_priority(self) -> str:
-        """Return the search tool priority."""
-        # The search tool priority is the order of the search functions in the list below
-        list = [
-            self.search_file_skeleton,
-            self.search_class_skeleton,
-            self.search_method_in_class,
-            self.search_callable,
-            self.search_source_code,
-        ]
-        # convert the list to a description string, use the name of the function
-        return f"""
-        Please follow the search tool priority below:
-        1. {list[0].__name__}
-        2. {list[1].__name__}
-        3. {list[2].__name__}: use this after you have already tried {list[1].__name__},
-        4. {list[3].__name__}: use this when you can't make sure the query is a method,
-        5. {list[4].__name__}: only use source code search when you can't find the query in the file.
-        """
-
     def _get_code_snippet(self, file_path: str, start: int, end: int) -> str:
         """Get the code snippet in the range in the file, without line numbers.
 
