@@ -54,7 +54,8 @@ follow the instruction "Now let's come to a conclusion. ".
     After no input actions in search queue, provide the final bug locations in JSON structure like this.
 
     {bug_locations}
-    DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
+    DO NOT generate observation or new_search_actions in the conclusion step.
+    DO NOT mix it with any title or description. If method is not belong to any class, set class to empty string.
 
 """
 

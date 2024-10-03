@@ -336,7 +336,10 @@ class SearchWorker(BaseAgentWorker):
             new_steps = [
                 step.get_next_step(
                     step_id=str(uuid.uuid4()),
-                    input="Now let's come to a conclusion. Please produce the bug locations. \n",  # this step is conclusion
+                    input="""Now let's come to a conclusion. Please produce the bug locations.
+                    Please don't generate observations or new_search_actions. \n
+                    It's time for CONCLUSION! \n
+                    \n""",  # this step is conclusion
                 )
             ]
         elif next_step == "explore":
