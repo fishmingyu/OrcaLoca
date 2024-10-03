@@ -14,9 +14,10 @@ args_dict = {
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    "filter_instance": "^(django__django-11848)$",
+    # "filter_instance": "^(django__django-11848)$",
     # "filter_instance": "^(django__django-10914)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
+    "filter_instance": "^(sympy__sympy-23262)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
@@ -34,17 +35,17 @@ args_dict = {
     #    ")$"
     # ),
     # Wrong format
-    "filter_instance": (
-        "^("
-        "django__django-11848|"
-        "django__django-16139|"
-        "django__django-16527|"
-        "scikit-learn__scikit-learn-14087|"
-        "sympy__sympy-12481|"
-        "sympy__sympy-20154|"
-        "django__django-15814"
-        ")$"
-    ),
+    # "filter_instance": (
+    #     "^("
+    #     "django__django-11848|"
+    #     "django__django-16139|"
+    #     "django__django-16527|"
+    #     "scikit-learn__scikit-learn-14087|"
+    #     "sympy__sympy-12481|"
+    #     "sympy__sympy-20154|"
+    #     "django__django-15814"
+    #     ")$"
+    # ),
 }
 
 
@@ -57,7 +58,7 @@ def test_agent():
     # final_stage = "extract"
     final_stage = "search"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    agent.set_redirect_log_output(True)
+    # agent.set_redirect_log_output(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
