@@ -27,7 +27,6 @@ from .prompts import (
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .search.search_tool import SearchManager
 from .types import (
     BaseReasoningStep,
     ObservationReasoningStep,
@@ -232,7 +231,6 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
-            "priority_desc": "\n".join(str(SearchManager.search_tool_priority)),
             "step_format": "".join(json.dumps(STEP_EXAMPLE, indent=4)),
             "bug_locations": "".join(json.dumps(BUG_OUTPUT, indent=4)),
         }

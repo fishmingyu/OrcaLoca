@@ -33,9 +33,6 @@ There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
 
-You also need to keep in ind the priority of these API calls.
-{priority_desc}
-
 Everytime you will do the following things:
 
 Provide the observation based on given input. Check whether it contains any class, method or function you need to further search.
@@ -43,7 +40,8 @@ Notice that you should put new classes, methods or functions related to your cur
 You can put multiple classes, methods or functions in the new_search_actions list.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 
-Conclusion is a final standalone step to provide the final bug locations when nothing else to search.
+Conclusion is a final standalone step to provide the final bug locations when nothing else to search. Please keep in mind to
+follow the instruction "Now let's come to a conclusion. ".
 
 ## Output format
 1. Regular Step Format:
@@ -53,9 +51,10 @@ Conclusion is a final standalone step to provide the final bug locations when no
     In relevance, set to True if the given context is relevant to the bug location, otherwise set to False.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
-    After no input actions in search queue, provide the final bug locations in JSON structure like this,
-    DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
+    After no input actions in search queue, provide the final bug locations in JSON structure like this.
+
     {bug_locations}
+    DO NOT mix it with the observation or add any title or description. If method is not belong to any class, set class to empty string.
 
 """
 
