@@ -286,27 +286,24 @@ class ExtractOutputParser(BaseOutputParser):
     """Extractor Agent formatter."""
 
     def parse(self, output: str, method: str) -> BaseReasoningStep:
+        json_obj: Dict = json.loads(output, strict=False)
         if method == "slice":
-            json_obj: Dict = json.loads(output)
             return ExtractSliceStep(
                 traceback_warning_log_slice=json_obj["traceback_warning_log_slice"],
                 issue_reproducer_slice=json_obj["issue_reproducer_slice"],
                 source_code_slice=json_obj["source_code_slice"],
             )
         elif method == "parse":
-            json_obj: Dict = json.loads(output)
             code_info_list: List[CodeInfo] = [
                 CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
                 for x in json_obj["code_info_list"]
             ]
             return ExtractParseStep(code_info_list=code_info_list)
         elif method == "judge":
-            json_obj: Dict = json.loads(output)
             return ExtractJudgeStep(
                 is_successful=json_obj["is_successful"],
             )
         elif method == "summarize":
-            json_obj: Dict = json.loads(output)
             code_info_list: List[CodeInfo] = [
                 CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
                 for x in json_obj["code_info_list"]
