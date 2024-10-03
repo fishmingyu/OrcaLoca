@@ -1,6 +1,7 @@
 config
 datasets
 docker
+gdown
 httpx
 llama-index-agent-llm-compiler
 llama-index-core
