@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from typing import Dict, List
@@ -7,8 +8,8 @@ import pandas as pd
 from pydantic import BaseModel
 
 
-def download_golden_data() -> pd.DataFrame:
-    dir = "./artifact/assets"
+def download_golden_data(artifact_dir: str) -> pd.DataFrame:
+    dir = f"{artifact_dir}/assets"
     os.makedirs(dir, exist_ok=True)
     url_dict: Dict[str, str] = {
         "common_golden_stats.csv": "https://drive.google.com/file/d/1t0nl6LLq4WEVNHbasULLQ1onQQtxLL6A/view?usp=sharing",
@@ -78,8 +79,7 @@ class ParsedPatch(BaseModel):
         )
 
 
-def parse_log(ds_golden: pd.DataFrame) -> None:
-    log_dir = "./log"
+def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
     file_match = 0
     keyword_match = 0
     notgen_cnt = 0
@@ -87,7 +87,7 @@ def parse_log(ds_golden: pd.DataFrame) -> None:
     extractor_notgen_cnt = 0
     log_dict = dict()
     issues = os.listdir(log_dir)
-    for inst_id in issues:
+    for inst_id in sorted(issues):
         inst = ds_golden[ds_golden["instance_id"] == inst_id].iloc[0]
         log_dict[inst_id] = dict()
 
@@ -205,15 +205,31 @@ def parse_log(ds_golden: pd.DataFrame) -> None:
     )
     # print(f"Extractor File match: {extractor_file_match / total_cnt:.2f}")
     # print(f"Extractor Json not gen: {extractor_notgen_cnt / total_cnt:.2f}")
-    output_path = f"./artifact/assets/orcar_parsed_log.json"
+    output_path = f"{artifact_dir}/assets/orcar_parsed_log.json"
     with open(output_path, "w") as handle:
         json.dump(log_dict, handle, indent=4)
     print(f"Parsed log dumped to {output_path}")
 
 
 def main():
-    ds_golden = download_golden_data()
-    parse_log(ds_golden)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-a",
+        "--artifact_dir",
+        default="./artifact",
+        help=f"The directory of the artifact folder",
+    )
+    parser.add_argument(
+        "-l",
+        "--log_dir",
+        default="./log",
+        help=f"The directory of the log dir",
+    )
+    args = parser.parse_args()
+    log_dir: str = args.log_dir
+    artifact_dir: str = args.artifact_dir
+    ds_golden = download_golden_data(artifact_dir=artifact_dir)
+    parse_log(ds_golden, log_dir=log_dir, artifact_dir=artifact_dir)
 
 
 if __name__ == "__main__":
