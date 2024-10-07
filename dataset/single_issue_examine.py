@@ -117,22 +117,26 @@ def examine_experiment_dir(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-i",
         "--instance_id",
         required=True,
         help=f"The ID of target instance",
     )
     default_dataset = "princeton-nlp/SWE-bench_Lite"
     parser.add_argument(
+        "-d",
         "--dataset",
         default=default_dataset,
         help=f"The target dataset (default: {default_dataset})",
     )
     parser.add_argument(
+        "-e",
         "--experiment_dir",
         default=None,
         help=f"The directory of SWE-bench Experiments (default: None)",
     )
     parser.add_argument(
+        "-v",
         "--verbose",
         type=int,
         default=0,
