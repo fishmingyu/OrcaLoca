@@ -11,7 +11,7 @@ from matplotlib.patches import Patch
 
 from ..environment.benchmark import BenchmarkEnv, get_repo_dir
 
-Loc = namedtuple("Loc", ["file_name", "start_line", "end_line"])
+Loc = namedtuple("Loc", ["file_name", "node_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
 
 
@@ -124,6 +124,33 @@ class RepoGraph:
         ):  # no prefix, meaning it's a file or directory (not a function)
             return False
         return parts[-2] == prefix
+
+    # distance between two nodes, A, B
+    def get_hops_between_nodes(self, A, B) -> int:
+        hop_number = 0
+        # A large constant to represent no path
+        NO_PATH = 999999
+
+        # Try A to B in the original direction
+        try:
+            hop_number_A_to_B = nx.shortest_path_length(self.graph, source=A, target=B)
+        except nx.NetworkXNoPath:
+            hop_number_A_to_B = NO_PATH  # No path found in this direction
+
+        # Try B to A in the reversed direction
+        try:
+            hop_number_B_to_A = nx.shortest_path_length(self.graph, source=B, target=A)
+        except nx.NetworkXNoPath:
+            hop_number_B_to_A = NO_PATH  # No path found in this direction
+
+        # Determine the smaller hop number if any path exists
+        if hop_number_A_to_B == NO_PATH and hop_number_B_to_A == NO_PATH:
+            # no path exists
+            hop_number = NO_PATH
+        else:
+            hop_number = min(hop_number_A_to_B, hop_number_B_to_A)
+
+        return hop_number
 
     def add_node(self, node_name, node_type, signature=None, docstring=None, loc=None):
         """Add a node to the graph with a type and its corresponding layer.
@@ -318,7 +345,6 @@ class RepoGraph:
                 type_of_node = self.graph.nodes[node]["type"]
                 if type_of_node == "file":
                     if extracted_file_path == file_path:
-                        print(file_path)
                         # this is file node
                         # get all neighbors of this node means all methods
                         for childs in self.graph.neighbors(node):
@@ -330,6 +356,16 @@ class RepoGraph:
                                     type=self.graph.nodes[childs]["type"],
                                 )
                                 return locinfo
+                            # if child is a class, then we need to check all the methods in the class
+                            if self.graph.nodes[childs]["type"] == "class":
+                                for method in self.graph.neighbors(childs):
+                                    method_name = method.split("::")[-1]
+                                    if method_name == query:
+                                        locinfo = LocInfo(
+                                            loc=self.graph.nodes[method]["loc"],
+                                            type=self.graph.nodes[method]["type"],
+                                        )
+                                        return locinfo
                 # only add neighbors that are files or directories
                 for neighbor in self.graph.neighbors(node):
                     if self.graph.nodes[neighbor]["type"] in ["file", "directory"]:
@@ -345,7 +381,12 @@ class RepoGraph:
             # Skip directories that match any exclude pattern
             if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
                 continue
-            loc = Loc(file_name=dir_node_name, start_line=0, end_line=0)
+            loc = Loc(
+                file_name=dir_node_name,
+                node_name=dir_node_name,
+                start_line=0,
+                end_line=0,
+            )
             self.add_node(dir_node_name, "directory", loc=loc)
 
             dirs[:] = [
@@ -363,7 +404,12 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
-                loc = Loc(file_name=sub_dir_node_name, start_line=0, end_line=0)
+                loc = Loc(
+                    file_name=sub_dir_node_name,
+                    node_name=sub_dir_node_name,
+                    start_line=0,
+                    end_line=0,
+                )
                 self.add_node(sub_dir_node_name, "directory", loc=loc)
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
@@ -381,7 +427,12 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    loc = Loc(file_name=file_node_name, start_line=0, end_line=0)
+                    loc = Loc(
+                        file_name=file_node_name,
+                        node_name=file_node_name,
+                        start_line=0,
+                        end_line=0,
+                    )
                     self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 
@@ -395,7 +446,12 @@ class RepoGraph:
         for root, dirs, files in self.swe_env.walk(repo_path):
             # Add a node for the directory
             dir_node_name = os.path.relpath(root, repo_path)
-            loc = Loc(file_name=dir_node_name, start_line=0, end_line=0)
+            loc = Loc(
+                file_name=dir_node_name,
+                node_name=dir_node_name,
+                start_line=0,
+                end_line=0,
+            )
             self.add_node(dir_node_name, "directory", loc=loc)
 
             # Skip directories that match any exclude pattern
@@ -417,7 +473,12 @@ class RepoGraph:
                 sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
 
                 # Add a node for each subdirectory
-                loc = Loc(file_name=sub_dir_node_name, start_line=0, end_line=0)
+                loc = Loc(
+                    file_name=sub_dir_node_name,
+                    node_name=sub_dir_node_name,
+                    start_line=0,
+                    end_line=0,
+                )
                 self.add_node(sub_dir_node_name, "directory")
                 self.add_edge(dir_node_name, sub_dir_node_name, "contains")
 
@@ -435,7 +496,12 @@ class RepoGraph:
                         continue
 
                     # Add a node for the file and link it to the directory
-                    loc = Loc(file_name=file_node_name, start_line=0, end_line=0)
+                    loc = Loc(
+                        file_name=file_node_name,
+                        node_name=file_node_name,
+                        start_line=0,
+                        end_line=0,
+                    )
                     self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")
 
@@ -647,6 +713,7 @@ class AstVistor(ast.NodeVisitor):
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
             file_name=self.current_file,
+            node_name=node_name,
             start_line=node.lineno,
             end_line=node.end_lineno,
         )
@@ -675,6 +742,7 @@ class AstVistor(ast.NodeVisitor):
         node_name = f"{self.current_file}::{class_name}"
         node_loc = Loc(
             file_name=self.current_file,
+            node_name=node_name,
             start_line=node.lineno,
             end_line=node.end_lineno,
         )
@@ -700,6 +768,7 @@ class AstVistor(ast.NodeVisitor):
                     node_name = f"{self.current_file}::{var_name}"
                     node_loc = Loc(
                         file_name=self.current_file,
+                        node_name=node_name,
                         start_line=node.lineno,
                         end_line=node.end_lineno,
                     )

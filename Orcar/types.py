@@ -13,70 +13,6 @@ class BaseReasoningStep(BaseModel):
     def get_content(self) -> str:
         """Get content."""
 
-    @property
-    @abstractmethod
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-
-
-class ActionReasoningStep(BaseReasoningStep):
-    """Action Reasoning step."""
-
-    thought: str
-    action: str
-    action_input: Dict
-
-    def get_content(self) -> str:
-        """Get content."""
-        return (
-            f"Thought: {self.thought}\nAction: {self.action}\n"
-            f"Action Input: {self.action_input}"
-        )
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
-
-
-class ObservationReasoningStep(BaseReasoningStep):
-    """Observation reasoning step."""
-
-    observation: str
-    return_direct: bool = False
-
-    def get_content(self) -> str:
-        """Get content."""
-        return f"Observation: {self.observation}"
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return self.return_direct
-
-
-class ResponseReasoningStep(BaseReasoningStep):
-    """Response reasoning step."""
-
-    thought: str
-    response: str
-    is_streaming: bool = False
-
-    def get_content(self) -> str:
-        """Get content."""
-        if self.is_streaming:
-            return (
-                f"Thought: {self.thought}\n"
-                f"Answer (Starts With): {self.response} ..."
-            )
-        else:
-            return f"Thought: {self.thought}\n" f"Answer: {self.response}"
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return True
-
 
 class SearchActionStep(BaseReasoningStep):
     """Search action reasoning step."""
@@ -90,11 +26,6 @@ class SearchActionStep(BaseReasoningStep):
             f"Search Action: {self.action}\n"
             f"Search Action Input: {self.action_input}"
         )
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
 
 
 class SearchResult(BaseReasoningStep):
@@ -112,33 +43,37 @@ class SearchResult(BaseReasoningStep):
             f"\n {self.search_content}"
         )
 
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return True
+    def get_query(self) -> str:
+        """Get query."""
+        """Different search_action
+            self.search_class_skeleton,
+            self.search_method_in_class,
+            self.search_file_skeleton,
+            self.search_callable,
+            self.search_source_code,
+        """
+        query_key = ""
+        for action in self.search_action:
+            if action == "search_class_skeleton":
+                query_key = "class_name"
+            elif action == "search_method_in_class":
+                query_key = "method"
+            elif action == "search_file_skeleton":
+                query_key = "file_name"
+            elif action == "search_callable":
+                query_key = "query"
+            elif action == "search_source_code":
+                query_key = "file_path"
+
+        return self.search_action_input[query_key]
 
 
-class SearchObservationStep(BaseReasoningStep):
-    """Search observation reasoning step."""
+class BugLocations(BaseModel):
+    """Bug locations reasoning step."""
 
-    observation: str
-    search_new: List[Dict[str, str]] = []  # Updated to a list of dictionaries
-
-    def get_content(self) -> str:
-        """Get content."""
-        search_items = ", ".join(
-            f"{key}: {value}" for item in self.search_new for key, value in item.items()
-        )
-        if not search_items:
-            return f"Observation Feedback: {self.observation} Nothing new to search"
-        return f"Observation Feedback: {self.observation}, What new to search: {search_items}"
-
-    @property
-    def is_done(self) -> bool:
-        """search_new is empty"""
-        if len(self.search_new) == 0:
-            return True
-        return False
+    file_name: str
+    class_name: str
+    method_name: str
 
 
 class ExtractSliceStep(BaseReasoningStep):
@@ -155,11 +90,6 @@ class ExtractSliceStep(BaseReasoningStep):
             f"issue_reproducer_slice: {self.issue_reproducer_slice}\n"
             f"source_code_slice: {self.source_code_slice}\n"
         )
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
 
 
 class CodeInfo(BaseModel, frozen=True):
@@ -178,11 +108,6 @@ class ExtractParseStep(BaseReasoningStep):
         """Get content."""
         return f"code_info_list: {self.code_info_list}\n"
 
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
-
 
 class ExtractJudgeStep(BaseReasoningStep):
     """Extract summarize step"""
@@ -192,11 +117,6 @@ class ExtractJudgeStep(BaseReasoningStep):
     def get_content(self) -> str:
         """Get content."""
         return f"is_successful: {self.is_successful}\n"
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
 
 
 class ExtractSummarizeStep(BaseReasoningStep):
@@ -208,11 +128,6 @@ class ExtractSummarizeStep(BaseReasoningStep):
     def get_content(self) -> str:
         """Get content."""
         return f"summary: {self.summary}\n" f"code_info_list: {self.code_info_list}\n"
-
-    @property
-    def is_done(self) -> bool:
-        """Is the reasoning step the last one."""
-        return False
 
 
 class ExtractOutput(BaseModel):

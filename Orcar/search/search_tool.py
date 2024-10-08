@@ -3,12 +3,16 @@ import os
 import re
 from typing import Tuple
 
+import pandas as pd
+
 from .build_graph import Loc, LocInfo, RepoGraph
 
 
 class SearchManager:
     def __init__(self, repo_path) -> None:
-        self.history = []
+        self.history = pd.DataFrame(
+            columns=["search_action", "search_query", "search_content"]
+        )
         self.repo_path = repo_path
         self._setup_graph()
 
@@ -156,6 +160,14 @@ class SearchManager:
         """
 
         loc, res = self._get_file_skeleton(file_name)
+        new_row = {
+            "search_action": "search_file_skeleton",
+            "search_query": loc.node_name,
+            "search_content": res,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
         if loc is None:
             return f"Cannot find the file skeleton of {file_name}"
         return f"""
@@ -176,6 +188,14 @@ class SearchManager:
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
         loc, snapshot = self._get_class_skeleton(class_name)
+        new_row = {
+            "search_action": "search_class_skeleton",
+            "search_query": loc.node_name,
+            "search_content": snapshot,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
         if loc is None:
             return f"Cannot find the class skeleton of {class_name}"
         return f"""
@@ -198,15 +218,25 @@ class SearchManager:
                 If not found, return the error message.
         """
         loc = self._search_method_in_class_kg(class_name, method_name)
+
         if loc is None:
             return (
                 f"Cannot find the definition of method:{method_name} in class:{class_name}",
             )
         joined_path = os.path.join(self.repo_path, loc.file_name)
+        content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
+        new_row = {
+            "search_action": "search_method_in_class",
+            "search_query": loc.node_name,
+            "search_content": content,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
         return f"""
         File Path: {loc.file_name} \n
         Method Code Snippet: \n
-        {self._get_code_snippet(joined_path, loc.start_line, loc.end_line)}
+        {content}
         """
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
@@ -220,10 +250,19 @@ class SearchManager:
             str: The file path and the related function/class code snippet.
                 If not found, return the error message.
         """
+        content = self._search_source_code(file_path, source_code)
+        new_row = {
+            "search_action": "search_source_code",
+            "search_query": source_code,
+            "search_content": content,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
         return f"""
         File Path: {file_path} \n
         Code Snippet: \n
-        {self._search_source_code(file_path, source_code)}
+        {content}
         """
 
     def search_callable(self, query: str, **kwargs) -> str:
@@ -250,13 +289,24 @@ class SearchManager:
             return f"Cannot find the definition of {query}"
         loc = locinfo.loc
         type = locinfo.type
+
         joined_path = os.path.join(self.repo_path, loc.file_name)
         # if type is class, we use the class snapshot
         if type == "class":
             return self.search_class_skeleton(query)
 
+        content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
+        new_row = {
+            "search_action": "search_callable",
+            "search_query": loc.node_name,
+            "search_content": content,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
+
         return f"""
         File Path: {loc.file_name} \n
         Code Snippet or Skeleton (if class): \n
-        {self._get_code_snippet(joined_path, loc.start_line, loc.end_line)}
+        {content}
         """

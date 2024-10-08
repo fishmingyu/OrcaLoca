@@ -1,6 +1,17 @@
 STEP_EXAMPLE = {
     "observation_feedback": "observation",
-    "relevance": True,
+    "potential_bug_locations": [
+        {
+            "file": "path/to/file",
+            "class": "class_name",
+            "method": "function_name",
+        },
+        {
+            "file": "path/to/file",
+            "class": "class_name",
+            "method": "function_name",
+        },
+    ],
     "new_search_actions": [
         {"action": "search_func", "action_input": {"func_name": "str"}},
         {
@@ -48,7 +59,9 @@ follow the instruction "Now let's come to a conclusion. ".
     Provide your answer in a clear JSON structure like this,
     {step_format}
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
-    In relevance, set to True if the given context is relevant to the bug location, otherwise set to False.
+    In potential_bug_locations, you should provide the file path, class name and method name.
+    It's not the final answer, just a hint for possible bug locations.
+    If method is not belong to any class, set class to empty string.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
     After no input actions in search queue, provide the final bug locations in JSON structure like this.
