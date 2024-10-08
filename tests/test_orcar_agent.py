@@ -18,9 +18,11 @@ args_dict = {
     # "filter_instance": "^(django__django-10914)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
-    "filter_instance": "^(sympy__sympy-23262)$",
+    # "filter_instance": "^(sympy__sympy-23262)$",
+    # whole repo
+    # "filter_instance": ".*",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
@@ -75,7 +77,7 @@ def test_agent():
     # final_stage = "extract"
     final_stage = "search"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    agent.set_redirect_log_output(True)
+    # agent.set_redirect_log_output(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
