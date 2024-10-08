@@ -36,7 +36,7 @@ from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import SearchActionStep, SearchInput, SearchResult
+from .types import BugLocations, SearchActionStep, SearchInput, SearchResult
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
@@ -200,19 +200,20 @@ class SearchWorker(BaseAgentWorker):
 
     def _extract_exploring_step(
         self, output: ChatResponse
-    ) -> Tuple[str, bool, List[SearchActionStep]]:
+    ) -> Tuple[str, List[BugLocations], List[SearchActionStep]]:
         """Extract search step."""
         # parse the output
         if output.message.content is None:
             raise ValueError("Got empty message.")
         message_content = output.message.content
         try:
-            obseravtion, relevance, explore_step = self._output_parser.parse_explore(
-                message_content
+            obseravtion, potential_bugs, explore_step = (
+                self._output_parser.parse_explore(message_content)
             )
+            # logger.info("potential_bugs: " + str(potential_bugs))
         except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
-        return obseravtion, relevance, explore_step
+        return obseravtion, potential_bugs, explore_step
 
     def _bug_location_calibrate(self, output_str: str) -> str:
         """Calibrate bug location."""
@@ -412,7 +413,7 @@ class SearchWorker(BaseAgentWorker):
                 is_done=True,
             )
 
-        observation, relevance, search_steps = self._extract_exploring_step(
+        observation, potential_bugs, search_steps = self._extract_exploring_step(
             chat_response
         )
         # push back search steps to the queue
@@ -429,11 +430,10 @@ class SearchWorker(BaseAgentWorker):
             f"Current search queue size: {len(task.extra_state['search_queue'])}"
         )
         is_complete = len(task.extra_state["search_queue"]) == 0
-        # add observation feedback to new memory if relevance is True
-        if relevance:
-            task.extra_state["new_memory"].put(
-                ChatMessage(content=observation, role=MessageRole.ASSISTANT)
-            )
+
+        task.extra_state["new_memory"].put(
+            ChatMessage(content=observation, role=MessageRole.ASSISTANT)
+        )
         if is_complete:
             task.extra_state["is_done"] = True
             return self._get_task_step_response(
@@ -452,10 +452,8 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
-        # add search result to history
-        if relevance:
-            # add search steps to task state
-            task.extra_state["current_search"].append(search_result)
+        # add search steps to task state
+        task.extra_state["current_search"].append(search_result)
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response

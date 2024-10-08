@@ -5,10 +5,6 @@ from abc import abstractmethod
 from typing import List, Optional, Sequence, Tuple
 
 import tiktoken
-from llama_index.core.agent.react.prompts import (
-    CONTEXT_REACT_CHAT_SYSTEM_HEADER,
-    REACT_CHAT_SYSTEM_HEADER,
-)
 from llama_index.core.agent.types import Task, TaskStep
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
@@ -27,12 +23,7 @@ from .prompts import (
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .types import (
-    BaseReasoningStep,
-    ObservationReasoningStep,
-    SearchActionStep,
-    SearchResult,
-)
+from .types import BaseReasoningStep, SearchActionStep, SearchResult
 
 logger = get_logger(__name__)
 
@@ -119,87 +110,6 @@ class BaseAgentChatFormatter(BaseModel):
         current_reasoning: Optional[List[BaseReasoningStep]] = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
-
-
-class ReActChatFormatter(BaseAgentChatFormatter):
-    """ReAct chat formatter."""
-
-    system_header: str = REACT_CHAT_SYSTEM_HEADER  # default
-    context: str = ""  # not needed w/ default
-
-    def format(
-        self,
-        tools: Sequence[BaseTool],
-        chat_history: List[ChatMessage],
-        current_reasoning: Optional[List[BaseReasoningStep]] = None,
-    ) -> List[ChatMessage]:
-        """Format chat history into list of ChatMessage."""
-        current_reasoning = current_reasoning or []
-
-        format_args = {
-            "tool_desc": "\n".join(get_react_tool_descriptions(tools)),
-            "tool_names": ", ".join([tool.metadata.get_name() for tool in tools]),
-        }
-        if self.context:
-            format_args["context"] = self.context
-
-        fmt_sys_header = self.system_header.format(**format_args)
-
-        # format reasoning history as alternating user and assistant messages
-        # where the assistant messages are thoughts and actions and the user
-        # messages are observations
-        reasoning_history = []
-        for reasoning_step in current_reasoning:
-            if isinstance(reasoning_step, ObservationReasoningStep):
-                message = ChatMessage(
-                    role=MessageRole.USER,
-                    content=reasoning_step.get_content(),
-                )
-            else:
-                message = ChatMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=reasoning_step.get_content(),
-                )
-            reasoning_history.append(message)
-
-        return [
-            ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
-            *chat_history,
-            *reasoning_history,
-        ]
-
-    @classmethod
-    def from_defaults(
-        cls,
-        system_header: Optional[str] = None,
-        context: Optional[str] = None,
-    ) -> "ReActChatFormatter":
-        """Create ReActChatFormatter from defaults."""
-        if not system_header:
-            system_header = (
-                REACT_CHAT_SYSTEM_HEADER
-                if not context
-                else CONTEXT_REACT_CHAT_SYSTEM_HEADER
-            )
-
-        return ReActChatFormatter(
-            system_header=system_header,
-            context=context or "",
-        )
-
-    @classmethod
-    def from_context(cls, context: str) -> "ReActChatFormatter":
-        """Create ReActChatFormatter from context.
-
-        NOTE: deprecated
-
-        """
-        logger.warning(
-            "ReActChatFormatter.from_context is deprecated, please use `from_defaults` instead."
-        )
-        return ReActChatFormatter.from_defaults(
-            system_header=CONTEXT_REACT_CHAT_SYSTEM_HEADER, context=context
-        )
 
 
 def get_tool_descriptions(tools: Sequence[BaseTool]) -> List[str]:
@@ -292,19 +202,6 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             queue_message,
             fmt_control_msg,
         ]
-
-    @classmethod
-    def from_defaults(
-        cls,
-        system_header: Optional[str] = None,
-    ) -> "SearchChatFormatter":
-        """Create SearchChatFormatter from defaults."""
-        if not system_header:
-            system_header = REACT_CHAT_SYSTEM_HEADER
-
-        return SearchChatFormatter(
-            system_header=system_header,
-        )
 
 
 class ExtractChatFormatter(BaseAgentChatFormatter):

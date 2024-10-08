@@ -123,22 +123,20 @@ def test_fitsrec_source_code():
     )
     print(line_num)
 
+    print(search_manager.history["search_query"])
+
 
 def test_search_callable_in_file():
     repo_path = "~/.orcar/astropy__astropy/"
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
-    callable_name = "CompoundModel"
-    code_snippet = search_manager.search_callable_in_file(
-        "astropy/modeling/core.py", callable_name
+    callable_name = "_scale_back_ascii"
+    code_snippet = search_manager.search_callable(
+        callable_name, file_path="astropy/io/fits/fitsrec.py"
     )
     print(code_snippet)
 
-
-def print_search_priority():
-    repo_path = "./test_repo"
-    search_m = SearchManager(repo_path=repo_path)
-    print(search_m.search_tool_priority)
+    print(search_manager.history["search_query"])
 
 
 if __name__ == "__main__":
@@ -147,7 +145,7 @@ if __name__ == "__main__":
     # test_search_manager()
     # test_local_build_graph()
     # test_env_build_graph()
-    test_fitsrec()
+    # test_fitsrec()
     # test_fitsrec_source_code()
-    # test_search_callable_in_file()
+    test_search_callable_in_file()
     # print_search_priority()

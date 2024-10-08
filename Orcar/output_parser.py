@@ -2,26 +2,21 @@
 
 import json
 import re
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Dict, List, Tuple
 
-from llama_index.core.output_parsers.utils import extract_json_str
-from llama_index.core.tools import BaseTool
 from llama_index.core.types import BaseOutputParser
 
 from .environment.utils import get_logger
-from .schema import JoinerOutput, LLMCompilerParseResult
 from .types import (
-    ActionReasoningStep,
     BaseReasoningStep,
+    BugLocations,
     CodeInfo,
     ExtractJudgeStep,
     ExtractParseStep,
     ExtractSliceStep,
     ExtractSummarizeStep,
-    ResponseReasoningStep,
     SearchActionStep,
 )
-from .utils import get_graph_dict
 
 logger = get_logger(__name__)
 
@@ -39,62 +34,6 @@ def default_dependency_rule(idx: int, args: str) -> bool:
     matches = re.findall(ID_PATTERN, args)
     numbers = [int(match) for match in matches]
     return idx in numbers
-
-
-class LLMCompilerPlanParser(BaseOutputParser):
-    """LLM Compiler plan output parser.
-
-    Directly adapted from source code: https://github.com/SqueezeAILab/LLMCompiler/blob/main/src/llm_compiler/output_parser.py.
-
-    """
-
-    def __init__(self, tools: Sequence[BaseTool]):
-        """Init params."""
-        self.tools = tools
-
-    def parse(self, text: str) -> Dict[int, Any]:
-        # 1. search("Ronaldo number of kids") -> 1, "search", '"Ronaldo number of kids"'
-        # pattern = r"(\d+)\. (\w+)\(([^)]+)\)"
-        pattern = rf"(?:{THOUGHT_PATTERN}\n)?{ACTION_PATTERN}"
-        matches = re.findall(pattern, text)
-
-        # convert matches to a list of LLMCompilerParseResult
-        results: List[LLMCompilerParseResult] = []
-        for match in matches:
-            thought, idx, tool_name, args, _ = match
-            idx = int(idx)
-            results.append(
-                LLMCompilerParseResult(
-                    thought=thought, idx=idx, tool_name=tool_name, args=args
-                )
-            )
-
-        # get graph dict
-        return get_graph_dict(results, self.tools)
-
-
-# Helper functions
-
-
-class LLMCompilerJoinerParser(BaseOutputParser):
-    """LLM Compiler output parser for the join step.
-
-    Adapted from _parse_joiner_output in
-    https://github.com/SqueezeAILab/LLMCompiler/blob/main/src/llm_compiler/llm_compiler.py
-
-    """
-
-    def parse(self, text: str) -> JoinerOutput:
-        """Parse."""
-        thought, answer, is_replan = "", "", False  # default values
-        raw_answers = text.split("\n")
-        for answer in raw_answers:
-            if answer.startswith("Action:"):
-                answer = answer[answer.find("(") + 1 : answer.find(")")]
-                is_replan = JOINER_REPLAN in answer
-            elif answer.startswith("Thought:"):
-                thought = answer.split("Thought:")[1].strip()
-        return JoinerOutput(thought=thought, answer=answer, is_replan=is_replan)
 
 
 def extract_tool_use(input_text: str) -> Tuple[str, str, str]:
@@ -133,71 +72,6 @@ def extract_final_response(input_text: str) -> Tuple[str, str]:
     return thought, answer
 
 
-def parse_action_reasoning_step(output: str) -> ActionReasoningStep:
-    """
-    Parse an action reasoning step from the LLM output.
-    """
-    # Weaker LLMs may generate ReActAgent steps whose Action Input are horrible JSON strings.
-    # `dirtyjson` is more lenient than `json` in parsing JSON strings.
-    import dirtyjson as json
-
-    thought, action, action_input = extract_tool_use(output)
-    json_str = extract_json_str(action_input)
-    # First we try json, if this fails we use ast
-    try:
-        action_input_dict = json.loads(json_str)
-    except Exception:
-        action_input_dict = action_input_parser(json_str)
-    return ActionReasoningStep(
-        thought=thought, action=action, action_input=action_input_dict
-    )
-
-
-class ReActOutputParser(BaseOutputParser):
-    """ReAct Output parser."""
-
-    def parse(self, output: str, is_streaming: bool = False) -> BaseReasoningStep:
-        """Parse output from ReAct agent.
-
-        We expect the output to be in one of the following formats:
-        1. If the agent need to use a tool to answer the question:
-            ```
-            Thought: <thought>
-            Action: <action>
-            Action Input: <action_input>
-            ```
-        2. If the agent can answer the question without any tools:
-            ```
-            Thought: <thought>
-            Answer: <answer>
-            ```
-        """
-        if "Thought:" not in output:
-            # NOTE: handle the case where the agent directly outputs the answer
-            # instead of following the thought-answer format
-            return ResponseReasoningStep(
-                thought="(Implicit) I can answer without any more tools!",
-                response=output,
-                is_streaming=is_streaming,
-            )
-
-        # An "Action" should take priority over an "Answer"
-        if "Action:" in output:
-            return parse_action_reasoning_step(output)
-
-        if "Answer:" in output:
-            thought, answer = extract_final_response(output)
-            return ResponseReasoningStep(
-                thought=thought, response=answer, is_streaming=is_streaming
-            )
-
-        raise ValueError(f"Could not parse output: {output}")
-
-    def format(self, output: str) -> str:
-        """Format a query with structured output formatting instructions."""
-        raise NotImplementedError
-
-
 def escape_newlines_in_json_strings(json_str):
     # Find all strings in the JSON and replace \n within them
     def replace_newline(match):
@@ -218,12 +92,25 @@ class SearchOutputParser(BaseOutputParser):
         elif method == "bug_report":
             return self.parse_bug_report(output)
 
-    def parse_explore(self, output: str) -> Tuple[str, bool, List[SearchActionStep]]:
+    def parse_explore(
+        self, output: str
+    ) -> Tuple[str, List[BugLocations], List[SearchActionStep]]:
         """Parse output from Search agent.
 
         We expect the output to be the following format:
             "observation": "str",
-            "relevance": "bool",
+            "potential_bug_locations": [
+                {
+                    "file": "path/to/file",
+                    "class": "class_name",
+                    "method": "function_name",
+                },
+                {
+                    "file": "path/to/file",
+                    "class": "class_name",
+                    "method": "function_name",
+                },
+            ],
             "action_lists": [
                 {
                     "action": "search_api1",
@@ -242,18 +129,26 @@ class SearchOutputParser(BaseOutputParser):
         """
         if "observation_feedback" in output:
             action_list: List[SearchActionStep] = []
+            bug_list: List[BugLocations] = []
             # cast the output to SearchActionStep
             json_str = json.loads(output)
             observation = json_str["observation_feedback"]
             # convert the string to boolean
-            relevance = json_str["relevance"]
+
+            for bug_location in json_str["potential_bug_locations"]:
+                bug = BugLocations(
+                    file_name=bug_location["file"],
+                    class_name=bug_location["class"],
+                    method_name=bug_location["method"],
+                )
+                bug_list.append(bug)
             for action in json_str["new_search_actions"]:
                 action_list.append(
                     SearchActionStep(
                         action=action["action"], action_input=action["action_input"]
                     )
                 )
-            return observation, relevance, action_list
+            return observation, bug_list, action_list
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse search action output: {output}")
