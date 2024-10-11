@@ -1,5 +1,6 @@
 """LLM Compiler Output Parser."""
 
+import io
 import json
 import re
 from typing import Dict, List, Tuple
@@ -181,7 +182,15 @@ class ExtractOutputParser(BaseOutputParser):
     """Extractor Agent formatter."""
 
     def parse(self, output: str, method: str) -> BaseReasoningStep:
-        json_obj: Dict = json.loads(output, strict=False)
+        try:
+            json_obj: Dict = json.loads(output, strict=False)
+        except json.JSONDecodeError:
+            with io.StringIO() as err_msg_io:
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info, file=err_msg_io)
+                err_msg_io.write("Trying to escape all backslashes")
+                logger.info(err_msg_io.getvalue())
+            json_obj: Dict = json.loads(output.replace("\\", r"\\"), strict=False)
         if method == "slice":
             return ExtractSliceStep(
                 traceback_warning_log_slice=json_obj["traceback_warning_log_slice"],

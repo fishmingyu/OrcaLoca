@@ -211,9 +211,9 @@ class ExtractWorker(BaseAgentWorker):
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
         log = self.env.run(
-            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
-            output_log=True,
+            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path)
         )
+        logger.info(f"Reproducer log:\n{log}")
         return log
 
     def handle_step_slice(self, step: TaskStep, task: Task) -> List[TaskStep]:

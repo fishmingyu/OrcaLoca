@@ -3,6 +3,7 @@
 *egg-info/
 dist/
 log/
+output/
 build/
 __pycache__/
 .mypy_cache/
