@@ -7,10 +7,10 @@ from typing import Any, Dict
 import unidiff
 import yaml
 
-from Orcar.environment.utils import get_logger
 from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
+from Orcar.log_utils import get_logger
 
-logger = get_logger("single_issue_examine")
+logger = get_logger(__name__)
 
 """
 Example Usage:

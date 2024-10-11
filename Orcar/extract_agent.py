@@ -12,8 +12,8 @@ from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
 from .environment.benchmark import BenchmarkEnv, get_repo_dir
-from .environment.utils import get_logger
 from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
+from .log_utils import get_logger
 from .output_parser import ExtractOutputParser
 from .tracer import gen_tracer_cmd, read_tracer_output
 from .types import (
@@ -25,7 +25,7 @@ from .types import (
     ExtractSummarizeStep,
 )
 
-logger = get_logger("extract_agent")
+logger = get_logger(__name__)
 
 """
 1. Get name

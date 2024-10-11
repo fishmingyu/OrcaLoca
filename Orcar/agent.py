@@ -14,10 +14,15 @@ from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.environment.utils import (
     ContainerBash,
     get_container,
-    get_logger,
     pause_persistent_container,
 )
 from Orcar.extract_agent import ExtractAgent
+from Orcar.log_utils import (
+    get_logger,
+    set_log_dir,
+    switch_log_to_file,
+    switch_log_to_stdout,
+)
 from Orcar.search_agent import SearchAgent
 from Orcar.types import ExtractOutput, SearchInput
 
@@ -66,7 +71,7 @@ class OrcarAgent:
         self.env = BenchmarkEnv(args, self.ctr_bash)
         self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=True)
         self.base_path = self.env.cache_dir
-        self.logger = get_logger("OrcarAgent")
+        self.logger = get_logger(__name__)
         self.redirect_log_output: bool = False
         self.final_stage = str2stage(final_stage)
 
@@ -79,6 +84,10 @@ class OrcarAgent:
 
     def set_redirect_log_output(self, new_value: bool) -> None:
         self.redirect_log_output = new_value
+        if self.redirect_log_output:
+            switch_log_to_file()
+        else:
+            switch_log_to_stdout()
 
     def run_extract_agent(self) -> ExtractOutput:
         """Run the extract agent."""
@@ -90,7 +99,9 @@ class OrcarAgent:
 
         if self.redirect_log_output:
             extract_json_obj = json.loads(extract_output.model_dump_json())
-            with open(f"{self.log_dir}/extractor_{self.inst_id}.json", "w") as handle:
+            with open(
+                f"{self.output_dir}/extractor_{self.inst_id}.json", "w"
+            ) as handle:
                 json.dump(extract_json_obj, handle, indent=4)
 
         return extract_output
@@ -118,7 +129,7 @@ class OrcarAgent:
         search_output = json.loads(search_agent_chat_response.response)
         search_json_obj = search_output
         if self.redirect_log_output:
-            with open(f"{self.log_dir}/searcher_{self.inst_id}.json", "w") as handle:
+            with open(f"{self.output_dir}/searcher_{self.inst_id}.json", "w") as handle:
                 json.dump(search_json_obj, handle, indent=4)
         return search_output
 
@@ -127,7 +138,10 @@ class OrcarAgent:
         self.inst = instance
         self.inst_id = self.inst["instance_id"]
         self.log_dir = f"./log/{self.inst_id}"
+        self.output_dir = f"./output/{self.inst_id}"
+        set_log_dir(self.log_dir)
 
+        os.makedirs(self.output_dir, exist_ok=True)
         if self.redirect_log_output:
             os.makedirs(self.log_dir, exist_ok=True)
             with open(f"{self.log_dir}/orcar_{self.inst_id}.log", "w") as f:

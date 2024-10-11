@@ -5,11 +5,11 @@ import subprocess
 from typing import Any, Dict
 
 from Orcar.environment.benchmark import get_repo_dir
-from Orcar.environment.utils import get_logger
 from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
+from Orcar.log_utils import get_logger
 from Orcar.search.build_graph import RepoGraph
 
-logger = get_logger("insts_stats")
+logger = get_logger(__name__)
 
 
 def clone_repo(repo: str, to_dir: str):

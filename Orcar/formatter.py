@@ -13,7 +13,7 @@ from llama_index.core.tools import BaseTool
 from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.openai import OpenAI
 
-from .environment.utils import get_logger
+from .log_utils import get_logger
 from .prompts import (
     BUG_OUTPUT,
     EXTRACT_EXAMPLES,

@@ -3,11 +3,13 @@
 import io
 import json
 import re
+import sys
+import traceback
 from typing import Dict, List, Tuple
 
 from llama_index.core.types import BaseOutputParser
 
-from .environment.utils import get_logger
+from .log_utils import get_logger
 from .types import (
     BaseReasoningStep,
     BugLocations,
