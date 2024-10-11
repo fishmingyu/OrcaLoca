@@ -33,6 +33,8 @@ class LoggingManager:
         return logger
 
     def set_log_dir(self, new_dir: str) -> None:
+        if self.current_log_dir == new_dir:
+            return
         self.current_log_dir = new_dir
 
         # Ensure the new directory exists
@@ -42,30 +44,51 @@ class LoggingManager:
             self._update_handlers()
 
     def switch_to_file(self) -> None:
+        if not self.use_stdout:
+            return
         self.use_stdout = False
         if self.current_log_dir:
             self._update_handlers()
 
     def switch_to_stdout(self) -> None:
+        if self.use_stdout:
+            return
         self.use_stdout = True
         self._update_handlers()
 
     def _update_handlers(self) -> None:
+        assert self.current_log_dir and os.path.isdir(self.current_log_dir)
+
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+
+        unified_log_file = os.path.join(self.current_log_dir, f"orcar_total.log")
+        if os.path.exists(unified_log_file):
+            os.remove(unified_log_file)
+        unified_file_handler = logging.FileHandler(unified_log_file)
+        unified_file_handler.setLevel(logging.DEBUG)
+        unified_file_handler.setFormatter(formatter)
+
         for name, logger in self.loggers.items():
             # Remove existing handlers
             for handler in logger.handlers[:]:
                 logger.removeHandler(handler)
 
-            # Add new handler
-            if not self.use_stdout:
-                new_handler = logging.FileHandler(
-                    os.path.join(self.current_log_dir, f"{name}.log")
-                )
-            else:
-                new_handler = self.rich_handler
+            if self.use_stdout:
+                logger.addHandler(self.rich_handler)
+                return
 
+            # Add new handler
+            new_log_file = os.path.join(self.current_log_dir, f"{name}.log")
+            if os.path.exists(new_log_file):
+                os.remove(new_log_file)
+            new_handler = logging.FileHandler(new_log_file)
             new_handler.setLevel(logging.DEBUG)
+            new_handler.setFormatter(formatter)
+
             logger.addHandler(new_handler)
+            logger.addHandler(unified_file_handler)
 
 
 # Global LoggingManager instance
