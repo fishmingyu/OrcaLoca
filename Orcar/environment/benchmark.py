@@ -7,18 +7,19 @@ from typing import Any, Dict
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
 
+from Orcar.log_utils import get_logger
+
 from .utils import (
     ContainerBash,
     copy_file_to_container,
     get_exit_code,
-    get_logger,
     run_command_in_container,
 )
 
 LONG_TIMEOUT = 500
 PATH_TO_REQS = "/root/requirements.txt"
 PATH_TO_ENV_YML = "/root/environment.yml"
-logger = get_logger("env_benchmark")
+logger = get_logger(__name__)
 
 
 def get_repo_dir(repo: str) -> str:

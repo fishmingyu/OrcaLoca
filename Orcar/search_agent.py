@@ -32,13 +32,13 @@ from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.llms.openai import OpenAI
 
-from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
+from .log_utils import get_logger
 from .output_parser import SearchOutputParser
 from .search import SearchManager
 from .types import BugLocations, SearchActionStep, SearchInput, SearchResult
 
-logger = get_logger("search_agent")
+logger = get_logger(__name__)
 dispatcher = get_dispatcher(__name__)
 
 

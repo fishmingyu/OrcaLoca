@@ -2,11 +2,12 @@ import argparse
 import os
 
 from Orcar.environment.benchmark import BenchmarkEnv
-from Orcar.environment.utils import ContainerBash, get_container, get_logger
+from Orcar.environment.utils import ContainerBash, get_container
 from Orcar.load_cache_dataset import load_filter_hf_dataset
+from Orcar.log_utils import get_logger
 from Orcar.search import RepoGraph, SearchManager
 
-logger = get_logger("test_env")
+logger = get_logger(__name__)
 
 
 def test_build_graph():

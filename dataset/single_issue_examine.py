@@ -7,10 +7,10 @@ from typing import Any, Dict
 import unidiff
 import yaml
 
-from Orcar.environment.utils import get_logger
 from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
+from Orcar.log_utils import get_logger
 
-logger = get_logger("single_issue_examine")
+logger = get_logger(__name__)
 
 """
 Example Usage:
@@ -117,22 +117,26 @@ def examine_experiment_dir(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-i",
         "--instance_id",
         required=True,
         help=f"The ID of target instance",
     )
     default_dataset = "princeton-nlp/SWE-bench_Lite"
     parser.add_argument(
+        "-d",
         "--dataset",
         default=default_dataset,
         help=f"The target dataset (default: {default_dataset})",
     )
     parser.add_argument(
+        "-e",
         "--experiment_dir",
         default=None,
         help=f"The directory of SWE-bench Experiments (default: None)",
     )
     parser.add_argument(
+        "-v",
         "--verbose",
         type=int,
         default=0,

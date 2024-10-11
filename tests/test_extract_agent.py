@@ -8,14 +8,14 @@ from Orcar.environment.benchmark import BenchmarkEnv
 from Orcar.environment.utils import (
     ContainerBash,
     get_container,
-    get_logger,
     pause_persistent_container,
 )
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
+from Orcar.log_utils import get_logger
 from Orcar.types import ExtractOutput
 
-logger = get_logger("test_extract_agent")
+logger = get_logger(__name__)
 
 args_dict = {
     "model": "claude-3-5-sonnet-20240620",

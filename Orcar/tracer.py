@@ -6,10 +6,10 @@ from typing import Any, Dict, Generator, List, Optional, Set
 
 from pydantic import BaseModel
 
-from .environment.utils import get_logger
+from .log_utils import get_logger
 from .types import CodeInfo
 
-logger = get_logger("tracer")
+logger = get_logger(__name__)
 
 
 # From https://github.com/gaogaotiantian/viztracer/blob/master/src/viztracer/functree.py

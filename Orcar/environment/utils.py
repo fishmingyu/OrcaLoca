@@ -1,6 +1,5 @@
 import datetime
 import hashlib
-import logging
 import os
 import shlex
 import subprocess
@@ -10,22 +9,15 @@ import time
 import traceback
 from io import BytesIO
 from subprocess import PIPE, STDOUT
-from typing import Callable, List, Union
+from typing import Callable, Union
 
 from docker.models.containers import Container
-from rich.logging import RichHandler
 
 import docker
+from Orcar.log_utils import get_logger
 
-_SET_UP_LOGGERS = set()
-_ADDITIONAL_HANDLERS: List[logging.Handler] = []
-
-logging.TRACE = 5  # type: ignore
-logging.addLevelName(logging.TRACE, "TRACE")  # type: ignore
 DOCKER_START_UP_DELAY = 1
-
-_STREAM_LEVEL = logging.DEBUG
-_FILE_LEVEL = logging.TRACE  # type: ignore
+logger = get_logger(__name__)
 
 
 class ContainerBash:
@@ -42,31 +34,6 @@ class ContainerBash:
         self.ctr_pid = (
             ctr_pid if (ctr_pid is not None) else get_bash_pid_in_docker(ctr_subprocess)
         )
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Get logger. Use this instead of `logging.getLogger` to ensure
-    that the logger is set up with the correct handlers.
-    """
-    logger = logging.getLogger(name)
-    if name in _SET_UP_LOGGERS:
-        # Already set up
-        return logger
-    handler = RichHandler(
-        show_time=bool(os.environ.get("SWE_AGENT_LOG_TIME", False)),
-        show_path=False,
-    )
-    handler.setLevel(_STREAM_LEVEL)
-    logger.setLevel(min(_STREAM_LEVEL, _FILE_LEVEL))
-    logger.addHandler(handler)
-    logger.propagate = False
-    _SET_UP_LOGGERS.add(name)
-    for handler in _ADDITIONAL_HANDLERS:
-        logger.addHandler(handler)
-    return logger
-
-
-logger = get_logger("env_utils")
 
 
 def get_container(
