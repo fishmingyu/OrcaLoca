@@ -125,6 +125,10 @@ class RepoGraph:
             return False
         return parts[-2] == prefix
 
+    # check node name exists in the graph
+    def check_node_exists(self, node_name) -> bool:
+        return node_name in self.graph.nodes
+
     # distance between two nodes, A, B
     def get_hops_between_nodes(self, A, B) -> int:
         hop_number = 0

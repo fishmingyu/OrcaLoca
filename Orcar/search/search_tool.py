@@ -11,7 +11,7 @@ from .build_graph import Loc, LocInfo, RepoGraph
 class SearchManager:
     def __init__(self, repo_path) -> None:
         self.history = pd.DataFrame(
-            columns=["search_action", "search_query", "search_content"]
+            columns=["search_action", "search_input", "search_query", "search_content"]
         )
         self.repo_path = repo_path
         self._setup_graph()
@@ -29,6 +29,30 @@ class SearchManager:
             self.search_callable,
             self.search_source_code,
         ]
+
+    def get_query_from_history(self, action: str, input: str) -> str | None:
+        # Get the search_query from the history using the search_action and search_input
+        result = self.history[
+            (self.history["search_action"] == action)
+            & (self.history["search_input"] == input)
+        ]["search_query"]
+
+        if not result.empty:
+            query = result.values[0]
+        else:
+            query = None
+
+        return query
+
+    def get_node_existance(self, query: str) -> bool:
+        # Check if the query exists in the knowledge graph
+        return self.kg.check_node_exists(query)
+
+    def get_distance_between_queries(self, query1: str, query2: str) -> int:
+        if query1 is None or query2 is None:
+            return -1
+        else:
+            return self.kg.get_hops_between_nodes(query1, query2)
 
     def _get_code_snippet(self, file_path: str, start: int, end: int) -> str:
         """Get the code snippet in the range in the file, without line numbers.
@@ -160,16 +184,18 @@ class SearchManager:
         """
 
         loc, res = self._get_file_skeleton(file_name)
+        if loc is None:
+            return f"Cannot find the file skeleton of {file_name}"
+
         new_row = {
             "search_action": "search_file_skeleton",
+            "search_input": file_name,
             "search_query": loc.node_name,
             "search_content": res,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
         )
-        if loc is None:
-            return f"Cannot find the file skeleton of {file_name}"
         return f"""
         File Path: {loc.file_name} \n
         File Skeleton: \n
@@ -188,16 +214,17 @@ class SearchManager:
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
         loc, snapshot = self._get_class_skeleton(class_name)
+        if loc is None:
+            return f"Cannot find the class skeleton of {class_name}"
         new_row = {
             "search_action": "search_class_skeleton",
+            "search_input": class_name,
             "search_query": loc.node_name,
             "search_content": snapshot,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
         )
-        if loc is None:
-            return f"Cannot find the class skeleton of {class_name}"
         return f"""
         File Path: {loc.file_name} \n
         Class Skeleton: \n
@@ -227,6 +254,7 @@ class SearchManager:
         content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
         new_row = {
             "search_action": "search_method_in_class",
+            "search_input": f"{class_name}::{method_name}",
             "search_query": loc.node_name,
             "search_content": content,
         }
@@ -253,6 +281,7 @@ class SearchManager:
         content = self._search_source_code(file_path, source_code)
         new_row = {
             "search_action": "search_source_code",
+            "search_input": file_path,
             "search_query": source_code,
             "search_content": content,
         }
@@ -298,6 +327,7 @@ class SearchManager:
         content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
         new_row = {
             "search_action": "search_callable",
+            "search_input": query,
             "search_query": loc.node_name,
             "search_content": content,
         }

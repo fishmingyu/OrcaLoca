@@ -43,7 +43,7 @@ class SearchResult(BaseReasoningStep):
             f"\n {self.search_content}"
         )
 
-    def get_query(self) -> str:
+    def get_search_input(self) -> str:
         """Get query."""
         """Different search_action
             self.search_class_skeleton,
@@ -52,20 +52,35 @@ class SearchResult(BaseReasoningStep):
             self.search_callable,
             self.search_source_code,
         """
-        query_key = ""
-        for action in self.search_action:
-            if action == "search_class_skeleton":
-                query_key = "class_name"
-            elif action == "search_method_in_class":
-                query_key = "method"
-            elif action == "search_file_skeleton":
-                query_key = "file_name"
-            elif action == "search_callable":
-                query_key = "query"
-            elif action == "search_source_code":
-                query_key = "file_path"
+        search_input = ""
+        if self.search_action == "search_class_skeleton":
+            search_input = self.search_action_input["class_name"]
+        elif self.search_action == "search_method_in_class":
+            search_input = f"{self.search_action_input['class_name']}::{self.search_action_input['method_name']}"
+        elif self.search_action == "search_file_skeleton":
+            search_input = self.search_action_input["file_name"]
+        elif self.search_action == "search_callable":
+            search_input = self.search_action_input["query"]
+        elif self.search_action == "search_source_code":
+            search_input = self.search_action_input["file_path"]
 
-        return self.search_action_input[query_key]
+        return search_input
+
+
+class HeuristicSearchResult(BaseModel):
+    """Heuristic search result reasoning step."""
+
+    heuristic: float
+    search_result: SearchResult
+
+    def get_content(self) -> str:
+        """Get content."""
+        # cut off the first 50 characters of the search content
+        search_content = self.search_result.get_content()
+        return f"Heuristic: {self.heuristic}\n" f"{search_content[:50]}"
+
+    def __lt__(self, other):
+        return self.heuristic < other.heuristic
 
 
 class BugLocations(BaseModel):
@@ -74,6 +89,20 @@ class BugLocations(BaseModel):
     file_name: str
     class_name: str
     method_name: str
+
+    def bug_query(self) -> str | None:
+        """Get bug query."""
+        # class_name can be "", method_name can also be ""
+        if self.file_name == "":
+            return None
+        if self.class_name != "" and self.method_name != "":
+            return f"{self.file_name}::{self.class_name}::{self.method_name}"
+        elif self.class_name == "" and self.method_name != "":
+            return f"{self.file_name}::{self.method_name}"
+        elif self.class_name != "" and self.method_name == "":
+            return f"{self.file_name}::{self.class_name}"
+        else:
+            return f"{self.file_name}"
 
 
 class ExtractSliceStep(BaseReasoningStep):

@@ -5,6 +5,7 @@ A search agent. Process raw response into json format.
 import json
 import uuid
 from collections import deque
+from queue import PriorityQueue
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from llama_index.core.agent.runner.base import AgentRunner
@@ -36,7 +37,13 @@ from .environment.utils import get_logger
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .output_parser import SearchOutputParser
 from .search import SearchManager
-from .types import BugLocations, SearchActionStep, SearchInput, SearchResult
+from .types import (
+    BugLocations,
+    HeuristicSearchResult,
+    SearchActionStep,
+    SearchInput,
+    SearchResult,
+)
 
 logger = get_logger("search_agent")
 dispatcher = get_dispatcher(__name__)
@@ -88,6 +95,7 @@ class SearchWorker(BaseAgentWorker):
         llm: LLM,
         search_input: SearchInput = None,
         max_iterations: int = 10,
+        search_manager: SearchManager = None,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,
@@ -98,6 +106,8 @@ class SearchWorker(BaseAgentWorker):
         self._search_input = search_input
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
+        self.top_k_search = 10
+        self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
         self._token_counter = TokenCounter(llm)
@@ -121,6 +131,7 @@ class SearchWorker(BaseAgentWorker):
         llm: Optional[LLM] = None,
         search_input: Optional[SearchInput] = None,
         max_iterations: int = 10,
+        search_manager: SearchManager = None,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,
@@ -146,6 +157,7 @@ class SearchWorker(BaseAgentWorker):
             llm=llm,
             search_input=search_input,
             max_iterations=max_iterations,
+            search_manager=search_manager,
             search_formatter=search_formatter,
             output_parser=output_parser,
             callback_manager=callback_manager,
@@ -170,6 +182,7 @@ class SearchWorker(BaseAgentWorker):
         search_queue: deque = deque()
         action_history: List[SearchActionStep] = []
         current_search: List[SearchResult] = []
+        search_cache: List[SearchResult] = []
         # temporary memory for new messages
         new_memory = ChatMemoryBuffer.from_defaults()
         instruct_memory = ChatMemoryBuffer.from_defaults()
@@ -181,6 +194,7 @@ class SearchWorker(BaseAgentWorker):
             "search_queue": search_queue,
             "action_history": action_history,
             "current_search": current_search,
+            "search_cache": search_cache,
             "new_memory": new_memory,
             "instruct_memory": instruct_memory,
             "token_cnts": list(),
@@ -293,6 +307,50 @@ class SearchWorker(BaseAgentWorker):
             search_results_str += search_result.get_content() + "\n"
         return search_results_str
 
+    def _search_result_heuristic(
+        self, search_result: SearchResult, potential_bugs: List[BugLocations]
+    ) -> HeuristicSearchResult:
+        """Heuristic to determine if the search result is a bug location."""
+        search_action = search_result.search_action
+        search_input = search_result.get_search_input()
+
+        search_query = self._search_manager.get_query_from_history(
+            action=search_action, input=search_input
+        )
+
+        vaild_search = False
+        if search_query is not None:
+            vaild_search = self._search_manager.get_node_existance(search_query)
+        if vaild_search is False:
+            return HeuristicSearchResult(
+                heuristic=-1, search_result=search_result
+            )  # -1 means drop this search result
+
+        weighted_heuristic = 0
+        valid_bug_count = 0
+        for bug in potential_bugs:
+            bug_query = bug.bug_query()
+            vaild_bug = (
+                bug_query is not None
+            ) and self._search_manager.get_node_existance(bug_query)
+            if vaild_bug:
+                heuristic = self._search_manager.get_distance_between_queries(
+                    search_query, bug_query
+                )
+                weighted_heuristic += heuristic
+                valid_bug_count += 1
+            else:
+                continue  # if the bug_query is not valid, we should continue to check the next bug
+        if valid_bug_count == 0:
+            return HeuristicSearchResult(
+                heuristic=0, search_result=search_result
+            )  # normal search result
+        else:
+            weighted_heuristic = weighted_heuristic / valid_bug_count
+        return HeuristicSearchResult(
+            heuristic=weighted_heuristic, search_result=search_result
+        )
+
     def _check_action_valid(
         self, action: SearchActionStep, action_history: List[SearchActionStep]
     ) -> bool:
@@ -380,9 +438,10 @@ class SearchWorker(BaseAgentWorker):
             chat_history=task.extra_state["instruct_memory"].get_all()
             + task.memory.get(input=task.input)
             + task.extra_state["new_memory"].get_all(),
-            current_search=task.extra_state["current_search"],
+            current_search=task.extra_state["search_cache"],
             current_queue=task.extra_state["search_queue"],
         )
+        logger.info(f"search cache: {task.extra_state['search_cache']}")
         # if task.extra_state["is_done"]:
         #     logger.info(input_chat)
         self._del_previous_inst_input(task.extra_state["instruct_memory"])
@@ -452,8 +511,28 @@ class SearchWorker(BaseAgentWorker):
         agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
-        # add search steps to task state
-        task.extra_state["current_search"].append(search_result)
+        # calculate the heuristic of the search result
+        if search_result is not None:
+            heuristic_search_result = self._search_result_heuristic(
+                search_result, potential_bugs
+            )
+            if (
+                heuristic_search_result.heuristic >= 0
+            ):  # if the heuristic is greater than 0, we should add it to the current search
+                # add search steps to task state
+                task.extra_state["current_search"].append(search_result)
+
+        search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
+        # every step recalcuate the heuristic of the search result
+        for search_result in task.extra_state["current_search"]:
+            heuristic_search_result = self._search_result_heuristic(
+                search_result, potential_bugs
+            )
+            search_cache.put(heuristic_search_result)
+        # get the top k search results, put it to task.extra_state["search_cache"]
+        task.extra_state["search_cache"] = []
+        for _ in range(min(self.top_k_search, search_cache.qsize())):
+            task.extra_state["search_cache"].append(search_cache.get().search_result)
 
         # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
@@ -551,6 +630,7 @@ class SearchAgent(AgentRunner):
             llm=llm,
             search_input=search_input,
             max_iterations=max_iterations,
+            search_manager=self._search_manager,
             search_formatter=search_formatter,
             output_parser=output_parser,
             callback_manager=callback_manager,
