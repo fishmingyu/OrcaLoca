@@ -137,7 +137,10 @@ def test_search_callable_in_file():
     )
     print(code_snippet)
 
-    print(search_manager.history["search_query"])
+    res = search_manager.get_query_from_history(
+        action="search_callable", input="_scale_back_ascii"
+    )
+    print(res)
 
 
 if __name__ == "__main__":
