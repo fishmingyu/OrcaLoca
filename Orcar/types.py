@@ -27,6 +27,9 @@ class SearchActionStep(BaseReasoningStep):
             f"Search Action Input: {self.action_input}"
         )
 
+    def __eq__(self, other):
+        return self.action == other.action and self.action_input == other.action_input
+
 
 class SearchResult(BaseReasoningStep):
     """Search result reasoning step."""
@@ -165,8 +168,8 @@ class ExtractOutput(BaseModel):
     """
 
     summary: str = ""
-    suspicous_code: List[CodeInfo] = []
-    suspicous_code_from_tracer: List[CodeInfo] = []
+    suspicious_code: List[CodeInfo] = []
+    suspicious_code_from_tracer: List[CodeInfo] = []
     related_source_code: str = ""
 
 
@@ -180,12 +183,28 @@ class SearchInput(BaseModel):
 
     def get_content(self) -> str:
         """Get content."""
-        suspicous_code = ", ".join(
-            f"{code.keyword}" for code in self.extract_output.suspicous_code
+        suspicious_code = ", ".join(
+            f"{code.keyword}" for code in self.extract_output.suspicious_code
+        )
+        suspicious_code_from_tracer = ", ".join(
+            f"{code.keyword}"
+            for code in self.extract_output.suspicious_code_from_tracer
         )
         summary = self.extract_output.summary
-        return (
-            f"Problem Statement: {self.problem_statement}\n"
-            f"Suspicious Keyword: {suspicous_code}\n"
-            f"Summary: {summary}\n"
-        )
+
+        if len(self.extract_output.suspicious_code_from_tracer) == 0:
+            return (
+                f"Problem Statement: {self.problem_statement}\n"
+                f"Suspicious Keyword: {suspicious_code}\n"
+                f"Summary: {summary}\n"
+            )
+        else:
+            return (
+                f"Problem Statement: {self.problem_statement}\n"
+                f"Suspicious Keyword: {suspicious_code}\n"
+                f"""Suspicious Keyword from Tracer:
+                The following func/class names are more likely to be related to the bug, since they are called by reproducer code.
+                We had already put them in the search queue for you.
+                {suspicious_code_from_tracer} \n"""
+                f"Summary: {summary}\n"
+            )

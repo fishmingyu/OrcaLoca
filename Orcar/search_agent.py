@@ -51,11 +51,11 @@ dispatcher = get_dispatcher(__name__)
 
 def parse_search_input_step(input: SearchInput, task: Task) -> None:
     extract_output = input.extract_output
-    suspicous_code_from_tracer = extract_output.suspicous_code_from_tracer
-    # for every codeinfo in suspicous_code_from_tracer, parse it into a action step
+    suspicious_code_from_tracer = extract_output.suspicious_code_from_tracer
+    # for every codeinfo in suspicious_code_from_tracer, parse it into a action step
 
-    if len(suspicous_code_from_tracer) > 0:
-        for code_info in suspicous_code_from_tracer:
+    if len(suspicious_code_from_tracer) > 0:
+        for code_info in suspicious_code_from_tracer:
             query = code_info.keyword
             file_path = code_info.file_path
             search_step = SearchActionStep(
@@ -106,7 +106,7 @@ class SearchWorker(BaseAgentWorker):
         self._search_input = search_input
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
-        self.top_k_search = 10
+        self.top_k_search = 12
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
@@ -356,8 +356,9 @@ class SearchWorker(BaseAgentWorker):
     ) -> bool:
         """Check if the action is valid."""
         # first check if the action is in the history
-        if action in action_history:
-            return False
+        for history_action in action_history:
+            if history_action == action:
+                return False
         # if we search_query is in the history, we don't need to call search_callable or search_class or search_func
         search_query = ""
         if action.action == "search_class_skeleton":
@@ -458,7 +459,10 @@ class SearchWorker(BaseAgentWorker):
         out_token_cnt = self._token_counter.count(chat_response.message.content)
         token_cnt = TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt)
         logger.info(token_cnt)
-        task.extra_state["token_cnts"].append(("Searcher step", token_cnt))
+        if task.extra_state["is_done"]:
+            task.extra_state["token_cnts"].append(("Conclusion step", token_cnt))
+        else:
+            task.extra_state["token_cnts"].append(("Searcher step", token_cnt))
 
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
@@ -506,7 +510,7 @@ class SearchWorker(BaseAgentWorker):
         head_search_step = task.extra_state["search_queue"].popleft()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(task, tools, search_step)
-        # logger.info(f"Search result: {search_result}")
+        # logger.info(f"Next Search Input: {search_result}")
 
         agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
