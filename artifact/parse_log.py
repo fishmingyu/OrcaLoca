@@ -184,7 +184,7 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
         else:
             with open(json_dir, "r") as handle:
                 model_extractor_output = json.load(handle)
-            for code in model_extractor_output["suspicous_code"]:
+            for code in model_extractor_output["suspicious_code"]:
                 file_name = code["file_path"]
                 if file_name and file_name[0] == "/":
                     file_name = file_name[1:]

@@ -97,9 +97,9 @@ class ExtractWorker(BaseAgentWorker):
             "step_done": {init_step_id},
             "slices": dict(),
             "parse_type": dict(),
-            "suspicous_code": set(),
-            "suspicous_code_from_tracer": list(),
-            "suspicous_code_from_tracer_max_size": 5,
+            "suspicious_code": set(),
+            "suspicious_code_from_tracer": list(),
+            "suspicious_code_from_tracer_max_size": 5,
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
@@ -282,7 +282,7 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"After parse path: {parse_step}")
         for code_info in parse_step.code_info_list:
-            task.extra_state["suspicous_code"].add(code_info)
+            task.extra_state["suspicious_code"].add(code_info)
         next_step_names: list[str] = []
         return self.gen_next_steps(step, next_step_names)
 
@@ -348,7 +348,7 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
-            task.extra_state["suspicous_code"].add(code_info)
+            task.extra_state["suspicious_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
 
         next_step_names: list[str] = []
@@ -375,7 +375,7 @@ class ExtractWorker(BaseAgentWorker):
 
         # parse the result
         sensitivity_list = [
-            code_info.keyword for code_info in task.extra_state["suspicous_code"]
+            code_info.keyword for code_info in task.extra_state["suspicious_code"]
         ]
         logger.info(f"sensitivity_list: {sensitivity_list}")
         function_list = read_tracer_output(
@@ -383,7 +383,7 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"function_list: {function_list}")
 
-        max_size = task.extra_state["suspicous_code_from_tracer_max_size"]
+        max_size = task.extra_state["suspicious_code_from_tracer_max_size"]
         if len(function_list) > max_size:
             function_list = function_list[0 : 2 * max_size]
 
@@ -395,7 +395,7 @@ class ExtractWorker(BaseAgentWorker):
             function_list = function_list[0:max_size]
         logger.info(f"After limit size & parse: {function_list}")
 
-        task.extra_state["suspicous_code_from_tracer"] = function_list
+        task.extra_state["suspicious_code_from_tracer"] = function_list
 
         next_step_names: list[str] = []
         os.remove(output_host_path)
@@ -431,18 +431,18 @@ class ExtractWorker(BaseAgentWorker):
             )
 
     def gen_output(self, task: Task) -> ExtractOutput:
-        suspicous_code_from_tracer: List[CodeInfo] = task.extra_state[
-            "suspicous_code_from_tracer"
+        suspicious_code_from_tracer: List[CodeInfo] = task.extra_state[
+            "suspicious_code_from_tracer"
         ]
-        suspicous_keywords_from_tracer = set(
-            [code_loc.keyword for code_loc in suspicous_code_from_tracer]
+        suspicious_keywords_from_tracer = set(
+            [code_loc.keyword for code_loc in suspicious_code_from_tracer]
         )
-        suspicous_code: Set[CodeInfo] = task.extra_state["suspicous_code"]
-        suspicous_code = set(
+        suspicious_code: Set[CodeInfo] = task.extra_state["suspicious_code"]
+        suspicious_code = set(
             [
                 code_loc
-                for code_loc in suspicous_code
-                if code_loc.keyword not in suspicous_keywords_from_tracer
+                for code_loc in suspicious_code
+                if code_loc.keyword not in suspicious_keywords_from_tracer
             ]
         )
         related_source_code = ""
@@ -450,8 +450,8 @@ class ExtractWorker(BaseAgentWorker):
             related_source_code = task.extra_state["slices"]["source_code_parse"]
         return ExtractOutput(
             summary=task.extra_state["summary"],
-            suspicous_code=list(suspicous_code),
-            suspicous_code_from_tracer=suspicous_code_from_tracer,
+            suspicious_code=list(suspicious_code),
+            suspicious_code_from_tracer=suspicious_code_from_tracer,
             related_source_code=related_source_code,
         )
 
