@@ -72,7 +72,8 @@ class OrcarAgent:
         self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=True)
         self.base_path = self.env.cache_dir
         self.logger = get_logger(__name__)
-        self.redirect_log_output: bool = False
+        self.redirect_log: bool = False
+        self.output_to_file: bool = True
         self.final_stage = str2stage(final_stage)
 
     def __del__(self) -> None:
@@ -82,12 +83,15 @@ class OrcarAgent:
         if self.persistent:
             pause_persistent_container(self.ctr_bash)
 
-    def set_redirect_log_output(self, new_value: bool) -> None:
-        self.redirect_log_output = new_value
-        if self.redirect_log_output:
+    def set_redirect_log(self, new_value: bool) -> None:
+        self.redirect_log = new_value
+        if self.redirect_log:
             switch_log_to_file()
         else:
             switch_log_to_stdout()
+
+    def set_output_to_file(self, new_value: bool) -> None:
+        self.output_to_file = new_value
 
     def run_extract_agent(self) -> ExtractOutput:
         """Run the extract agent."""
@@ -97,7 +101,7 @@ class OrcarAgent:
         extract_output = ExtractOutput.model_validate_json(response.response)
         self.logger.info(extract_output)
 
-        if self.redirect_log_output:
+        if self.output_to_file:
             extract_json_obj = json.loads(extract_output.model_dump_json())
             with open(
                 f"{self.output_dir}/extractor_{self.inst_id}.json", "w"
@@ -128,7 +132,7 @@ class OrcarAgent:
         self.logger.info(search_agent_chat_response.response)
         search_output = json.loads(search_agent_chat_response.response)
         search_json_obj = search_output
-        if self.redirect_log_output:
+        if self.output_to_file:
             with open(f"{self.output_dir}/searcher_{self.inst_id}.json", "w") as handle:
                 json.dump(search_json_obj, handle, indent=4)
         return search_output
@@ -142,7 +146,7 @@ class OrcarAgent:
         set_log_dir(self.log_dir)
 
         os.makedirs(self.output_dir, exist_ok=True)
-        if self.redirect_log_output:
+        if self.redirect_log:
             os.makedirs(self.log_dir, exist_ok=True)
             with open(f"{self.log_dir}/orcar_{self.inst_id}.log", "w") as f:
                 sys.stdout = f
@@ -155,7 +159,7 @@ class OrcarAgent:
 
         # Redirect log contains format with rich text.
         # Provide a rich-free version for log parsing or less viewing.
-        if self.redirect_log_output:
+        if self.redirect_log:
             with open(f"{self.log_dir}/orcar_{self.inst_id}.log", "r") as f:
                 content = f.read()
             content = re.sub(r"\[.*?m", "", content)
