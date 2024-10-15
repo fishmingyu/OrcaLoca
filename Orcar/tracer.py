@@ -2,7 +2,8 @@ import bisect
 import copy
 import json
 import re
-from typing import Any, Dict, Generator, List, Optional, Set
+from functools import total_ordering
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 from pydantic import BaseModel
 
@@ -158,14 +159,61 @@ def gen_tracer_cmd(input_path: str, output_path: str) -> str:
     return cmd
 
 
-class FuncItem(BaseModel):
+class FuncSign(BaseModel):
+    "Function Signature"
+    filename: str
+    lineno: int
+    funcname: str
+
+    @classmethod
+    def from_functreenode(cls, f: FuncTreeNode):
+        return cls(
+            filename=f.filename,
+            lineno=f.lineno,
+            funcname=f.funcname,
+        )
+
+    def to_codeinfo(self) -> CodeInfo:
+        return CodeInfo(keyword=self.funcname, file_path=self.filename)
+
+    class Config:
+        frozen = True
+
+
+class FuncQueueElement(BaseModel):
     "Function call item in tracer log"
     node: FuncTreeNode
     layer: int
-    should_care: bool
+    closest_key_parent_node_layer: Tuple[FuncTreeNode, int] | None
+    called_by: list[FuncSign]
 
     class Config:
         arbitrary_types_allowed = True
+
+
+@total_ordering
+class FuncScore(BaseModel):
+    "Scoring point of a func, smaller is better"
+    is_same_file_with_key_parent: bool
+    layers_from_key_parent: int
+    absolute_calling_index: int
+    absolute_layer: int
+    called_by: list[FuncSign]
+    # TBD: score based on LLM analyzed relationship
+
+    def get_score(self):
+        return (
+            int(not self.is_same_file_with_key_parent),
+            self.layers_from_key_parent,
+            self.absolute_layer,
+            -self.absolute_calling_index,
+        )
+
+    def __eq__(self, other: "FuncScore") -> bool:
+        return self.get_score() == other.get_score()
+
+    def __le__(self, other: "FuncScore") -> bool:
+        return self.get_score() < other.get_score()
 
 
 def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[CodeInfo]:
@@ -196,43 +244,73 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
     func_tree = list(func_trees.values())[0]
     logger.info("Successfully parsed tracer output into func_tree")
 
-    # TODO:
-    # Ranking with:
-    # 1. layer diff to ancestor sensitive node (smaller has priority)
-    # 2. absolute layer (smaller has priority)
-
-    lst: List[FuncItem] = [FuncItem(node=func_tree.root, layer=0, should_care=False)]
-    list_with_layer_order: List[CodeInfo] = []
+    lst: List[FuncQueueElement] = [
+        FuncQueueElement(
+            node=func_tree.root,
+            layer=0,
+            closest_key_parent_node_layer=None,
+            called_by=[],
+        )
+    ]
+    func_score_dict: Dict[FuncSign, List[FuncScore]] = dict()
     file_sensitivity_set: Set[str] = set()
+    absolute_calling_index: int = 0
     while lst:
+        absolute_calling_index += 1
         ret = lst.pop()
-        should_care = ret.should_care
         if (
             ret.node.funcname
             and ret.node.funcname in sensitivity_list
             and ret.node.filename
         ):
-            should_care = True
+            ret.closest_key_parent_node_layer = (ret.node, ret.layer)
+            ret.called_by = []
             file_sensitivity_set.add(ret.node.filename)
         lst.extend(
             [
-                FuncItem(node=child, layer=ret.layer + 1, should_care=should_care)
+                FuncQueueElement(
+                    node=child,
+                    layer=ret.layer + 1,
+                    closest_key_parent_node_layer=ret.closest_key_parent_node_layer,
+                    called_by=(
+                        ret.called_by + [FuncSign.from_functreenode(ret.node)]
+                        if ret.closest_key_parent_node_layer
+                        else []
+                    ),
+                )
                 for child in ret.node.children[::-1]
+                # Children is already Time reversed, reverse again to reconstruct call time order
             ]
         )
-        if (
-            ret.node.funcname
-            and should_care
-            and (ret.node.filename in file_sensitivity_set)
-        ):
-            list_with_layer_order.append(
-                CodeInfo(keyword=ret.node.funcname, file_path=ret.node.filename)
+        if ret.closest_key_parent_node_layer and ret.node.funcname.isidentifier():
+            func_score = FuncScore(
+                is_same_file_with_key_parent=(
+                    ret.node.filename == ret.closest_key_parent_node_layer[0].filename
+                ),
+                layers_from_key_parent=(
+                    ret.layer - ret.closest_key_parent_node_layer[1]
+                ),
+                absolute_calling_index=absolute_calling_index,
+                absolute_layer=ret.layer,
+                called_by=ret.called_by,
             )
+            func_sign = FuncSign.from_functreenode(ret.node)
+            if func_sign not in func_score_dict:
+                func_score_dict[func_sign] = []
+            func_score_dict[func_sign].append(func_score)
 
-    return_list = []
-    for item in list_with_layer_order:
-        if item not in return_list:
-            return_list.append(item)
+    logger.info("Got funcs:")
+    logger.info(func_score_dict)
+
+    return_sort_list: List[Tuple[FuncSign, FuncScore]] = [
+        (func_sign, min(func_score_dict[func_sign])) for func_sign in func_score_dict
+    ]
+    return_sort_list.sort(key=lambda x: x[1])
+    logger.info("Got sorted funcs:")
+    for x in return_sort_list:
+        logger.info((x[0], x[1], x[1].get_score()))
+
+    return_list: List[CodeInfo] = [x[0].to_codeinfo() for x in return_sort_list]
 
     logger.info("Finished tracer output parsing")
     return return_list

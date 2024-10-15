@@ -79,14 +79,14 @@ class ParsedPatch(BaseModel):
         )
 
 
-def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
+def parse_log(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) -> None:
     file_match = 0
     keyword_match = 0
     notgen_cnt = 0
     extractor_file_match = 0
     extractor_notgen_cnt = 0
     log_dict = dict()
-    issues = os.listdir(log_dir)
+    issues = os.listdir(output_dir)
     for inst_id in sorted(issues):
         inst = ds_golden[ds_golden["instance_id"] == inst_id].iloc[0]
         log_dict[inst_id] = dict()
@@ -120,7 +120,7 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
         #    print(parsed_patch)
 
         # is_searcher_match = False
-        json_dir = f"{log_dir}/{inst_id}/searcher_{inst_id}.json"
+        json_dir = f"{output_dir}/{inst_id}/searcher_{inst_id}.json"
         model_file_set = set()
         model_keyword_set = set()
         # print(inst_id)
@@ -176,7 +176,7 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
                     log_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
 
         # is_extractor_match = False
-        json_dir = f"{log_dir}/{inst_id}/extractor_{inst_id}.json"
+        json_dir = f"{output_dir}/{inst_id}/extractor_{inst_id}.json"
         extractor_file_set = set()
         if not os.path.isfile(json_dir):
             extractor_notgen_cnt += 1
@@ -221,15 +221,15 @@ def main():
     )
     parser.add_argument(
         "-l",
-        "--log_dir",
-        default="./log",
-        help=f"The directory of the log dir",
+        "--output_dir",
+        default="./output",
+        help=f"The directory of the output dir",
     )
     args = parser.parse_args()
-    log_dir: str = args.log_dir
+    output_dir: str = args.output_dir
     artifact_dir: str = args.artifact_dir
     ds_golden = download_golden_data(artifact_dir=artifact_dir)
-    parse_log(ds_golden, log_dir=log_dir, artifact_dir=artifact_dir)
+    parse_log(ds_golden, output_dir=output_dir, artifact_dir=artifact_dir)
 
 
 if __name__ == "__main__":

@@ -69,7 +69,7 @@ class OrcarAgent:
             ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name
         )
         self.env = BenchmarkEnv(args, self.ctr_bash)
-        self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=True)
+        self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=False)
         self.base_path = self.env.cache_dir
         self.logger = get_logger(__name__)
         self.redirect_log: bool = False
