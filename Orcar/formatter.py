@@ -5,6 +5,8 @@ from abc import abstractmethod
 from typing import List, Optional, Sequence, Tuple
 
 import tiktoken
+from anthropic.types import Usage
+from anthropic.types.beta.prompt_caching import PromptCachingBetaUsage
 from llama_index.core.agent.types import Task, TaskStep
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
@@ -47,9 +49,28 @@ class TokenCount(BaseModel, frozen=True):
     in_token_cnt: int
     out_token_cnt: int
 
+    def __add__(self, other: "TokenCount"):
+        return TokenCount(
+            in_token_cnt=self.in_token_cnt + other.in_token_cnt,
+            out_token_cnt=self.out_token_cnt + other.out_token_cnt,
+        )
+
+
+class TokenCountCached(TokenCount, frozen=True):
+    cache_write_cnt: int = 0
+    cache_read_cnt: int = 0
+
+    def __add__(self, other: "TokenCountCached"):
+        return TokenCountCached(
+            in_token_cnt=self.in_token_cnt + other.in_token_cnt,
+            out_token_cnt=self.out_token_cnt + other.out_token_cnt,
+            cache_read_cnt=self.cache_read_cnt + other.cache_read_cnt,
+            cache_write_cnt=self.cache_write_cnt + other.cache_write_cnt,
+        )
+
 
 class TokenCounter:
-    """Token counter based on tiktoken"""
+    """Token counter based on tiktoken / Anthropic"""
 
     def __init__(self, llm: LLM) -> None:
         model = llm.metadata.model_name
@@ -75,6 +96,43 @@ class TokenCounter:
         return (
             response,
             TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt),
+        )
+
+
+class TokenCounterCached(TokenCounter):
+    """Token counter with cache based on Anthropic"""
+
+    def __init__(self, llm: LLM) -> None:
+        super().__init__(llm)
+        assert isinstance(llm, Anthropic)
+        # TODO: Manually set price data, add function to compute whether cache is worthy
+
+    @classmethod
+    def is_cache_enabled(cls, llm: LLM) -> bool:
+        return isinstance(llm, Anthropic)
+
+    def count_chat(
+        self, messages: List[ChatMessage], llm: LLM
+    ) -> Tuple[ChatResponse, TokenCountCached]:
+        response = llm.chat(
+            messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
+        )
+        usage = response.raw["usage"]
+        assert isinstance(usage, PromptCachingBetaUsage) or isinstance(
+            usage, Usage
+        ), f"Unknown usage type: {type(usage)}"
+        return (
+            response,
+            TokenCountCached(
+                in_token_cnt=usage.input_tokens,
+                out_token_cnt=usage.output_tokens,
+                cache_write_cnt=(
+                    0 if isinstance(usage, Usage) else usage.cache_creation_input_tokens
+                ),
+                cache_read_cnt=(
+                    0 if isinstance(usage, Usage) else usage.cache_read_input_tokens
+                ),
+            ),
         )
 
 

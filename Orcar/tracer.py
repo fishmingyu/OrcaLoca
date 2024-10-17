@@ -176,6 +176,9 @@ class FuncSign(BaseModel):
     def to_codeinfo(self) -> CodeInfo:
         return CodeInfo(keyword=self.funcname, file_path=self.filename)
 
+    def to_str(self) -> str:
+        return f"{self.funcname} ({self.filename}:{self.lineno})"
+
     class Config:
         frozen = True
 
@@ -206,7 +209,7 @@ class FuncScore(BaseModel):
             int(not self.is_same_file_with_key_parent),
             self.layers_from_key_parent,
             self.absolute_layer,
-            -self.absolute_calling_index,
+            self.absolute_calling_index,
         )
 
     def __eq__(self, other: "FuncScore") -> bool:
@@ -216,7 +219,9 @@ class FuncScore(BaseModel):
         return self.get_score() < other.get_score()
 
 
-def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[CodeInfo]:
+def read_tracer_output(
+    output_path: str, sensitivity_list: List[str]
+) -> List[Tuple[FuncSign, FuncScore]]:
     with open(output_path) as f:
         tracer_output = json.load(f)
     logger.info(f"Found tracer output at {output_path}")
@@ -310,7 +315,7 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
     for x in return_sort_list:
         logger.info((x[0], x[1], x[1].get_score()))
 
-    return_list: List[CodeInfo] = [x[0].to_codeinfo() for x in return_sort_list]
+    # return_list: List[CodeInfo] = [x[0].to_codeinfo() for x in return_sort_list]
 
     logger.info("Finished tracer output parsing")
-    return return_list
+    return return_sort_list
