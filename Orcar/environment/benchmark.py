@@ -311,6 +311,8 @@ class BenchmarkEnv:
         self.run_with_handle(
             f"pip install viztracer",
             err_msg="Failed to install viztracer",
+            timeout=LONG_TIMEOUT,
+            output_log=True,
         )
 
         logger.info("Installation step took %.2f seconds", time.perf_counter() - t0)

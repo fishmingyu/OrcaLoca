@@ -105,6 +105,7 @@ class FuncScorer:
 
         self._token_cnts: List[TokenCount] = []
         if self._enable_cache:
+            logger.info(f"Cache is enabled for llm type {type(llm)}")
             self._token_counter = TokenCounterCached(llm)
 
     # TODO: Add function to fill cachable_fix to satisfy min length
@@ -128,7 +129,7 @@ class FuncScorer:
 
     def log_token_stats(self) -> None:
         logger.info(
-            "Total cnt : "
+            f"{'Total cnt':<25}: "
             + str(
                 sum(
                     self._token_cnts,

@@ -6,7 +6,6 @@ from typing import List, Optional, Sequence, Tuple
 
 import tiktoken
 from anthropic.types import Usage
-from anthropic.types.beta.prompt_caching import PromptCachingBetaUsage
 from llama_index.core.agent.types import Task, TaskStep
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
 from llama_index.core.bridge.pydantic import BaseModel
@@ -118,19 +117,21 @@ class TokenCounterCached(TokenCounter):
             messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
         )
         usage = response.raw["usage"]
-        assert isinstance(usage, PromptCachingBetaUsage) or isinstance(
-            usage, Usage
-        ), f"Unknown usage type: {type(usage)}"
+        assert isinstance(usage, Usage), f"Unknown usage type: {type(usage)}"
         return (
             response,
             TokenCountCached(
                 in_token_cnt=usage.input_tokens,
                 out_token_cnt=usage.output_tokens,
                 cache_write_cnt=(
-                    0 if isinstance(usage, Usage) else usage.cache_creation_input_tokens
+                    usage.cache_creation_input_tokens
+                    if hasattr(usage, "cache_creation_input_tokens")
+                    else 0
                 ),
                 cache_read_cnt=(
-                    0 if isinstance(usage, Usage) else usage.cache_read_input_tokens
+                    usage.cache_read_input_tokens
+                    if hasattr(usage, "cache_read_input_tokens")
+                    else 0
                 ),
             ),
         )

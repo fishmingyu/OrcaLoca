@@ -282,6 +282,8 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"After parse path: {parse_step}")
         for code_info in parse_step.code_info_list:
+            if not code_info.keyword.isidentifier():
+                continue
             task.extra_state["suspicious_code"].add(code_info)
         next_step_names: list[str] = []
         return self.gen_next_steps(step, next_step_names)
@@ -316,13 +318,11 @@ class ExtractWorker(BaseAgentWorker):
         logger.info(f"{judge_step}")
 
         next_step_names = []
+        next_step_names.append("reproduce_code_parse")
         if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
-            if "traceback_parse" not in task.extra_state["slices"]:
-                # Only read trace when traceback is not present
-                next_step_names.append("reproduce_trace")
-        else:
-            next_step_names.append("reproduce_code_parse")
+            next_step_names.append("reproduce_trace")
+
         return self.gen_next_steps(step, next_step_names)
 
     def handle_step_summarize(self, step: TaskStep, task: Task) -> List[TaskStep]:
@@ -348,6 +348,8 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
+            if not code_info.keyword.isidentifier():
+                continue
             task.extra_state["suspicious_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
 
@@ -375,13 +377,25 @@ class ExtractWorker(BaseAgentWorker):
 
         # parse the result
         max_size = task.extra_state["suspicious_code_from_tracer_max_size"]
-        sensitivity_list = [
-            code_info.keyword for code_info in task.extra_state["suspicious_code"]
-        ]
-        logger.info(f"sensitivity_list: {sensitivity_list}")
+        sensitivity_list = []
+        for c in task.extra_state["suspicious_code"]:
+            c: CodeInfo  # path format: 'astropy/modeling/separable.py'
+            if not c.file_path:
+                sensitivity_list.append(c)
+            else:
+                full_path = (
+                    f"/{get_repo_dir(task.extra_state['inst']['repo'])}/{c.file_path}"
+                )
+                sensitivity_list.append(
+                    CodeInfo(keyword=c.keyword, file_path=full_path)
+                )
+                # path format: '/astropy__astropy/astropy/modeling/separable.py'
         funcsign_score_list = read_tracer_output(
             output_path=output_host_path, sensitivity_list=sensitivity_list
         )  # Path format: '/astropy__astropy/astropy/modeling/separable.py'
+        logger.info(
+            f"Limiting Tracer output from {len(funcsign_score_list)} to {5 * max_size} for reranking"
+        )
         funcsign_score_list = funcsign_score_list[
             0 : 5 * max_size
         ]  # limit rerank max size

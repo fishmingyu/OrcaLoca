@@ -220,8 +220,16 @@ class FuncScore(BaseModel):
 
 
 def read_tracer_output(
-    output_path: str, sensitivity_list: List[str]
+    output_path: str, sensitivity_list: List[CodeInfo]
 ) -> List[Tuple[FuncSign, FuncScore]]:
+    sensitivity_dict: Dict[str, Set] = dict()
+    for c in sensitivity_list:
+        if c.keyword not in sensitivity_dict:
+            sensitivity_dict[c.keyword] = set()
+        if c.file_path:
+            sensitivity_dict[c.keyword].add(c.file_path)
+    logger.info(f"sensitivity_dict: {sensitivity_dict}")
+
     with open(output_path) as f:
         tracer_output = json.load(f)
     logger.info(f"Found tracer output at {output_path}")
@@ -265,8 +273,12 @@ def read_tracer_output(
         ret = lst.pop()
         if (
             ret.node.funcname
-            and ret.node.funcname in sensitivity_list
+            and ret.node.funcname in sensitivity_dict.keys()
             and ret.node.filename
+            and (
+                (not sensitivity_dict[ret.node.funcname])
+                or (ret.node.filename in sensitivity_dict[ret.node.funcname])
+            )
         ):
             ret.closest_key_parent_node_layer = (ret.node, ret.layer)
             ret.called_by = []
