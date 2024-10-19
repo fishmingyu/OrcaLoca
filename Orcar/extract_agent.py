@@ -104,6 +104,7 @@ class ExtractWorker(BaseAgentWorker):
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
+            "reproducer_path": "",
         }
         task.extra_state.update(task_state)
 
@@ -205,9 +206,12 @@ class ExtractWorker(BaseAgentWorker):
         self.env.run(f"cd -")
         return processed_code_info_list
 
-    def reproduce_issue(self, issue_reproducer: str, inst: Dict[str, Any]) -> str:
+    def reproduce_issue(self, task: Task) -> str:
+        issue_reproducer = task.extra_state["slices"]["reproduce_code_parse"]
+        inst = task.extra_state["inst"]
         repo_dir = get_repo_dir(inst["repo"])
         reproducer_path = f"/{repo_dir}/reproducer_{inst['instance_id']}.py"
+        task.extra_state["reproducer_path"] = reproducer_path
         output_path = f"/tmp/tracer_output_{inst['instance_id']}.json"
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
@@ -293,10 +297,7 @@ class ExtractWorker(BaseAgentWorker):
         if step_name != "reproduce_judge":
             raise NotImplementedError
         logger.info(f"Current step: {step_name} in handle_step_judge")
-        reproduce_log: str = self.reproduce_issue(
-            issue_reproducer=task.extra_state["slices"]["reproduce_code_parse"],
-            inst=task.extra_state["inst"],
-        )
+        reproduce_log: str = self.reproduce_issue(task=task)
         task.extra_state["slices"]["reproduce_log_parse"] = reproduce_log
         task.extra_state["parse_type"]["reproduce_log_parse"] = "traceback"
 
@@ -393,12 +394,23 @@ class ExtractWorker(BaseAgentWorker):
         funcsign_score_list = read_tracer_output(
             output_path=output_host_path, sensitivity_list=sensitivity_list
         )  # Path format: '/astropy__astropy/astropy/modeling/separable.py'
-        logger.info(
-            f"Limiting Tracer output from {len(funcsign_score_list)} to {5 * max_size} for reranking"
-        )
-        funcsign_score_list = funcsign_score_list[
-            0 : 5 * max_size
-        ]  # limit rerank max size
+        reproducer_path = task.extra_state["reproducer_path"]
+        repo_dir = get_repo_dir(task.extra_state["inst"]["repo"])
+        funcsign_score_list = [
+            x
+            for x in funcsign_score_list
+            if (x[0].filename != reproducer_path)
+            and (x[0].filename.startswith(f"/{repo_dir}/"))
+        ]
+        if len(funcsign_score_list) > 5 * max_size:
+            logger.info(
+                f"Limiting Tracer output from {len(funcsign_score_list)} to {5 * max_size} for reranking"
+            )
+            funcsign_score_list = funcsign_score_list[
+                0 : 5 * max_size
+            ]  # limit rerank max size
+        else:
+            logger.info(f"Tracer output {len(funcsign_score_list)} items for reranking")
         funcsign_score_list = redirect_filepath_to_cache(
             input=funcsign_score_list, cache_dir=self.env.cache_dir
         )  # Path format: '/home/dbmw/.orcar/astropy__astropy/astropy/modeling/separable.py'
@@ -522,15 +534,15 @@ class ExtractWorker(BaseAgentWorker):
             logger.info(
                 (
                     f"{tag:<25}: "
-                    f"in {token_cnt.in_token_cnt:<5} tokens, "
-                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                    f"in {token_cnt.in_token_cnt:>6} tokens, "
+                    f"out {token_cnt.out_token_cnt:>6} tokens"
                 )
             )
         logger.info(
             (
                 f"{'Total cnt':<25}: "
-                f"in {in_token_cnt:<5} tokens, "
-                f"out {out_token_cnt:<5} tokens"
+                f"in {in_token_cnt:>6} tokens, "
+                f"out {out_token_cnt:>6} tokens"
             )
         )
 

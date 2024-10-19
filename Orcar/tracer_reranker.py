@@ -110,31 +110,51 @@ class FuncScorer:
 
     # TODO: Add function to fill cachable_fix to satisfy min length
 
-    def score(self, function_content: str) -> int:
+    def score(self, function_content: str, called_by: list[FuncSign]) -> int:
         function_prompt = ChatMessage(
             role="user",
             content="<function_content>" f"{function_content}" "</function_content>",
         )
+        callchain = " -> ".join([f"'{x.funcname}'" for x in called_by])
+        callchain_prompt = ChatMessage(
+            role="user",
+            content=f"This function is traced in an issue reproducer, and its captured call chain is: {callchain}",
+        )
+        logger.info(callchain_prompt.content)
         messages_prefix = self._messages_prefix
         if self._enable_cache and messages_prefix[-1].role == MessageRole.USER:
             messages_prefix[-1].additional_kwargs["cache_control"] = {
                 "type": "ephemeral"
             }
 
-        messages = self._messages_prefix + [function_prompt, self._order_prompt]
+        messages = self._messages_prefix + [
+            function_prompt,
+            callchain_prompt,
+            self._order_prompt,
+        ]
         response, cnt = self._token_counter.count_chat(llm=self._llm, messages=messages)
         logger.info(cnt)
         self._token_cnts.append(cnt)
         return int(response.message.content)
 
     def log_token_stats(self) -> None:
+        if isinstance(self._token_counter, TokenCounterCached):
+            sum_cnt = sum(
+                self._token_cnts,
+                start=TokenCountCached(in_token_cnt=0, out_token_cnt=0),
+            )
+            logger.info(f"{'Total cached cnt':<25}: " + str(sum_cnt))
+            sum_cnt = self._token_counter.equivalent_cost(sum_cnt)
+        else:
+            sum_cnt = sum(
+                self._token_cnts,
+                start=TokenCount(in_token_cnt=0, out_token_cnt=0),
+            )
         logger.info(
-            f"{'Total cnt':<25}: "
-            + str(
-                sum(
-                    self._token_cnts,
-                    start=TokenCountCached(in_token_cnt=0, out_token_cnt=0),
-                )
+            (
+                f"{'Total cnt':<25}: "
+                f"in {sum_cnt.in_token_cnt:>6} tokens, "
+                f"out {sum_cnt.out_token_cnt:>6} tokens"
             )
         )
 
@@ -159,7 +179,10 @@ def rerank_func(
         else:
             logger.warning("Cannot find function:")
             logger.warning(func_sign)
-        llm_score = scorer.score(function_content=func_content)
+        llm_score = scorer.score(
+            function_content=func_content, called_by=func_score.called_by + [func_sign]
+        )
+        logger.info(f"LLM score: {llm_score} / 100")
         llm_int_score = 100 - llm_score
         score = (
             llm_int_score
@@ -183,6 +206,15 @@ def rerank_func(
     output_sorted_list.sort(key=lambda x: x[0])
 
     logger.info("----------------After sort------------------------")
+    # for x in output_sorted_list:
+    #    logger.info(f"Score: {x[0]}")
+    #    logger.info(x[1].to_str())
+    #    logger.info(f"LLM Score: {x[3]}")
+    #    logger.info(x[2].get_score())
+    logger.info([(x[1].funcname, x[3]) for x in output_sorted_list])
+
+    output_sorted_list = [x for x in output_sorted_list if x[3] > 50]
+    logger.info("----------------After filter------------------------")
     # for x in output_sorted_list:
     #    logger.info(f"Score: {x[0]}")
     #    logger.info(x[1].to_str())

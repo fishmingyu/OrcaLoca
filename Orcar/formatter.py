@@ -104,7 +104,20 @@ class TokenCounterCached(TokenCounter):
     def __init__(self, llm: LLM) -> None:
         super().__init__(llm)
         assert isinstance(llm, Anthropic)
+        self.write_cost_ratio: float = 1.25
+        self.read_cost_ratio: float = 0.1
         # TODO: Manually set price data, add function to compute whether cache is worthy
+
+    def equivalent_cost(self, token_count_cached: TokenCountCached) -> TokenCount:
+        equi_cost = round(
+            token_count_cached.in_token_cnt
+            + token_count_cached.cache_write_cnt * self.write_cost_ratio
+            + token_count_cached.cache_read_cnt * self.read_cost_ratio
+        )
+        return TokenCount(
+            in_token_cnt=equi_cost,
+            out_token_cnt=token_count_cached.out_token_cnt,
+        )
 
     @classmethod
     def is_cache_enabled(cls, llm: LLM) -> bool:
@@ -341,7 +354,6 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "output_fields": EXTRACT_FIELDS[handler],
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
-                "reproduce_snippet": task.extra_state["slices"]["reproduce_code_parse"],
                 "reproducer_log": task.extra_state["slices"]["reproduce_log_parse"],
             }
             fmt_user_msg = user_msg.format(**format_args)

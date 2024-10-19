@@ -60,7 +60,7 @@ class LoggingManager:
         assert self.current_log_dir and os.path.isdir(self.current_log_dir)
 
         formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            "[%(asctime)s - %(name)s - %(levelname)s] %(message)s"
         )
 
         unified_log_file = os.path.join(self.current_log_dir, f"orcar_total.log")
