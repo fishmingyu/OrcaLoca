@@ -596,15 +596,15 @@ class SearchWorker(BaseAgentWorker):
             logger.info(
                 (
                     f"{tag:<25}: "
-                    f"in {token_cnt.in_token_cnt:<5} tokens, "
-                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                    f"in {token_cnt.in_token_cnt:>6} tokens, "
+                    f"out {token_cnt.out_token_cnt:>6} tokens"
                 )
             )
         logger.info(
             (
                 f"{'Total cnt':<25}: "
-                f"in {in_token_cnt:<5} tokens, "
-                f"out {out_token_cnt:<5} tokens"
+                f"in {in_token_cnt:>6} tokens, "
+                f"out {out_token_cnt:>6} tokens"
             )
         )
 

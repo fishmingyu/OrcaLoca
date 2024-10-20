@@ -66,7 +66,7 @@ class BenchmarkEnv:
             subprocess.run(cmd, shell=True, check=True)
         # git checkout to base commit
         base_commit = inst["base_commit"]
-        cmd = f"cd {host_path}; git checkout {base_commit}"
+        cmd = f"cd {host_path}; git reset --hard {base_commit}"
         logger.info(f"Checking out to base commit: {cmd}")
         subprocess.run(cmd, shell=True, check=True)
 
@@ -311,6 +311,8 @@ class BenchmarkEnv:
         self.run_with_handle(
             f"pip install viztracer",
             err_msg="Failed to install viztracer",
+            timeout=LONG_TIMEOUT,
+            output_log=True,
         )
 
         logger.info("Installation step took %.2f seconds", time.perf_counter() - t0)

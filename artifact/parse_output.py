@@ -79,17 +79,17 @@ class ParsedPatch(BaseModel):
         )
 
 
-def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
+def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) -> None:
     file_match = 0
     keyword_match = 0
     notgen_cnt = 0
     extractor_file_match = 0
     extractor_notgen_cnt = 0
-    log_dict = dict()
-    issues = os.listdir(log_dir)
+    output_dict = dict()
+    issues = os.listdir(output_dir)
     for inst_id in sorted(issues):
         inst = ds_golden[ds_golden["instance_id"] == inst_id].iloc[0]
-        log_dict[inst_id] = dict()
+        output_dict[inst_id] = dict()
 
         parsed_patch = ParsedPatch.model_validate_json(inst["parsed_patch"])
         file_set = set()
@@ -120,20 +120,20 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
         #    print(parsed_patch)
 
         # is_searcher_match = False
-        json_dir = f"{log_dir}/{inst_id}/searcher_{inst_id}.json"
+        json_dir = f"{output_dir}/{inst_id}/searcher_{inst_id}.json"
         model_file_set = set()
         model_keyword_set = set()
         # print(inst_id)
         if not os.path.isfile(json_dir):
             notgen_cnt += 1
-            log_dict[inst_id]["status"] = "Json not gen"
+            output_dict[inst_id]["status"] = "Json not gen"
             # print('    Json not gen')
         else:
             with open(json_dir, "r") as handle:
                 model_searcher_output = json.load(handle)
             if "bug_locations" not in model_searcher_output:
                 notgen_cnt += 1
-                log_dict[inst_id]["status"] = "Json invalid"
+                output_dict[inst_id]["status"] = "Json invalid"
             else:
                 for loc in model_searcher_output["bug_locations"]:
                     file_name = loc["file"]
@@ -154,29 +154,29 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
                     file_match += 1
                     # is_searcher_match = True
                     # print('    File Matched!')
-                    log_dict[inst_id]["file"] = "Matched"
+                    output_dict[inst_id]["file"] = "Matched"
                 else:
                     # print('    File mismatch:')
                     # print('    Golden: \n    ',file_set)
                     # print('    Model: \n    ',model_file_set)
-                    log_dict[inst_id]["file"] = dict()
-                    log_dict[inst_id]["file"]["golden"] = list(file_set)
-                    log_dict[inst_id]["file"]["model"] = list(model_file_set)
+                    output_dict[inst_id]["file"] = dict()
+                    output_dict[inst_id]["file"]["golden"] = list(file_set)
+                    output_dict[inst_id]["file"]["model"] = list(model_file_set)
 
                 if keyword_set.issubset(model_keyword_set):
                     keyword_match += 1
                     # print('    Keyword Matched!')
-                    log_dict[inst_id]["keyword"] = "Matched"
+                    output_dict[inst_id]["keyword"] = "Matched"
                 else:
                     # print('    Keyword mismatch:')
                     # print('    Golden: \n    ',keyword_set)
                     # print('    Model: \n    ',model_keyword_set)
-                    log_dict[inst_id]["keyword"] = dict()
-                    log_dict[inst_id]["keyword"]["golden"] = list(keyword_set)
-                    log_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
+                    output_dict[inst_id]["keyword"] = dict()
+                    output_dict[inst_id]["keyword"]["golden"] = list(keyword_set)
+                    output_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
 
         # is_extractor_match = False
-        json_dir = f"{log_dir}/{inst_id}/extractor_{inst_id}.json"
+        json_dir = f"{output_dir}/{inst_id}/extractor_{inst_id}.json"
         extractor_file_set = set()
         if not os.path.isfile(json_dir):
             extractor_notgen_cnt += 1
@@ -205,10 +205,10 @@ def parse_log(ds_golden: pd.DataFrame, log_dir: str, artifact_dir: str) -> None:
     )
     # print(f"Extractor File match: {extractor_file_match / total_cnt:.2f}")
     # print(f"Extractor Json not gen: {extractor_notgen_cnt / total_cnt:.2f}")
-    output_path = f"{artifact_dir}/assets/orcar_parsed_log.json"
+    output_path = f"{artifact_dir}/assets/orcar_parsed_output.json"
     with open(output_path, "w") as handle:
-        json.dump(log_dict, handle, indent=4)
-    print(f"Parsed log dumped to {output_path}")
+        json.dump(output_dict, handle, indent=4)
+    print(f"Parsed output dumped to {output_path}")
 
 
 def main():
@@ -221,15 +221,15 @@ def main():
     )
     parser.add_argument(
         "-l",
-        "--log_dir",
-        default="./log",
-        help=f"The directory of the log dir",
+        "--output_dir",
+        default="./output",
+        help=f"The directory of the output dir",
     )
     args = parser.parse_args()
-    log_dir: str = args.log_dir
+    output_dir: str = args.output_dir
     artifact_dir: str = args.artifact_dir
     ds_golden = download_golden_data(artifact_dir=artifact_dir)
-    parse_log(ds_golden, log_dir=log_dir, artifact_dir=artifact_dir)
+    parse_output(ds_golden, output_dir=output_dir, artifact_dir=artifact_dir)
 
 
 if __name__ == "__main__":
