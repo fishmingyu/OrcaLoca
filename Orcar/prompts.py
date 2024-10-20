@@ -47,7 +47,9 @@ The API calls include:
 Everytime you will do the following things:
 
 Provide the observation based on given input. Check whether it contains any class, method or function you need to further search.
-Notice that you should put new classes, methods or functions related to your current code snippets. Don't put any class, method or function we currently haven't searched.
+If you find any thing suspicious, provide the potential bug locations.
+If you need to search more, provide the new search actions.
+Notice that you should put new classes, methods or functions related to your current code snippets.
 You can put multiple classes, methods or functions in the new_search_actions list.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 

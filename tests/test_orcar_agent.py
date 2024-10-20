@@ -14,7 +14,7 @@ args_dict = {
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    # "filter_instance": "^(django__django-11848)$",
+    # "filter_instance": "^(matplotlib__matplotlib-23314)$",
     # "filter_instance": "^(django__django-10914)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
@@ -77,7 +77,7 @@ def test_agent():
     # final_stage = "extract"
     final_stage = "search"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    # agent.set_redirect_log_output(True)
+    agent.set_redirect_log_output(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))

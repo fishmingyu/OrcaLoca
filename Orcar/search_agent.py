@@ -70,7 +70,7 @@ def add_user_step_to_memory(
     step: TaskStep,
     search_input: SearchInput,
     task: Task,
-) -> None:
+) -> bool:
     """Add user step to memory."""
     if "is_first" in step.step_state and step.step_state["is_first"]:
         memory = task.extra_state["new_memory"]
@@ -79,11 +79,13 @@ def add_user_step_to_memory(
         # logger.info("step input: \n" + step.input)
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         step.step_state["is_first"] = False
+        return True
     else:
         # logger.info("step input: \n" + step.input)
         memory = task.extra_state["instruct_memory"]
         memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
         # logger.info(f"Add user input to memory: {step.input}")
+        return False
 
 
 class SearchWorker(BaseAgentWorker):
@@ -418,6 +420,18 @@ class SearchWorker(BaseAgentWorker):
             next_steps=new_steps,
         )
 
+    def _get_step_str(
+        self,
+        is_first: bool,
+        task: Task,
+    ) -> str:
+        if is_first:
+            return "FIRST"
+        elif task.extra_state["is_done"]:
+            return "CONCLUSION"
+        else:
+            return "REGULAR"
+
     def _run_step(
         self,
         step: TaskStep,
@@ -426,7 +440,7 @@ class SearchWorker(BaseAgentWorker):
         """Run step."""
         # TODO: see if we want to do step-based inputs
         if step.input is not None:
-            add_user_step_to_memory(
+            is_first = add_user_step_to_memory(
                 step=step,
                 search_input=self._search_input,
                 task=task,
@@ -434,7 +448,7 @@ class SearchWorker(BaseAgentWorker):
         tools = self.get_tools(task.input)
         # add task input to chat history
         input_chat = self._search_formatter.format(
-            "CONCLUSION" if task.extra_state["is_done"] else "REGULAR",
+            self._get_step_str(is_first, task),
             tools,
             chat_history=task.extra_state["instruct_memory"].get_all()
             + task.memory.get(input=task.input)
