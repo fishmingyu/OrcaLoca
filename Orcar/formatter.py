@@ -212,9 +212,14 @@ class SearchChatFormatter(BaseAgentChatFormatter):
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         assert step_type in [
+            "FIRST",
             "REGULAR",
             "CONCLUSION",
         ], f"format: Unknown step type {step_type}"
+        is_first = step_type == "FIRST"
+        # convert FIRST step to REGULAR step
+        if is_first:
+            step_type = "REGULAR"
         current_search = current_search or []
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
@@ -267,13 +272,27 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             ),
         )
 
-        return [
-            ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
-            *chat_history,
-            *searching_history,
-            queue_message,
-            fmt_control_msg,
-        ]
+        if is_first:
+            return [
+                ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+                *chat_history,
+                fmt_control_msg,
+            ]
+        elif step_type == "REGULAR":
+            return [
+                ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+                *chat_history,
+                *searching_history,
+                queue_message,
+                fmt_control_msg,
+            ]
+        else:
+            return [
+                ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+                *chat_history,
+                *searching_history,
+                fmt_control_msg,
+            ]
 
 
 class ExtractChatFormatter(BaseAgentChatFormatter):
