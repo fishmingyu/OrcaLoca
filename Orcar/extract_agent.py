@@ -16,6 +16,7 @@ from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
 from .log_utils import get_logger
 from .output_parser import ExtractOutputParser
 from .tracer import gen_tracer_cmd, read_tracer_output
+from .tracer_reranker import redirect_filepath_to_cache, rerank_func
 from .types import (
     CodeInfo,
     ExtractJudgeStep,
@@ -103,6 +104,7 @@ class ExtractWorker(BaseAgentWorker):
             "summary": "",
             "inst": dict(),
             "token_cnts": list(),
+            "reproducer_path": "",
         }
         task.extra_state.update(task_state)
 
@@ -204,9 +206,12 @@ class ExtractWorker(BaseAgentWorker):
         self.env.run(f"cd -")
         return processed_code_info_list
 
-    def reproduce_issue(self, issue_reproducer: str, inst: Dict[str, Any]) -> str:
+    def reproduce_issue(self, task: Task) -> str:
+        issue_reproducer = task.extra_state["slices"]["reproduce_code_parse"]
+        inst = task.extra_state["inst"]
         repo_dir = get_repo_dir(inst["repo"])
         reproducer_path = f"/{repo_dir}/reproducer_{inst['instance_id']}.py"
+        task.extra_state["reproducer_path"] = reproducer_path
         output_path = f"/tmp/tracer_output_{inst['instance_id']}.json"
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
@@ -220,7 +225,6 @@ class ExtractWorker(BaseAgentWorker):
         step_name = step.step_state["name"]
         logger.info(f"Current step: {step_name} in handle_step_slice")
 
-        # TODO: extract into a function?
         messages = self._chat_formatter.format(step, task, "slice")
         logger.info(f"{messages}")
         chat_response = self.chat_with_count(
@@ -282,6 +286,8 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"After parse path: {parse_step}")
         for code_info in parse_step.code_info_list:
+            if not code_info.keyword.isidentifier():
+                continue
             task.extra_state["suspicious_code"].add(code_info)
         next_step_names: list[str] = []
         return self.gen_next_steps(step, next_step_names)
@@ -291,10 +297,7 @@ class ExtractWorker(BaseAgentWorker):
         if step_name != "reproduce_judge":
             raise NotImplementedError
         logger.info(f"Current step: {step_name} in handle_step_judge")
-        reproduce_log: str = self.reproduce_issue(
-            issue_reproducer=task.extra_state["slices"]["reproduce_code_parse"],
-            inst=task.extra_state["inst"],
-        )
+        reproduce_log: str = self.reproduce_issue(task=task)
         task.extra_state["slices"]["reproduce_log_parse"] = reproduce_log
         task.extra_state["parse_type"]["reproduce_log_parse"] = "traceback"
 
@@ -316,13 +319,11 @@ class ExtractWorker(BaseAgentWorker):
         logger.info(f"{judge_step}")
 
         next_step_names = []
+        next_step_names.append("reproduce_code_parse")
         if judge_step.is_successful:
             next_step_names.append("reproduce_log_parse")
-            if "traceback_parse" not in task.extra_state["slices"]:
-                # Only read trace when traceback is not present
-                next_step_names.append("reproduce_trace")
-        else:
-            next_step_names.append("reproduce_code_parse")
+            next_step_names.append("reproduce_trace")
+
         return self.gen_next_steps(step, next_step_names)
 
     def handle_step_summarize(self, step: TaskStep, task: Task) -> List[TaskStep]:
@@ -348,6 +349,8 @@ class ExtractWorker(BaseAgentWorker):
         )
         logger.info(f"{summarize_step.code_info_list}")
         for code_info in summarize_step.code_info_list:
+            if not code_info.keyword.isidentifier():
+                continue
             task.extra_state["suspicious_code"].add(code_info)
         task.extra_state["summary"] = summarize_step.summary
 
@@ -374,23 +377,64 @@ class ExtractWorker(BaseAgentWorker):
         self.env.copy_file_from_env(output_path, output_host_path)
 
         # parse the result
-        sensitivity_list = [
-            code_info.keyword for code_info in task.extra_state["suspicious_code"]
-        ]
-        logger.info(f"sensitivity_list: {sensitivity_list}")
-        function_list = read_tracer_output(
-            output_path=output_host_path, sensitivity_list=sensitivity_list
-        )
-        logger.info(f"function_list: {function_list}")
-
         max_size = task.extra_state["suspicious_code_from_tracer_max_size"]
-        if len(function_list) > max_size:
-            function_list = function_list[0 : 2 * max_size]
-
-        function_list = self.parse_path_in_code_info(
-            task.extra_state["inst"], function_list
+        sensitivity_list = []
+        for c in task.extra_state["suspicious_code"]:
+            c: CodeInfo  # path format: 'astropy/modeling/separable.py'
+            if not c.file_path:
+                sensitivity_list.append(c)
+            else:
+                full_path = (
+                    f"/{get_repo_dir(task.extra_state['inst']['repo'])}/{c.file_path}"
+                )
+                sensitivity_list.append(
+                    CodeInfo(keyword=c.keyword, file_path=full_path)
+                )
+                # path format: '/astropy__astropy/astropy/modeling/separable.py'
+        funcsign_score_list = read_tracer_output(
+            output_path=output_host_path, sensitivity_list=sensitivity_list
+        )  # Path format: '/astropy__astropy/astropy/modeling/separable.py'
+        reproducer_path = task.extra_state["reproducer_path"]
+        repo_dir = get_repo_dir(task.extra_state["inst"]["repo"])
+        funcsign_score_list = [
+            x
+            for x in funcsign_score_list
+            if (x[0].filename != reproducer_path)
+            and (x[0].filename.startswith(f"/{repo_dir}/"))
+        ]
+        if len(funcsign_score_list) > 5 * max_size:
+            logger.info(
+                f"Limiting Tracer output from {len(funcsign_score_list)} to {5 * max_size} for reranking"
+            )
+            funcsign_score_list = funcsign_score_list[
+                0 : 5 * max_size
+            ]  # limit rerank max size
+        else:
+            logger.info(f"Tracer output {len(funcsign_score_list)} items for reranking")
+        funcsign_score_list = redirect_filepath_to_cache(
+            input=funcsign_score_list, cache_dir=self.env.cache_dir
+        )  # Path format: '/home/dbmw/.orcar/astropy__astropy/astropy/modeling/separable.py'
+        logger.info(f"funcsign_score_list: {funcsign_score_list}")
+        funcsign_list = rerank_func(
+            input=funcsign_score_list,
+            llm=self._llm,
+            token_counter=self._token_counter,
+            problem_statement=task.extra_state["inst"]["problem_statement"],
         )
-        function_list = [x for x in function_list if x.file_path]
+
+        function_list_abs_path = [x.to_codeinfo() for x in funcsign_list]
+        function_list = []
+        for codeinfo in function_list_abs_path:
+            abs_path_parts = codeinfo.file_path.split("/")
+            repo_index = len(self.env.cache_dir.split("/")) + 1
+            function_list.append(
+                CodeInfo(
+                    keyword=codeinfo.keyword,
+                    file_path="/".join(abs_path_parts[repo_index:]),
+                )
+            )
+        # Path format: 'astropy/modeling/separable.py'
+
         if len(function_list) > max_size:
             function_list = function_list[0:max_size]
         logger.info(f"After limit size & parse: {function_list}")
@@ -490,15 +534,15 @@ class ExtractWorker(BaseAgentWorker):
             logger.info(
                 (
                     f"{tag:<25}: "
-                    f"in {token_cnt.in_token_cnt:<5} tokens, "
-                    f"out {token_cnt.out_token_cnt:<5} tokens"
+                    f"in {token_cnt.in_token_cnt:>6} tokens, "
+                    f"out {token_cnt.out_token_cnt:>6} tokens"
                 )
             )
         logger.info(
             (
                 f"{'Total cnt':<25}: "
-                f"in {in_token_cnt:<5} tokens, "
-                f"out {out_token_cnt:<5} tokens"
+                f"in {in_token_cnt:>6} tokens, "
+                f"out {out_token_cnt:>6} tokens"
             )
         )
 

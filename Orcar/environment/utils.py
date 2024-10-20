@@ -281,11 +281,18 @@ def read_generator_with_timeout(
 
     execution_finished = False
     pids = []
+    data = b""
     while time.time() < end_time:
         while ready_to_read(fd):
-            data = os.read(fd, 4096)
-            if data:
-                yield data.decode()
+            new_data = os.read(fd, 4096)
+            if new_data:
+                data = data + new_data
+                try:
+                    data_decode = data.decode()
+                    data = b""
+                    yield data_decode
+                except UnicodeDecodeError:
+                    pass
                 # Refresh timeout if got output
                 end_time = time.time() + timeout_duration
             time.sleep(0.05)  # Prevents CPU hogging

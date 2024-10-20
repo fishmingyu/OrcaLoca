@@ -2,7 +2,8 @@ import bisect
 import copy
 import json
 import re
-from typing import Any, Dict, Generator, List, Optional, Set
+from functools import total_ordering
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 from pydantic import BaseModel
 
@@ -20,7 +21,10 @@ class FuncTreeNode:
         self.filename: Optional[str] = None
         self.lineno: Optional[int] = None
         self.is_python: Optional[bool] = False
-        self.funcname: Optional[str] = None
+        self.full_funcname: Optional[str] = (
+            None  # Format: funcname or class_name.method_name
+        )
+        self.funcname: Optional[str] = None  # Format: funcname or method_name
         self.parent: Optional[FuncTreeNode] = None
         self.children: List[FuncTreeNode] = []
         self.start: float = -(2**64)
@@ -37,7 +41,8 @@ class FuncTreeNode:
             m = re.match(self.name_regex, self.fullname)
             if m:
                 self.is_python = True
-                self.funcname = m.group(1)
+                self.full_funcname = m.group(1)
+                self.funcname = self.full_funcname.split(".")[-1]
                 self.filename = m.group(2)
                 self.lineno = int(m.group(3))
 
@@ -151,24 +156,129 @@ class FuncTree:  # pragma: no cover
 def gen_tracer_cmd(input_path: str, output_path: str) -> str:
     cmd = (
         f"viztracer"
-        f" --quiet --ignore_c_function --ignore_frozen --include_files"
-        f" . -o {output_path}"
+        f" --quiet --ignore_c_function --ignore_frozen"
+        f" -o {output_path}"
         f" -- {input_path}"
     )
     return cmd
 
 
-class FuncItem(BaseModel):
+class FuncSign(BaseModel):
+    "Function Signature"
+    filename: str
+    lineno: int
+    funcname: str
+
+    @classmethod
+    def from_functreenode(cls, f: FuncTreeNode):
+        return cls(
+            filename=f.filename,
+            lineno=f.lineno,
+            funcname=f.funcname,
+        )
+
+    def to_codeinfo(self) -> CodeInfo:
+        return CodeInfo(keyword=self.funcname, file_path=self.filename)
+
+    def to_str(self) -> str:
+        return f"{self.funcname} ({self.filename}:{self.lineno})"
+
+    class Config:
+        frozen = True
+
+
+class FuncQueueElement(BaseModel):
     "Function call item in tracer log"
     node: FuncTreeNode
     layer: int
-    should_care: bool
+    closest_key_parent_node_layer: Tuple[FuncTreeNode, int] | None
+    called_by: list[FuncSign]
 
     class Config:
         arbitrary_types_allowed = True
 
 
-def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[CodeInfo]:
+@total_ordering
+class FuncScore(BaseModel):
+    "Scoring point of a func, smaller is better"
+    is_same_file_with_key_parent: bool
+    layers_from_key_parent: int
+    absolute_calling_index: int
+    absolute_layer: int
+    called_by: list[FuncSign]
+    # TBD: score based on LLM analyzed relationship
+
+    def get_score(self):
+        return (
+            int(not self.is_same_file_with_key_parent),
+            self.layers_from_key_parent,
+            self.absolute_layer,
+            self.absolute_calling_index,
+        )
+
+    def __eq__(self, other: "FuncScore") -> bool:
+        return self.get_score() == other.get_score()
+
+    def __le__(self, other: "FuncScore") -> bool:
+        return self.get_score() < other.get_score()
+
+
+def is_sensitive_node(
+    ret: FuncQueueElement, sensitivity_dict: Dict[str, Set[str]]
+) -> bool:
+    ret_bool = (
+        ret.node.funcname
+        and ret.node.funcname in sensitivity_dict.keys()
+        and ret.node.filename
+        and (
+            (not sensitivity_dict[ret.node.funcname])
+            or (ret.node.filename in sensitivity_dict[ret.node.funcname])
+        )
+    )
+    return ret_bool
+
+
+def extend_ele_list(ret: FuncQueueElement) -> List[FuncQueueElement]:
+    extend_lst: List[FuncQueueElement] = []
+    for child in ret.node.children[::-1]:
+        # Children is already Time reversed, reverse again to reconstruct call time order
+        called_by = []
+        if ret.closest_key_parent_node_layer:
+            called_by = ret.called_by + [FuncSign.from_functreenode(ret.node)]
+        extend_ele = FuncQueueElement(
+            node=child,
+            layer=ret.layer + 1,
+            closest_key_parent_node_layer=ret.closest_key_parent_node_layer,
+            called_by=called_by,
+        )
+        extend_lst.append(extend_ele)
+    return extend_lst
+
+
+def gen_func_score(ret: FuncQueueElement, absolute_calling_index: int) -> FuncScore:
+    return FuncScore(
+        is_same_file_with_key_parent=(
+            ret.node.filename == ret.closest_key_parent_node_layer[0].filename
+        ),
+        layers_from_key_parent=(ret.layer - ret.closest_key_parent_node_layer[1]),
+        absolute_calling_index=absolute_calling_index,
+        absolute_layer=ret.layer,
+        called_by=ret.called_by,
+    )
+
+
+def read_tracer_output(
+    output_path: str, sensitivity_list: List[CodeInfo]
+) -> List[Tuple[FuncSign, FuncScore]]:
+    # gen sensitivity_dict from sensitivity_list
+    sensitivity_dict: Dict[str, Set[str]] = dict()
+    for c in sensitivity_list:
+        if c.keyword not in sensitivity_dict:
+            sensitivity_dict[c.keyword] = set()
+        if c.file_path:
+            sensitivity_dict[c.keyword].add(c.file_path)
+    logger.info(f"sensitivity_dict: {sensitivity_dict}")
+
     with open(output_path) as f:
         tracer_output = json.load(f)
     logger.info(f"Found tracer output at {output_path}")
@@ -179,6 +289,7 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
         [item["ph"] in {"M", "X"} for item in trace_events]
     ), f"Unknown Trace Event Type: {type_items}"
 
+    # gen func_trees from trace_events
     func_trees: Dict[str, FuncTree] = {}
     for data in trace_events:
         key = f"p{data['pid']}_t{data['tid']}"
@@ -187,52 +298,49 @@ def read_tracer_output(output_path: str, sensitivity_list: List[str]) -> List[Co
         else:
             tree = FuncTree(data["pid"], data["tid"])
             func_trees[key] = tree
-
         if data["ph"] == "X":
             tree.add_event(data)
-    assert (
-        len(func_trees) == 1
-    ), f"Unexpected multiple function trees: {list(func_trees.keys())}"
-    func_tree = list(func_trees.values())[0]
     logger.info("Successfully parsed tracer output into func_tree")
 
-    # TODO:
-    # Ranking with:
-    # 1. layer diff to ancestor sensitive node (smaller has priority)
-    # 2. absolute layer (smaller has priority)
-
-    lst: List[FuncItem] = [FuncItem(node=func_tree.root, layer=0, should_care=False)]
-    list_with_layer_order: List[CodeInfo] = []
-    file_sensitivity_set: Set[str] = set()
-    while lst:
-        ret = lst.pop()
-        should_care = ret.should_care
-        if (
-            ret.node.funcname
-            and ret.node.funcname in sensitivity_list
-            and ret.node.filename
-        ):
-            should_care = True
-            file_sensitivity_set.add(ret.node.filename)
-        lst.extend(
-            [
-                FuncItem(node=child, layer=ret.layer + 1, should_care=should_care)
-                for child in ret.node.children[::-1]
-            ]
-        )
-        if (
-            ret.node.funcname
-            and should_care
-            and (ret.node.filename in file_sensitivity_set)
-        ):
-            list_with_layer_order.append(
-                CodeInfo(keyword=ret.node.funcname, file_path=ret.node.filename)
+    func_score_dict: Dict[FuncSign, List[FuncScore]] = dict()
+    absolute_calling_index: int = 0
+    for func_tree in func_trees.values():
+        lst: List[FuncQueueElement] = [
+            FuncQueueElement(
+                node=func_tree.root,
+                layer=0,
+                closest_key_parent_node_layer=None,
+                called_by=[],
             )
+        ]
 
-    return_list = []
-    for item in list_with_layer_order:
-        if item not in return_list:
-            return_list.append(item)
+        while lst:
+            absolute_calling_index += 1
+            ret = lst.pop()
+            if is_sensitive_node(ret, sensitivity_dict):
+                # New sensitive node detected
+                ret.closest_key_parent_node_layer = (ret.node, ret.layer)
+                ret.called_by = []
+            lst.extend(extend_ele_list(ret))
+            if (not ret.closest_key_parent_node_layer) or (
+                not ret.node.funcname.isidentifier()
+            ):
+                # Not function in subtree of sensitive node, drop
+                continue
+            func_score = gen_func_score(ret, absolute_calling_index)
+            func_sign = FuncSign.from_functreenode(ret.node)
+            if func_sign not in func_score_dict:
+                func_score_dict[func_sign] = []
+            func_score_dict[func_sign].append(func_score)
+
+    return_sort_list: List[Tuple[FuncSign, FuncScore]] = [
+        (func_sign, min(func_score_dict[func_sign])) for func_sign in func_score_dict
+    ]
+    return_sort_list.sort(key=lambda x: x[1])
+    logger.info("Got sorted funcs:")
+    for i, x in enumerate(return_sort_list):
+        logger.info(f"Func {i:03}/{len(return_sort_list):03}")
+        logger.info((x[0], x[1], x[1].get_score()))
 
     logger.info("Finished tracer output parsing")
-    return return_list
+    return return_sort_list
