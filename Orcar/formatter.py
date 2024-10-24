@@ -1,4 +1,4 @@
-# ReAct agent formatter
+# Agent formatter
 
 import json
 from abc import abstractmethod
@@ -16,11 +16,14 @@ from llama_index.llms.openai import OpenAI
 
 from .log_utils import get_logger
 from .prompts import (
+    BUG_CODE_INPUT,
     BUG_OUTPUT,
+    EDIT_SYSTEM_HEADER,
     EXTRACT_EXAMPLES,
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
+    REVISED_OUTPUT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
@@ -293,6 +296,40 @@ class SearchChatFormatter(BaseAgentChatFormatter):
                 *searching_history,
                 fmt_control_msg,
             ]
+
+
+class EditChatFormatter(BaseAgentChatFormatter):
+    """Edit chat formatter."""
+
+    system_header: str = EDIT_SYSTEM_HEADER  # default
+
+    def format(
+        self,
+        problem_statement: str,
+        bug_code_input: str,
+    ) -> List[ChatMessage]:
+        """Format chat history into list of ChatMessage."""
+        format_args = {
+            "bug_code_format": "".join(json.dumps(BUG_CODE_INPUT, indent=4)),
+            "revised_code_format": "".join(json.dumps(REVISED_OUTPUT, indent=4)),
+        }
+
+        fmt_sys_header = self.system_header.format(**format_args)
+
+        user_msg = ChatMessage(
+            role=MessageRole.USER,
+            content=f"""<Problem Statement>\n{problem_statement}\n</Problem Statement>""",
+        )
+        bug_code_msg = ChatMessage(
+            role=MessageRole.USER,
+            content=f"""<Bug Code>\n{bug_code_input}\n</Bug Code>""",
+        )
+
+        return [
+            ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+            user_msg,
+            bug_code_msg,
+        ]
 
 
 class ExtractChatFormatter(BaseAgentChatFormatter):

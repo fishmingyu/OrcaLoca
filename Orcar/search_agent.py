@@ -89,7 +89,7 @@ def add_user_step_to_memory(
 
 
 class SearchWorker(BaseAgentWorker):
-    """OpenAI Agent worker."""
+    """Search Agent worker."""
 
     def __init__(
         self,
