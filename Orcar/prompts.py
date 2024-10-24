@@ -2,14 +2,14 @@ STEP_EXAMPLE = {
     "observation_feedback": "observation",
     "potential_bug_locations": [
         {
-            "file": "path/to/file",
-            "class": "class_name",
-            "method": "function_name",
+            "file_name": "path/to/file",
+            "class_name": "class_name",
+            "method_name": "function_name",
         },
         {
-            "file": "path/to/file",
-            "class": "class_name",
-            "method": "function_name",
+            "file_name": "path/to/file",
+            "class_name": "class_name",
+            "method_name": "function_name",
         },
     ],
     "new_search_actions": [
@@ -24,14 +24,14 @@ STEP_EXAMPLE = {
 BUG_OUTPUT = {
     "bug_locations": [
         {
-            "file": "path/to/file",
-            "class": "class_name",
-            "method": "function_name",
+            "file_name": "path/to/file",
+            "class_name": "class_name",
+            "method_name": "function_name",
         },
         {
-            "file": "path/to/file",
-            "class": "class_name",
-            "method": "function_name",
+            "file_name": "path/to/file",
+            "class_name": "class_name",
+            "method_name": "function_name",
         },
     ]
 }
@@ -50,7 +50,7 @@ Provide the observation based on given input. Check whether it contains any clas
 If you find any thing suspicious, provide the potential bug locations.
 If you need to search more, provide the new search actions.
 Notice that you should put new classes, methods or functions related to your current code snippets.
-You can put multiple classes, methods or functions in the new_search_actions list.
+You can put multiple actions in the new_search_actions list. Be sure to use arguments in the tool description.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 
 Conclusion is a final standalone step to provide the final bug locations when nothing else to search. Please keep in mind to

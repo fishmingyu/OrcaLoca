@@ -104,14 +104,14 @@ class SearchOutputParser(BaseOutputParser):
             "observation": "str",
             "potential_bug_locations": [
                 {
-                    "file": "path/to/file",
-                    "class": "class_name",
-                    "method": "function_name",
+                    "file_name": "path/to/file",
+                    "class_name": "class_name",
+                    "method_name": "function_name",
                 },
                 {
-                    "file": "path/to/file",
-                    "class": "class_name",
-                    "method": "function_name",
+                    "file_name": "path/to/file",
+                    "class_name": "class_name",
+                    "method_name": "function_name",
                 },
             ],
             "action_lists": [
@@ -135,14 +135,15 @@ class SearchOutputParser(BaseOutputParser):
             bug_list: List[BugLocations] = []
             # cast the output to SearchActionStep
             json_str = json.loads(output)
-            observation = json_str["observation_feedback"]
-            # convert the string to boolean
+            observation_json = json_str["observation_feedback"]
+            # add <Observation> and </Observation> to the observation
+            observation = f"<Observation>\n{observation_json}\n</Observation>"
 
             for bug_location in json_str["potential_bug_locations"]:
                 bug = BugLocations(
-                    file_name=bug_location["file"],
-                    class_name=bug_location["class"],
-                    method_name=bug_location["method"],
+                    file_name=bug_location["file_name"],
+                    class_name=bug_location["class_name"],
+                    method_name=bug_location["method_name"],
                 )
                 bug_list.append(bug)
             for action in json_str["new_search_actions"]:
@@ -160,14 +161,14 @@ class SearchOutputParser(BaseOutputParser):
         """
         "bug_locations": [
                 {
-                    "file": "path/to/file",
-                    "class": "class_name",
-                    "method": "function_name",
+                    "file_name": "path/to/file",
+                    "class_name": "class_name",
+                    "method_name": "function_name",
                 },
                 {
-                    "file": "path/to/file",
-                    "class": "class_name",
-                    "method": "function_name",
+                    "file_name": "path/to/file",
+                    "class_name": "class_name",
+                    "method_name": "function_name",
                 },
             ]
         """

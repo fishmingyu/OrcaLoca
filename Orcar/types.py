@@ -40,11 +40,10 @@ class SearchResult(BaseReasoningStep):
 
     def get_content(self) -> str:
         """Get content."""
-        return (
-            f"Search Action: {self.search_action}\n"
-            f"Search Action Input: {self.search_action_input}\n"
-            f"\n {self.search_content}"
-        )
+        return f"""<Search Result>\n
+            Search Action: {self.search_action}\n
+            Search Action Input: {self.search_action_input}\n
+            {self.search_content}\n</Search Result>"""
 
     def get_search_input(self) -> str:
         """Get query."""

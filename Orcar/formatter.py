@@ -265,9 +265,9 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             role=MessageRole.USER,
             content=(
                 f"Please generate next {step_type} step STRICTLY following given format:"
-                "<output_format>"
+                "<Output Format>"
                 f"{output_format}"
-                "</output_format>"
+                "</Output Format>"
                 "DO NOT SPEAK any REDUNDANT words (like 'json', 'output', etc.)) or thoughts"
             ),
         )

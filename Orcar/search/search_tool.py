@@ -294,7 +294,7 @@ class SearchManager:
         {content}
         """
 
-    def search_callable(self, query: str, **kwargs) -> str:
+    def search_callable(self, query: str, file_path: str = None) -> str:
         """API to search the callable definition in the file.
         The query can be a function, class, method or global variable. Don't use this API to search source code in the file.
 
@@ -303,14 +303,14 @@ class SearchManager:
             The format should be only the name.
             E.g. search_callable("function_name")
 
-        KwArgs: (Optional)
             file_path (str): The file path to search. If not provided, search in the whole repo.
+            Provide the file path if you know the file for better performance.
+            This is optional. E.g. search_callable("function_name", "a/example.py")
 
         Returns:
             str: The file path and the code snippet of the query. If query type is class, return the class skeleton.
         """
-        if "file_path" in kwargs:
-            file_path = kwargs["file_path"]
+        if file_path is not None:
             locinfo: LocInfo = self._get_query_in_file(file_path, query)
         else:
             locinfo: LocInfo = self._search_callable_kg(query)

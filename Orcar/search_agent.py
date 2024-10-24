@@ -235,17 +235,17 @@ class SearchWorker(BaseAgentWorker):
         """Calibrate bug location."""
         data = self._output_parser.parse_bug_report(output_str)
         for bug in data["bug_locations"]:
-            file_path = bug["file"]
-            # check each "file" in bug_location whether is a valid file path
+            file_path = bug["file_name"]
+            # check each "file_name" in bug_location whether is a valid file path
             # for example the correct file should be like "astropy/io/fits/fitsrec.py",
             # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
             # if the file is wrong, we should remove the first "/" and the first word before the first "/"
             # if the file is correct, we should keep it
-            file_path = bug["file"]
+            file_path = bug["file_name"]
             if file_path[0] == "/":
                 file_path = file_path[1:]
                 file_path = file_path[file_path.find("/") + 1 :]
-                bug["file"] = file_path
+                bug["file_name"] = file_path
         # logger.info(f"Bug location: {data}")
         return json.dumps(data)
 
@@ -457,6 +457,7 @@ class SearchWorker(BaseAgentWorker):
             current_queue=task.extra_state["search_queue"],
         )
         logger.info(f"search cache: {task.extra_state['search_cache']}")
+        logger.debug(f"Search content: {task.extra_state['instruct_memory'].get_all()}")
         # if task.extra_state["is_done"]:
         #     logger.info(input_chat)
         self._del_previous_inst_input(task.extra_state["instruct_memory"])
