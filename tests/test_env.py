@@ -16,7 +16,7 @@ from Orcar.log_utils import get_logger
 logger = get_logger(__name__)
 
 args_dict = {
-    "model": "claude-3-5-sonnet-20240620",
+    "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
     "dataset": "princeton-nlp/SWE-bench_Lite",
