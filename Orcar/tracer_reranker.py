@@ -1,4 +1,6 @@
 import ast
+import asyncio
+import time
 from typing import List, Tuple
 
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
@@ -110,6 +112,40 @@ class FuncScorer:
 
     # TODO: Add function to fill cachable_fix to satisfy min length
 
+    async def score_batch_async(self, chat_inputs: List[List[ChatMessage]]):
+        tasks = [
+            self._token_counter.count_achat(llm=self._llm, messages=chat_input)
+            for chat_input in chat_inputs
+        ]
+        return await asyncio.gather(*tasks)
+
+    def score_batch(self, input_message_lists: List[List[ChatMessage]]) -> List[int]:
+        messages_prefix = self._messages_prefix
+        if self._enable_cache and messages_prefix[-1].role == MessageRole.USER:
+            messages_prefix[-1].additional_kwargs["cache_control"] = {
+                "type": "ephemeral"
+            }
+        chat_inputs = [
+            messages_prefix + x + [self._order_prompt] for x in input_message_lists
+        ]
+        try:
+            # Get the current event loop
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # If there is no current event loop, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        start_time = time.time()
+        results = loop.run_until_complete(self.score_batch_async(chat_inputs))
+        # asyncio.run(self.score_batch_async(chat_inputs))
+        logger.info(f"Total batch chat time: {time.time() - start_time:.2f}s")
+        ret: List[int] = []
+        for response, cnt in results:
+            logger.info(cnt)
+            self._token_cnts.append(cnt)
+            ret.append(int(response.message.content))
+        return ret
+
     def score(self, function_content: str, called_by: list[FuncSign]) -> int:
         function_prompt = ChatMessage(
             role="user",
@@ -127,7 +163,7 @@ class FuncScorer:
                 "type": "ephemeral"
             }
 
-        messages = self._messages_prefix + [
+        messages = messages_prefix + [
             function_prompt,
             callchain_prompt,
             self._order_prompt,
@@ -159,6 +195,21 @@ class FuncScorer:
         )
 
 
+def rerank_helper(
+    function_content: str, called_by: list[FuncSign]
+) -> List[ChatMessage]:
+    function_prompt = ChatMessage(
+        role="user",
+        content="<function_content>" f"{function_content}" "</function_content>",
+    )
+    callchain = " -> ".join([f"'{x.funcname}'" for x in called_by])
+    callchain_prompt = ChatMessage(
+        role="user",
+        content=f"This function is traced in an issue reproducer, and its captured call chain is: {callchain}",
+    )
+    return [function_prompt, callchain_prompt]
+
+
 def rerank_func(
     input: List[Tuple[FuncSign, FuncScore]],
     llm: LLM,
@@ -169,28 +220,41 @@ def rerank_func(
         llm=llm, token_counter=token_counter, problem_statement=problem_statement
     )
     output_sorted_list: List[int, FuncSign, FuncScore, int] = []
-    for i, t in enumerate(input):
+    input_message_lists: List[List[ChatMessage]] = []
+    func_contents: List[str] = []
+    for _, t in enumerate(input):
         func_sign, func_score = t
         func_content = get_func_content(func_sign)
-        logger.info(f"Func {i+1:02d}/{len(input):02d}")
-        if func_content:
-            logger.info(func_sign)
-            logger.info(func_content)
-        else:
+
+        if not func_content:
             logger.warning("Cannot find function:")
             logger.warning(func_sign)
-        llm_score = scorer.score(
-            function_content=func_content, called_by=func_score.called_by + [func_sign]
+        func_contents.append(func_content)
+        input_message_lists.append(
+            rerank_helper(
+                function_content=func_content,
+                called_by=func_score.called_by + [func_sign],
+            )
         )
+
+    scores = scorer.score_batch(input_message_lists=input_message_lists)
+
+    for i, t in enumerate(input):
+        func_sign, func_score = t
+        func_content = func_contents[i]
+        llm_score = scores[i]
+
+        logger.info(f"Func {i+1:02d}/{len(input):02d}")
+        logger.info(func_sign)
         logger.info(f"LLM score: {llm_score} / 100")
+        logger.info(func_content)
+
         llm_int_score = 100 - llm_score
         score = (
             llm_int_score
             + int(not func_score.is_same_file_with_key_parent) * 40
             + func_score.layers_from_key_parent * 20
         )
-        # TBD: form message list, chat, parse output into an integer
-        # TBD: recalculate score & rerank
         output_sorted_list.append((score, func_sign, func_score, llm_score))
     scorer.log_token_stats()
 

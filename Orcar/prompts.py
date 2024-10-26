@@ -152,7 +152,9 @@ EXTRACT_FIELDS = {
             \n should be used for new line, 4 spaces should be used for indentation.
             If file creation is necessary, python file IO should be used.
             If the reproducer is mentioned in interactive mode, the code should be extracted and parsed into an .py file.
-            For example, '>>> ' should never be used in an .py file, and the output of interactive shell should also be commented.
+            For example, '>>> ' should never be used in an .py file, and the output of interactive shell should also be excluded.
+            If a value was auto-outputed because of using interactive shell, you should explicitly print that value instead.
+            All comments should be excluded. Add necessary imports if you believe they are missing.
             Code shouldn't be inferred from natural language description. Set to '' if not found.
 </field>
 <field>
@@ -230,14 +232,14 @@ from marshmallow import fields, Schema
 class MySchema(Schema):
     times = fields.List(fields.DateTime())
 
-s = MySchema()
+MySchema()
 ```
 
 Traceback:
 ```
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
-    s = MySchema()
+    MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
 AttributeError: 'List' object has no attribute 'opts'
@@ -249,7 +251,7 @@ It seems like it's treating the parent field as a Schema without checking that i
             "traceback_warning_log_slice": """
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
-    s = MySchema()
+    MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
 AttributeError: 'List' object has no attribute 'opts'
@@ -260,7 +262,7 @@ from marshmallow import fields, Schema
 class MySchema(Schema):
     times = fields.List(fields.DateTime())
 
-s = MySchema()
+print(MySchema())
 """,
             "source_code_slice": "",
         },
@@ -271,7 +273,7 @@ s = MySchema()
             "input_description": """
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
-    s = MySchema()
+    MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/fields.py", line 636, in _bind_to_schema
@@ -300,7 +302,7 @@ from marshmallow import fields, Schema
 class MySchema(Schema):
     times = fields.List(fields.DateTime())
 
-s = MySchema()
+MySchema()
 """,
             "example_output": {
                 "code_info_list": [
@@ -323,14 +325,14 @@ from marshmallow import fields, Schema
 class MySchema(Schema):
     times = fields.List(fields.DateTime())
 
-s = MySchema()
+MySchema()
 ```
 
 Traceback:
 ```
 Traceback (most recent call last):
   File "test-mm.py", line 8, in <module>
-    s = MySchema()
+    MySchema()
   File "/Users/victor/.pyenv/versions/marshmallow/lib/python3.6/site-packages/marshmallow/schema.py", line 383, in __init__
     self.fields = self._init_fields()
 AttributeError: 'List' object has no attribute 'opts'

@@ -100,6 +100,17 @@ class TokenCounter:
             TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt),
         )
 
+    async def count_achat(
+        self, messages: List[ChatMessage], llm: LLM
+    ) -> Tuple[ChatResponse, TokenCount]:
+        in_token_cnt = self.count(llm.messages_to_prompt(messages))
+        response = await llm.achat(messages)
+        out_token_cnt = self.count(response.message.content)
+        return (
+            response,
+            TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt),
+        )
+
 
 class TokenCounterCached(TokenCounter):
     """Token counter with cache based on Anthropic"""
@@ -130,6 +141,32 @@ class TokenCounterCached(TokenCounter):
         self, messages: List[ChatMessage], llm: LLM
     ) -> Tuple[ChatResponse, TokenCountCached]:
         response = llm.chat(
+            messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
+        )
+        usage = response.raw["usage"]
+        assert isinstance(usage, Usage), f"Unknown usage type: {type(usage)}"
+        return (
+            response,
+            TokenCountCached(
+                in_token_cnt=usage.input_tokens,
+                out_token_cnt=usage.output_tokens,
+                cache_write_cnt=(
+                    usage.cache_creation_input_tokens
+                    if hasattr(usage, "cache_creation_input_tokens")
+                    else 0
+                ),
+                cache_read_cnt=(
+                    usage.cache_read_input_tokens
+                    if hasattr(usage, "cache_read_input_tokens")
+                    else 0
+                ),
+            ),
+        )
+
+    async def count_achat(
+        self, messages: List[ChatMessage], llm: LLM
+    ) -> Tuple[ChatResponse, TokenCountCached]:
+        response = await llm.achat(
             messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
         )
         usage = response.raw["usage"]
