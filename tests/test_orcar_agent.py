@@ -19,8 +19,8 @@ args_dict = {
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
-    "filter_instance": "^(astropy__astropy-12907)$",
-    # "filter_instance": "^(sympy__sympy-17630)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
+    # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
     # "filter_instance": ".*",
     # Multi Issue Test

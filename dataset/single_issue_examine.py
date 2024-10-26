@@ -72,7 +72,9 @@ def examine_experiment_dir(
         solved_cnt += 1
 
         preds_path = f"{model_path}/all_preds.jsonl"
-        assert os.path.exists(preds_path)
+        if not os.path.exists(preds_path):
+            logger.warning(f"Cannot find {preds_path} for {model_name}, skipping")
+            continue
         model_inst = dict()
         with open(preds_path, "r") as file:
             for line in file:
@@ -84,6 +86,7 @@ def examine_experiment_dir(
             logger.warning(
                 f"Cannot find {inst['instance_id']} in {model_name}, skipping"
             )
+            continue
 
         if verbose > 0:
             logger.info("Model Patch:")
@@ -122,7 +125,7 @@ def main():
         required=True,
         help=f"The ID of target instance",
     )
-    default_dataset = "princeton-nlp/SWE-bench_Lite"
+    default_dataset = "princeton-nlp/SWE-bench_Verified"
     parser.add_argument(
         "-d",
         "--dataset",
