@@ -37,26 +37,27 @@ BUG_OUTPUT = {
 }
 
 SEARCH_SYSTEM_HEADER = r"""
-You are a helpful assistant that use API calls to report bug code snippets from a text into json format.
+You are a professional software engineer that use API calls to report bug code snippets from a text into json format.
 You need to extract where are the bug locations by analyzing the text.
-The given text will give you suspicious_code containing keyword. Make sure to search for the keyword in the codebase.
+The given text contains the problem statement and the code snippets.
 There are some API calls that you can use to extract the information.
 The API calls include:
 {tool_desc}
 
+<TASKS>
 Everytime you will do the following things:
 
-Provide the observation based on given input. Check whether it contains any class, method or function you need to further search.
-If you find any thing suspicious, provide the potential bug locations.
-If you need to search more, provide the new search actions.
-Notice that you should put new classes, methods or functions related to your current code snippets.
+Provide the observation based on given input. Think about where the bug might be in the code, and provide the potential bug locations.
+Check whether it contains any class, method or function you need to further search.
+Plan the new_search_actions based on the current context. You can use the given API calls to search for the bug locations.
 You can put multiple actions in the new_search_actions list. Be sure to use arguments in the tool description.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
 
 Conclusion is a final standalone step to provide the final bug locations when nothing else to search. Please keep in mind to
 follow the instruction "Now let's come to a conclusion. ".
+</TASKS>
 
-## Output format
+<OUTPUT FORMAT>
 1. Regular Step Format:
     Provide your answer in a clear JSON structure like this,
     {step_format}
@@ -71,7 +72,52 @@ follow the instruction "Now let's come to a conclusion. ".
     {bug_locations}
     DO NOT generate observation or new_search_actions in the conclusion step.
     DO NOT mix it with any title or description. If method is not belong to any class, set class to empty string.
+</OUTPUT FORMAT>
+"""
 
+BUG_CODE_INPUT = {
+    "bug_info": [
+        {
+            "file_name": "path/to/file",
+            "func_name": "function_name",
+            "content": "code snippet",
+        },
+        {
+            "file_name": "path/to/file",
+            "func_name": "function_name",
+            "content": "code snippet",
+        },
+    ]
+}
+
+REVISED_OUTPUT = {
+    "revised_code": [
+        {
+            "file_name": "path/to/file",
+            "func_name": "function_name",
+            "content": "revised code snippet",
+        },
+        {
+            "file_name": "path/to/file",
+            "func_name": "function_name",
+            "content": "revised code snippet",
+        },
+    ]
+}
+
+EDIT_SYSTEM_HEADER = r"""
+You are a professional software engineer that uses API calls to revise code snippets based on the bug report.
+We will provide you with the problem statement and the code snippets that need to be revised.
+Your task is to analyze the problem statement and the code snippets, and then provide the revised code snippets.
+<INPUT>
+You will receive the code snippets in the following JSON format:
+{bug_code_format}
+</INPUT>
+<OUTPUT FORMAT>
+Please also provide the output in a clear JSON structure like this:
+{revised_code_format}
+DO NOT add any title or description.
+</OUTPUT FORMAT>
 """
 
 EXTRACT_FORMATS = {

@@ -107,6 +107,30 @@ class BugLocations(BaseModel):
             return f"{self.file_name}"
 
 
+class EditBugCode(BaseModel):
+    """Edit bug code chunk."""
+
+    file_name: str
+    func_name: str
+    code_snippet: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"File Name: {self.file_name}\n"
+            f"Function Name: {self.func_name}\n"
+            f"Code Snippet: {self.code_snippet}\n"
+        )
+
+    def to_json(self) -> Dict:
+        """Convert to JSON."""
+        return {
+            "file_name": self.file_name,
+            "func_name": self.func_name,
+            "content": self.code_snippet,
+        }
+
+
 class ExtractSliceStep(BaseReasoningStep):
     """Extract slice step"""
 
@@ -207,3 +231,12 @@ class SearchInput(BaseModel):
                 {suspicious_code_from_tracer} \n"""
                 f"Summary: {summary}\n"
             )
+
+
+class EditInput(BaseModel):
+    """
+    Edit input
+    """
+
+    problem_statement: str
+    bug_locations: List[BugLocations]

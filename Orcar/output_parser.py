@@ -14,6 +14,7 @@ from .types import (
     BaseReasoningStep,
     BugLocations,
     CodeInfo,
+    EditBugCode,
     ExtractJudgeStep,
     ExtractParseStep,
     ExtractSliceStep,
@@ -179,6 +180,44 @@ class SearchOutputParser(BaseOutputParser):
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse bug report output: {output}")
+
+
+class EditOutputParser(BaseOutputParser):
+    """Edit Output parser."""
+
+    def parse(self, output: str) -> List[EditBugCode]:
+        """Parse output from Edit agent.
+
+        The input is like:
+        "revised_code": [
+            {
+                "file_name": "path/to/file",
+                "func_name": "function_name",
+                "content": "revised code snippet",
+            },
+            {
+                "file_name": "path/to/file",
+                "func_name": "function_name",
+                "content": "revised code snippet",
+            },
+        ]
+        """
+        if "revised_code" in output:
+            # cast the output to EditResult
+            edit_result = json.loads(output)
+            bug_code_list: List[EditBugCode] = []
+            for bug_code in edit_result["revised_code"]:
+                bug_code_list.append(
+                    EditBugCode(
+                        file_name=bug_code["file_name"],
+                        func_name=bug_code["func_name"],
+                        code_snippet=bug_code["content"],
+                    )
+                )
+            return bug_code_list
+        else:
+            # raise an error if the output is not in the expected format
+            raise ValueError(f"Could not parse edit output: {output}")
 
 
 class ExtractOutputParser(BaseOutputParser):
