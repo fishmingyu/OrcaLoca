@@ -116,6 +116,7 @@ You will receive the code snippets in the following JSON format:
 <OUTPUT FORMAT>
 Please also provide the output in a clear JSON structure like this:
 {revised_code_format}
+DO NOT add any title or description.
 </OUTPUT FORMAT>
 """
 

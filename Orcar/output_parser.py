@@ -214,6 +214,7 @@ class EditOutputParser(BaseOutputParser):
                         code_snippet=bug_code["content"],
                     )
                 )
+            return bug_code_list
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse edit output: {output}")

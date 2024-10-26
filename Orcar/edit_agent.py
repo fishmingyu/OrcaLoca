@@ -96,9 +96,7 @@ class EditWorker(BaseAgentWorker):
         """Get tools."""
         return [t for t in self._get_tools(input)]
 
-    def _extract_editing_step(
-        self, output: ChatResponse
-    ) -> Tuple[str, List[EditBugCode]]:
+    def _extract_editing_step(self, output: ChatResponse) -> List[EditBugCode]:
         """Extract search step."""
         # parse the output
         if output.message.content is None:
@@ -147,9 +145,13 @@ class EditWorker(BaseAgentWorker):
 
     def _get_response(
         self,
-        current_res: EditBugCode,
+        current_res: List[EditBugCode],
     ) -> AgentChatResponse:
-        response_str = current_res.get_content()
+        # concat list of EditBugCode into a string
+        response_str = json.dumps(
+            {"revised_code": [bug.to_json() for bug in current_res]}
+        )
+
         return AgentChatResponse(response=response_str)
 
     def _get_task_step_response(
@@ -207,8 +209,6 @@ class EditWorker(BaseAgentWorker):
         problem_statement, bug_code_input = self._process_edit_input(self._edit_input)
         # add task input to chat history
         input_chat = self._edit_formatter.format(
-            chat_history=task.memory.get(input=task.input)
-            + task.extra_state["new_memory"].get_all(),
             problem_statement=problem_statement,
             bug_code_input=bug_code_input,
         )
@@ -284,17 +284,8 @@ class EditWorker(BaseAgentWorker):
         self.callback_manager = callback_manager
 
 
-class SearchAgent(AgentRunner):
-    """ReAct agent.
-
-    Subclasses AgentRunner with a ReActAgentWorker.
-
-    For the legacy implementation see:
-    ```python
-    from llama_index.core.agent.legacy.react.base import ReActAgent
-    ```
-
-    """
+class EditAgent(AgentRunner):
+    """Edit Agent"""
 
     def __init__(
         self,
