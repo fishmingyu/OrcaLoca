@@ -168,10 +168,14 @@ class ExtractJudgeStep(BaseReasoningStep):
     """Extract summarize step"""
 
     is_successful: bool
+    fixed_reproduce_snippet: str
 
     def get_content(self) -> str:
         """Get content."""
-        return f"is_successful: {self.is_successful}\n"
+        return (
+            f"is_successful: {self.is_successful}\n"
+            f"fixed_reproduce_snippet: {self.fixed_reproduce_snippet}\n"
+        )
 
 
 class ExtractSummarizeStep(BaseReasoningStep):

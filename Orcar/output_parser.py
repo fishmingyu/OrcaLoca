@@ -248,6 +248,7 @@ class ExtractOutputParser(BaseOutputParser):
         elif method == "judge":
             return ExtractJudgeStep(
                 is_successful=json_obj["is_successful"],
+                fixed_reproduce_snippet=json_obj["fixed_reproduce_snippet"],
             )
         elif method == "summarize":
             code_info_list: List[CodeInfo] = [
