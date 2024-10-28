@@ -447,6 +447,9 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "output_fields": EXTRACT_FIELDS[handler],
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
+                "reproducer_snippet": task.extra_state["slices"][
+                    "reproduce_code_parse"
+                ],
                 "reproducer_log": task.extra_state["slices"]["reproduce_log_parse"],
             }
             fmt_user_msg = user_msg.format(**format_args)
