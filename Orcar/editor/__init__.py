@@ -1,3 +1,3 @@
-from .edit_tool import Editor, ReviseInfo
+from .edit_tool import Editor, ReviseInfo, StringReplaceEditor
 
-__all__ = ["Editor", "ReviseInfo"]  # Specify the public interface of the module
+__all__ = ["Editor", "ReviseInfo", "StringReplaceEditor"]
