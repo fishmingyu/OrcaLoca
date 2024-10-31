@@ -1,5 +1,5 @@
-import asyncio
-from typing import Literal
+import subprocess
+from typing import Literal, Optional, Tuple
 
 from llama_index.core.bridge.pydantic import BaseModel
 
@@ -42,28 +42,54 @@ def maybe_truncate(content: str, truncate_after: int | None = MAX_RESPONSE_LEN):
     )
 
 
-async def run(
+def run_cmd(
     cmd: str,
-    timeout: float | None = 120.0,  # seconds
-    truncate_after: int | None = MAX_RESPONSE_LEN,
-):
-    """Run a shell command asynchronously with a timeout."""
-    process = await asyncio.create_subprocess_shell(
-        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
+    timeout: Optional[float] = 120.0,  # seconds
+    truncate_after: Optional[int] = MAX_RESPONSE_LEN,
+) -> Tuple[int, str, str]:
+    """
+    Run a shell command synchronously with a timeout.
 
+    Args:
+        cmd: The command to run
+        timeout: Maximum time to wait for command completion in seconds
+        truncate_after: Maximum length for stdout/stderr before truncation
+
+    Returns:
+        Tuple of (return_code, stdout, stderr)
+
+    Raises:
+        TimeoutError: If command execution exceeds timeout
+        subprocess.SubprocessError: For other subprocess-related errors
+    """
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        return (
-            process.returncode or 0,
-            maybe_truncate(stdout.decode(), truncate_after=truncate_after),
-            maybe_truncate(stderr.decode(), truncate_after=truncate_after),
+        # Run the command with timeout
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            text=True,  # Automatically decode output to strings
         )
-    except asyncio.TimeoutError as exc:
+
+        # Wait for command completion with timeout
+        stdout, stderr = process.communicate(timeout=timeout)
+
+        # Truncate outputs if needed
+        if truncate_after:
+            stdout = maybe_truncate(stdout, truncate_after=truncate_after)
+            stderr = maybe_truncate(stderr, truncate_after=truncate_after)
+
+        return (process.returncode or 0, stdout, stderr)
+
+    except subprocess.TimeoutExpired as exc:
+        # Kill the process if it times out
         try:
             process.kill()
-        except ProcessLookupError:
-            pass
+            process.wait()  # Clean up the process
+        except (ProcessLookupError, AttributeError):
+            pass  # Process already terminated
+
         raise TimeoutError(
             f"Command '{cmd}' timed out after {timeout} seconds"
         ) from exc

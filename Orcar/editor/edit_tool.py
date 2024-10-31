@@ -12,7 +12,7 @@ from .edit_utils import (
     Command,
     ToolError,
     maybe_truncate,
-    run,
+    run_cmd,
 )
 
 ReviseInfo = namedtuple("ReviseInfo", ["content", "file", "start_line", "end_line"])
@@ -105,7 +105,7 @@ class StringReplaceEditor:
         self._file_history = defaultdict(list)
         super().__init__()
 
-    async def __call__(
+    def __call__(
         self,
         *,
         command: Command,
@@ -120,7 +120,7 @@ class StringReplaceEditor:
         _path = Path(path)
         self.validate_path(command, _path)
         if command == "view":
-            return await self.view(_path, view_range)
+            return self.view(_path, view_range)
         elif command == "create":
             if not file_text:
                 raise ToolError("Parameter `file_text` is required for command: create")
@@ -173,7 +173,7 @@ class StringReplaceEditor:
                     f"The path {path} is a directory and only the `view` command can be used on directories"
                 )
 
-    async def view(self, path: Path, view_range: list[int] | None = None):
+    def view(self, path: Path, view_range: list[int] | None = None):
         """Implement the view command"""
         if path.is_dir():
             if view_range:
@@ -181,9 +181,7 @@ class StringReplaceEditor:
                     "The `view_range` parameter is not allowed when `path` points to a directory."
                 )
 
-            _, stdout, stderr = await run(
-                rf"find {path} -maxdepth 2 -not -path '*/\.*'"
-            )
+            _, stdout, stderr = run_cmd(rf"find {path} -maxdepth 2 -not -path '*/\.*'")
             if not stderr:
                 stdout = f"Here's the files and directories up to 2 levels deep in {path}, excluding hidden items:\n{stdout}\n"
             return CLIResult(output=stdout, error=stderr)
