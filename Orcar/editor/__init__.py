@@ -1,3 +1,3 @@
-from .edit_tool import Editor, ReviseInfo, StringReplaceEditor
+from .edit_tool import Editor, ReviseInfo
 
-__all__ = ["Editor", "ReviseInfo", "StringReplaceEditor"]
+__all__ = ["Editor", "ReviseInfo"]

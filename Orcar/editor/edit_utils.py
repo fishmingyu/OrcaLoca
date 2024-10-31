@@ -23,7 +23,8 @@ MAX_RESPONSE_LEN: int = 16000
 class CLIResult(BaseModel):
     """A ToolResult that can be rendered as a CLI output."""
 
-    output: str
+    output: str | None = None
+    error: str | None = None
 
 
 class ToolError(Exception):
