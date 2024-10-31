@@ -1,13 +1,12 @@
-import asyncio
 from pathlib import Path
 
 from Orcar.editor import StringReplaceEditor
 
 
-async def test_string_replace_editor():
+def test_string_replace_editor():
     editor = StringReplaceEditor()
     """
-    async def __call__(
+    def __call__(
         self,
         *,
         command: Command,
@@ -26,13 +25,13 @@ async def test_string_replace_editor():
     test_content = "Hello, World!\nThis is a test file.\nThird line\n"
 
     # Test create command
-    result = await editor(
+    result = editor(
         command="create", path=str(test_file.absolute()), file_text=test_content
     )
     print("Create result:", result.output)
 
     # Test insert command
-    result = await editor(
+    result = editor(
         command="insert",
         path=str(test_file.absolute()),
         new_str="This is a new line.\n",
@@ -41,7 +40,7 @@ async def test_string_replace_editor():
     print("Insert result:", result.output)
 
     # Test str_replace command
-    result = await editor(
+    result = editor(
         command="str_replace",
         path=str(test_file.absolute()),
         old_str="World",
@@ -50,7 +49,7 @@ async def test_string_replace_editor():
     print("Replace result:", result.output)
 
     # Test view command
-    result = await editor(
+    result = editor(
         command="view",
         path=str(test_file.absolute()),
         view_range=[1, 4],
@@ -62,4 +61,4 @@ async def test_string_replace_editor():
 
 
 if __name__ == "__main__":
-    asyncio.run(test_string_replace_editor())
+    test_string_replace_editor()
