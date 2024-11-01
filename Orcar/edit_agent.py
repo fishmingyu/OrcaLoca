@@ -4,23 +4,30 @@ A search agent. Process raw response into json format.
 
 import json
 import uuid
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
-from llama_index.core.callbacks import CallbackManager, trace_method
+from llama_index.core.callbacks import (
+    CallbackManager,
+    CBEventType,
+    EventPayload,
+    trace_method,
+)
 from llama_index.core.chat_engine.types import (
     AGENT_CHAT_RESPONSE_TYPE,
     AgentChatResponse,
 )
 from llama_index.core.instrumentation import get_dispatcher
+from llama_index.core.instrumentation.events.agent import AgentToolCallEvent
 from llama_index.core.llms.llm import LLM
 from llama_index.core.memory.chat_memory_buffer import ChatMemoryBuffer
 from llama_index.core.objects.base import ObjectRetriever
 from llama_index.core.prompts.base import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType, PromptMixinType
-from llama_index.core.tools import BaseTool
+from llama_index.core.settings import Settings
+from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.llms.openai import OpenAI
 
@@ -28,7 +35,7 @@ from .editor import Editor
 from .formatter import EditChatFormatter, TokenCount, TokenCounter
 from .log_utils import get_logger
 from .output_parser import EditOutputParser
-from .types import EditBugCode, EditInput
+from .types import EditActionStep, EditInput, EditOutput
 
 logger = get_logger(__name__)
 dispatcher = get_dispatcher(__name__)
@@ -39,6 +46,7 @@ class EditWorker(BaseAgentWorker):
 
     def __init__(
         self,
+        tools: Sequence[BaseTool],
         llm: LLM,
         edit_input: EditInput = None,
         max_iterations: int = 10,
@@ -58,7 +66,57 @@ class EditWorker(BaseAgentWorker):
         self._output_parser = output_parser or EditOutputParser()
         self._token_counter = TokenCounter(llm)
         self._verbose = verbose
-        self._get_tools = lambda _: []
+
+        if len(tools) > 0 and tool_retriever is not None:
+            raise ValueError("Cannot specify both tools and tool_retriever")
+        elif len(tools) > 0:
+            self._get_tools = lambda _: tools
+        elif tool_retriever is not None:
+            tool_retriever_c = cast(ObjectRetriever[BaseTool], tool_retriever)
+            self._get_tools = lambda message: tool_retriever_c.retrieve(message)
+        else:
+            self._get_tools = lambda _: []
+
+    @classmethod
+    def from_tools(
+        cls,
+        tools: Optional[Sequence[BaseTool]] = None,
+        tool_retriever: Optional[ObjectRetriever[BaseTool]] = None,
+        llm: Optional[LLM] = None,
+        edit_input: Optional[EditInput] = None,
+        max_iterations: int = 10,
+        edit_manager: Editor = None,
+        edit_formatter: Optional[EditChatFormatter] = None,
+        output_parser: Optional[EditOutputParser] = None,
+        callback_manager: Optional[CallbackManager] = None,
+        verbose: bool = False,
+        **kwargs: Any,
+    ) -> "EditWorker":
+        """Convenience constructor method from set of BaseTools (Optional).
+
+        NOTE: kwargs should have been exhausted by this point. In other words
+        the various upstream components such as BaseSynthesizer (response synthesizer)
+        or BaseRetriever should have picked up off their respective kwargs in their
+        constructions.
+
+        Returns:
+            EditWorker
+        """
+        llm = llm or Settings.llm
+        if callback_manager is not None:
+            llm.callback_manager = callback_manager
+        return cls(
+            tools=tools or [],
+            tool_retriever=tool_retriever,
+            llm=llm,
+            edit_input=edit_input,
+            max_iterations=max_iterations,
+            edit_manager=edit_manager,
+            edit_formatter=edit_formatter,
+            output_parser=output_parser,
+            callback_manager=callback_manager,
+            verbose=verbose,
+        )
 
     def _get_prompts(self) -> PromptDictType:
         """Get prompts."""
@@ -96,18 +154,18 @@ class EditWorker(BaseAgentWorker):
         """Get tools."""
         return [t for t in self._get_tools(input)]
 
-    def _extract_editing_step(self, output: ChatResponse) -> List[EditBugCode]:
+    def _extract_editing_step(self, output: ChatResponse) -> EditOutput:
         """Extract search step."""
         # parse the output
         if output.message.content is None:
             raise ValueError("Got empty message.")
         message_content = output.message.content
         try:
-            revised_code = self._output_parser.parse(message_content)
+            edit_output = self._output_parser.parse(message_content)
             # logger.info("potential_bugs: " + str(potential_bugs))
         except Exception as exc:
             raise ValueError(f"Could not parse output: {message_content}") from exc
-        return revised_code
+        return edit_output
 
     def _process_edit_input(self, input: EditInput) -> Tuple[str, str]:
         """Process edit input."""
@@ -115,42 +173,84 @@ class EditWorker(BaseAgentWorker):
         bug_locations = input.bug_locations
         # concat bug locations into a json like this
         """
-            "bug_info": [
+        "bug_info": [
             {
                 "file_name": "path/to/file",
                 "func_name": "function_name",
-                "content": "code snippet",
+                "range": "line numbers",
             },
             {
                 "file_name": "path/to/file",
                 "func_name": "function_name",
-                "content": "code snippet",
+                "range": "line numbers",
             },
         ]
         """
         bug_info = []
+
         for bug in bug_locations:
             revise_info = self._edit_manager._get_bug_code(
                 bug.method_name, bug.file_name
             )
+            start_line = revise_info.start_line
+            end_line = revise_info.end_line
+            range_str = f"{start_line}-{end_line}"
             bug_info.append(
                 {
-                    "file_name": bug.file_name,
+                    "file_name": revise_info.file,
                     "func_name": bug.method_name,
-                    "content": revise_info.content,
+                    "range": range_str,
                 }
             )
         bug_info_json = json.dumps({"bug_info": bug_info})
         return problem_statement, bug_info_json
 
+    def _process_editor_tool(
+        self,
+        task: Task,
+        tools: Sequence[BaseTool],
+        edit_step: EditActionStep,
+    ) -> str:
+        tools_dict: Dict[str, BaseTool] = {
+            tool.metadata.get_name(): tool for tool in tools
+        }
+        # try to call the tools
+        tool = tools_dict["editor_execute"]
+        with self.callback_manager.event(
+            CBEventType.FUNCTION_CALL,
+            payload={
+                EventPayload.FUNCTION_CALL: edit_step.action_input,
+                EventPayload.TOOL: tool.metadata,
+            },
+        ) as event:
+            try:
+                dispatcher.event(
+                    AgentToolCallEvent(
+                        arguments=json.dumps({**edit_step.action_input}),
+                        tool=tool.metadata,
+                    )
+                )
+                tool_output = tool.call(**edit_step.action_input)
+
+            except Exception as e:
+                tool_output = ToolOutput(
+                    content=f"Error: {e!s}",
+                    tool_name=tool.metadata.name,
+                    raw_input={"kwargs": edit_step.action_input},
+                    raw_output=e,
+                    is_error=True,
+                )
+            event.on_end(payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)})
+
+        return tool_output.content
+
     def _get_response(
         self,
-        current_res: List[EditBugCode],
+        tool_output: str,
+        current_res: EditOutput,
     ) -> AgentChatResponse:
         # concat list of EditBugCode into a string
-        response_str = json.dumps(
-            {"revised_code": [bug.to_json() for bug in current_res]}
-        )
+        response_str = current_res.get_content()
 
         return AgentChatResponse(response=response_str)
 
@@ -206,9 +306,11 @@ class EditWorker(BaseAgentWorker):
                 step=step,
                 task=task,
             )
+        tools = self.get_tools(task.input)
         problem_statement, bug_code_input = self._process_edit_input(self._edit_input)
         # add task input to chat history
         input_chat = self._edit_formatter.format(
+            tools=tools,
             problem_statement=problem_statement,
             bug_code_input=bug_code_input,
         )
@@ -226,9 +328,18 @@ class EditWorker(BaseAgentWorker):
         token_cnt = TokenCount(in_token_cnt=in_token_cnt, out_token_cnt=out_token_cnt)
         logger.info(token_cnt)
         logger.info(f"Chat response: {chat_response}")
-        revised_code = self._extract_editing_step(chat_response)
+        edit_output = self._extract_editing_step(chat_response)
+        edit_action_step = EditActionStep(
+            action_input=edit_output.action_input,
+        )
+        tool_feedback = self._process_editor_tool(
+            task=task,
+            tools=tools,
+            edit_step=edit_action_step,
+        )
+        logger.info(f"Tool feedback: {tool_feedback}")
 
-        agent_response = self._get_response(revised_code)
+        agent_response = self._get_response(edit_output)
 
         return self._get_task_step_response(agent_response, step, is_done=True)
 
@@ -302,8 +413,10 @@ class EditAgent(AgentRunner):
         callback_manager = callback_manager or llm.callback_manager
 
         self._edit_manager = Editor(repo_path=repo_path)
+        self._tools = self._setup_tools()
 
         step_engine = EditWorker(
+            tools=self._tools,
             llm=llm,
             edit_input=edit_input,
             max_iterations=max_iterations,
@@ -322,6 +435,17 @@ class EditAgent(AgentRunner):
             callback_manager=callback_manager,
             verbose=verbose,
         )
+
+    def _setup_tools(self) -> List[BaseTool]:
+        """Set up tools."""
+        tools = []
+        # tools in SearchManager
+
+        function = self._edit_manager.editor_execute
+        tool = FunctionTool.from_defaults(function)
+        tools.append(tool)
+
+        return tools
 
     def _get_prompt_modules(self) -> PromptMixinType:
         """Get prompt modules."""
