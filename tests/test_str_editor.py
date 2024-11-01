@@ -1,10 +1,11 @@
 from pathlib import Path
 
-from Orcar.editor import StringReplaceEditor
+from Orcar.editor import Editor
 
 
 def test_string_replace_editor():
-    editor = StringReplaceEditor()
+    repo_path = Path.cwd()
+    editor = Editor(repo_path)
     """
     def __call__(
         self,

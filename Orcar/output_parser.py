@@ -14,7 +14,7 @@ from .types import (
     BaseReasoningStep,
     BugLocations,
     CodeInfo,
-    EditBugCode,
+    EditOutput,
     ExtractJudgeStep,
     ExtractParseStep,
     ExtractSliceStep,
@@ -185,36 +185,22 @@ class SearchOutputParser(BaseOutputParser):
 class EditOutputParser(BaseOutputParser):
     """Edit Output parser."""
 
-    def parse(self, output: str) -> List[EditBugCode]:
+    def parse(self, output: str) -> EditOutput:
         """Parse output from Edit agent.
 
         The input is like:
-        "revised_code": [
-            {
-                "file_name": "path/to/file",
-                "func_name": "function_name",
-                "content": "revised code snippet",
-            },
-            {
-                "file_name": "path/to/file",
-                "func_name": "function_name",
-                "content": "revised code snippet",
-            },
-        ]
+        {
+            "feedback": "observation",
+            "action_input": {"command": "search_func", "path": "str"},
+        }
         """
-        if "revised_code" in output:
+        if "feedback" in output:
             # cast the output to EditResult
             edit_result = json.loads(output)
-            bug_code_list: List[EditBugCode] = []
-            for bug_code in edit_result["revised_code"]:
-                bug_code_list.append(
-                    EditBugCode(
-                        file_name=bug_code["file_name"],
-                        func_name=bug_code["func_name"],
-                        code_snippet=bug_code["content"],
-                    )
-                )
-            return bug_code_list
+            return EditOutput(
+                feedback=edit_result["feedback"],
+                action_input=edit_result["action_input"],
+            )
         else:
             # raise an error if the output is not in the expected format
             raise ValueError(f"Could not parse edit output: {output}")

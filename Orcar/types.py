@@ -31,6 +31,16 @@ class SearchActionStep(BaseReasoningStep):
         return self.action == other.action and self.action_input == other.action_input
 
 
+class EditActionStep(BaseReasoningStep):
+    """Edit action reasoning step."""
+
+    action_input: Dict
+
+    def get_content(self) -> str:
+        """Get content."""
+        return f"Edit Action Input: {self.action_input}"
+
+
 class SearchResult(BaseReasoningStep):
     """Search result reasoning step."""
 
@@ -105,30 +115,6 @@ class BugLocations(BaseModel):
             return f"{self.file_name}::{self.class_name}"
         else:
             return f"{self.file_name}"
-
-
-class EditBugCode(BaseModel):
-    """Edit bug code chunk."""
-
-    file_name: str
-    func_name: str
-    code_snippet: str
-
-    def get_content(self) -> str:
-        """Get content."""
-        return (
-            f"File Name: {self.file_name}\n"
-            f"Function Name: {self.func_name}\n"
-            f"Code Snippet: {self.code_snippet}\n"
-        )
-
-    def to_json(self) -> Dict:
-        """Convert to JSON."""
-        return {
-            "file_name": self.file_name,
-            "func_name": self.func_name,
-            "content": self.code_snippet,
-        }
 
 
 class ExtractSliceStep(BaseReasoningStep):
@@ -244,3 +230,14 @@ class EditInput(BaseModel):
 
     problem_statement: str
     bug_locations: List[BugLocations]
+
+
+class EditOutput(BaseModel):
+    """The output of the Edit prompt."""
+
+    feedback: str
+    action_input: Dict
+
+    def get_content(self) -> str:
+        """Get content."""
+        return f"Feedback: {self.feedback}\n" f"Action Input: {self.action_input}"

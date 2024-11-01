@@ -18,12 +18,12 @@ from .log_utils import get_logger
 from .prompts import (
     BUG_CODE_INPUT,
     BUG_OUTPUT,
+    EDIT_OUTPUT,
     EDIT_SYSTEM_HEADER,
     EXTRACT_EXAMPLES,
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
-    REVISED_OUTPUT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
@@ -342,13 +342,15 @@ class EditChatFormatter(BaseAgentChatFormatter):
 
     def format(
         self,
+        tools: Sequence[BaseTool],
         problem_statement: str,
         bug_code_input: str,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         format_args = {
+            "tool_desc": "\n".join(get_tool_descriptions(tools)),
             "bug_code_format": "".join(json.dumps(BUG_CODE_INPUT, indent=4)),
-            "revised_code_format": "".join(json.dumps(REVISED_OUTPUT, indent=4)),
+            "edit_output_format": "".join(json.dumps(EDIT_OUTPUT, indent=4)),
         }
 
         fmt_sys_header = self.system_header.format(**format_args)
@@ -357,6 +359,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
             role=MessageRole.USER,
             content=f"""<Problem Statement>\n{problem_statement}\n</Problem Statement>""",
         )
+
         bug_code_msg = ChatMessage(
             role=MessageRole.USER,
             content=f"""<Bug Code>\n{bug_code_input}\n</Bug Code>""",

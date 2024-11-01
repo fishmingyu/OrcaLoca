@@ -80,43 +80,39 @@ BUG_CODE_INPUT = {
         {
             "file_name": "path/to/file",
             "func_name": "function_name",
-            "content": "code snippet",
+            "range": "line numbers",
         },
         {
             "file_name": "path/to/file",
             "func_name": "function_name",
-            "content": "code snippet",
+            "range": "line numbers",
         },
     ]
 }
 
-REVISED_OUTPUT = {
-    "revised_code": [
-        {
-            "file_name": "path/to/file",
-            "func_name": "function_name",
-            "content": "revised code snippet",
-        },
-        {
-            "file_name": "path/to/file",
-            "func_name": "function_name",
-            "content": "revised code snippet",
-        },
-    ]
+EDIT_OUTPUT = {
+    "feedback": "observation",
+    "action_input": {"command": "search_func", "path": "str"},
 }
 
 EDIT_SYSTEM_HEADER = r"""
-You are a professional software engineer that uses API calls to revise code snippets based on the bug report.
+You are a professional software engineer that uses editor tools to revise code snippets based on the bug report.
+Your task is to analyze the problem statement and the code snippets, and then decide which commands to use to revise the code snippets.
+Here is the API call you can use to revise the code snippets:
+{tool_desc}
 We will provide you with the problem statement and the code snippets that need to be revised.
-Your task is to analyze the problem statement and the code snippets, and then provide the revised code snippets.
 <INPUT>
 You will receive the code snippets in the following JSON format:
 {bug_code_format}
 </INPUT>
+
 <OUTPUT FORMAT>
 Please also provide the output in a clear JSON structure like this:
-{revised_code_format}
-DO NOT add any title or description.
+{edit_output_format}
+Put the observation in the feedback field. The feedback should be a string. Respond to the feedback with "PATCH COMPLETE" if you think you fixed the issue.
+The action_input should be a dictionary of editor's arguments. Each time you can only use one command.
+E.g. {"command": "view", "path": "str"}
+DO NOT add any title or description outside the JSON structure.
 </OUTPUT FORMAT>
 """
 
