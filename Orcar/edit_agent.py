@@ -246,13 +246,21 @@ class EditWorker(BaseAgentWorker):
 
     def _get_response(
         self,
-        tool_output: str,
         current_res: EditOutput,
+        tool_output: str | None = None,
     ) -> AgentChatResponse:
-        # concat list of EditBugCode into a string
-        response_str = current_res.get_content()
+        # concat list tool_output and current_res.get_content
+        if tool_output is None:
+            response_str = current_res.get_content()
+        else:
+            response_str = f"{current_res.get_content()}\n Tool output:{tool_output}"
 
         return AgentChatResponse(response=response_str)
+
+    def _get_is_done(self, edit_output: EditOutput) -> bool:
+        """Get is done."""
+        # check PATCH COMPLETE in feedback
+        return "PATCH COMPLETE" in edit_output.get_content()
 
     def _get_task_step_response(
         self,
@@ -289,10 +297,6 @@ class EditWorker(BaseAgentWorker):
             # logger.info("step input: \n" + step.input)
             memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
             step.step_state["is_first"] = False
-        else:
-            # logger.info("step input: \n" + step.input)
-            memory = task.extra_state["instruct_memory"]
-            memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
 
     def _run_step(
         self,
@@ -306,11 +310,13 @@ class EditWorker(BaseAgentWorker):
                 step=step,
                 task=task,
             )
+
         tools = self.get_tools(task.input)
         problem_statement, bug_code_input = self._process_edit_input(self._edit_input)
         # add task input to chat history
         input_chat = self._edit_formatter.format(
             tools=tools,
+            chat_history=task.extra_state["new_memory"].get_all(),
             problem_statement=problem_statement,
             bug_code_input=bug_code_input,
         )
@@ -332,16 +338,27 @@ class EditWorker(BaseAgentWorker):
         edit_action_step = EditActionStep(
             action_input=edit_output.action_input,
         )
-        tool_feedback = self._process_editor_tool(
-            task=task,
-            tools=tools,
-            edit_step=edit_action_step,
+        is_done = self._get_is_done(edit_output)
+        task.extra_state["is_done"] = is_done
+
+        if not is_done:
+            tool_feedback = self._process_editor_tool(
+                task=task,
+                tools=tools,
+                edit_step=edit_action_step,
+            )
+            logger.info(f"Tool feedback: {tool_feedback}")
+            agent_response = self._get_response(edit_output, tool_feedback)
+        else:
+            agent_response = self._get_response(edit_output)
+        # add agent response to chat history
+        task.extra_state["new_memory"].put(
+            ChatMessage(content=agent_response.response, role=MessageRole.USER)
         )
-        logger.info(f"Tool feedback: {tool_feedback}")
+        if is_done:
+            task.extra_state["last_response"] = agent_response.response
 
-        agent_response = self._get_response(edit_output)
-
-        return self._get_task_step_response(agent_response, step, is_done=True)
+        return self._get_task_step_response(agent_response, step, is_done=is_done)
 
     @trace_method("run_step")
     def run_step(self, step: TaskStep, task: Task, **kwargs: Any) -> TaskStepOutput:
