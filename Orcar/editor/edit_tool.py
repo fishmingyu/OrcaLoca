@@ -322,7 +322,7 @@ class Editor:
             + "\n"
         )
 
-    def _get_bug_code(self, bug_query: str, file_path: str) -> str:
+    def _get_bug_code(self, bug_query: str, file_path: str) -> ReviseInfo:
         """Get the code snippet in the file."""
         # Get the code snippet in the file
         locinfo: LocInfo = self.search_manager._get_query_in_file(file_path, bug_query)

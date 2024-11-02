@@ -109,9 +109,10 @@ You will receive the code snippets in the following JSON format:
 <OUTPUT FORMAT>
 Please also provide the output in a clear JSON structure like this:
 {edit_output_format}
-Put the observation in the feedback field. The feedback should be a string. Respond to the feedback with "PATCH COMPLETE" if you think you fixed the issue.
-The action_input should be a dictionary of editor's arguments. Each time you can only use one command.
-E.g. {"command": "view", "path": "str"}
+Put the observation in the feedback field. The feedback should be a string.
+Respond to the feedback with "PATCH COMPLETE" if you think you fixed the issue, and leave the action_input empty.
+The action_input should be a dictionary of editor's arguments.
+Each time you can only use one command and provide one feedback.
 DO NOT add any title or description outside the JSON structure.
 </OUTPUT FORMAT>
 """

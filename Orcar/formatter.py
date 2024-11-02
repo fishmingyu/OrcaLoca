@@ -306,6 +306,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
     def format(
         self,
         tools: Sequence[BaseTool],
+        chat_history: List[ChatMessage],
         problem_statement: str,
         bug_code_input: str,
     ) -> List[ChatMessage]:
@@ -330,6 +331,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
 
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
+            *chat_history,
             user_msg,
             bug_code_msg,
         ]
