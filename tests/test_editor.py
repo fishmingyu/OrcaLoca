@@ -1,5 +1,6 @@
 import argparse
 import os
+import subprocess
 
 from Orcar import EditAgent
 from Orcar.environment.benchmark import get_repo_dir
@@ -41,6 +42,23 @@ test_bug_locations = {
 }
 
 
+def reset_cached_repo(repo_path, base_commit):
+    proc = subprocess.Popen(
+        f"git reset --hard {base_commit}".split(" "),
+        cwd=repo_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    proc.wait()
+    proc = subprocess.Popen(
+        f"git clean -fdx".split(" "),
+        cwd=repo_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    proc.wait()
+
+
 def test_agent():
     args = argparse.Namespace(**args_dict)
     cfg = Config("./key.cfg")
@@ -49,10 +67,16 @@ def test_agent():
 
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
+
         repo_name = get_repo_dir(inst["repo"])
         problem_statement = inst["problem_statement"]
         base_dir = os.path.expanduser("~/.orcar")
         repo_path = os.path.join(base_dir, repo_name)
+
+        # reset to base commit
+        base_commit = inst["base_commit"]
+        reset_cached_repo(repo_path, base_commit)
+
         # extract test bug locations
         bug_locations = test_bug_locations["bug_locations"]
         edit_input = EditInput(
@@ -62,6 +86,9 @@ def test_agent():
 
         response = edit_agent.chat(message="placeholders")
         print(response)
+
+        # reset to base commit
+        reset_cached_repo(repo_path, base_commit)
 
 
 if __name__ == "__main__":
