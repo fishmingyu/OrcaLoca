@@ -223,6 +223,14 @@ class SearchInput(BaseModel):
             )
 
 
+class SearchOutput(BaseModel):
+    """
+    search_agent output
+    """
+
+    bug_locations: List[BugLocations] = []
+
+
 class EditInput(BaseModel):
     """
     Edit input

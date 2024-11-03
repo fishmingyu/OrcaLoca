@@ -366,11 +366,24 @@ class EditChatFormatter(BaseAgentChatFormatter):
             content=f"""<Bug Code>\n{bug_code_input}\n</Bug Code>""",
         )
 
+        output_format: str = "".join(json.dumps(EDIT_OUTPUT, indent=4))
+        fmt_control_msg = ChatMessage(
+            role=MessageRole.USER,
+            content=(
+                f"Please generate next step STRICTLY following given format:"
+                "<Output Format>"
+                f"{output_format}"
+                "</Output Format>"
+                "DO NOT SPEAK any REDUNDANT words (like 'json', 'output', etc.)) or thoughts"
+            ),
+        )
+
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
             *chat_history,
             user_msg,
             bug_code_msg,
+            fmt_control_msg,
         ]
 
 

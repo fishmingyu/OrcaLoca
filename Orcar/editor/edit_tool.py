@@ -381,9 +381,17 @@ class Editor:
 
     # Create a git diff patch
     def create_patch(self) -> str:
-        """Create a git diff patch."""
+        """
+        Create a git diff patch.
+        To tract all added and deleted files, use `git add --all` before creating the patch.
+        """
+        subprocess.run(
+            ["git", "add", "--all"],
+            cwd=self.repo_path,
+            check=True,
+        )
         result = subprocess.run(
-            ["git", "diff", "--cached", "--no-index"],
+            ["git", "diff", "--cached"],
             cwd=self.repo_path,
             capture_output=True,
             text=True,

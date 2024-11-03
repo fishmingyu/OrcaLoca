@@ -320,6 +320,7 @@ class EditWorker(BaseAgentWorker):
             problem_statement=problem_statement,
             bug_code_input=bug_code_input,
         )
+        logger.info(f"Input chat: {input_chat}")
 
         in_token_cnt = self._token_counter.count(
             self._llm.messages_to_prompt(input_chat)
@@ -350,7 +351,8 @@ class EditWorker(BaseAgentWorker):
             logger.info(f"Tool feedback: {tool_feedback}")
             agent_response = self._get_response(edit_output, tool_feedback)
         else:
-            agent_response = self._get_response(edit_output)
+            patch = self._edit_manager.create_patch()
+            agent_response = AgentChatResponse(response=patch)
         # add agent response to chat history
         task.extra_state["new_memory"].put(
             ChatMessage(content=agent_response.response, role=MessageRole.USER)
