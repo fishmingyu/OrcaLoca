@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import traceback
 from enum import IntEnum
@@ -10,6 +11,7 @@ from typing import Any, Dict
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
+from Orcar.edit_agent import EditAgent
 from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
 from Orcar.environment.utils import (
     ContainerBash,
@@ -24,20 +26,13 @@ from Orcar.log_utils import (
     switch_log_to_stdout,
 )
 from Orcar.search_agent import SearchAgent
-from Orcar.types import ExtractOutput, SearchInput
+from Orcar.types import EditInput, ExtractOutput, SearchInput, SearchOutput
 
 
 class Stage(IntEnum):
     EXTRACT = 1
     SEARCH = 2
-
-
-def str2stage(input: str) -> Stage:
-    if input.lower() == "extract":
-        return Stage.EXTRACT
-    if input.lower() == "search":
-        return Stage.SEARCH
-    raise ValueError(f"str2stage: unrecognized stage {input}")
+    EDIT = 3
 
 
 class OrcarAgent:
@@ -74,7 +69,7 @@ class OrcarAgent:
         self.logger = get_logger(__name__)
         self.redirect_log: bool = False
         self.output_to_file: bool = True
-        self.final_stage = str2stage(final_stage)
+        self.final_stage = Stage[final_stage.upper()]
 
     def __del__(self) -> None:
         """Pause the container."""
@@ -110,16 +105,16 @@ class OrcarAgent:
 
         return extract_output
 
-    def run_search_agent(self, extract_output: ExtractOutput) -> Dict[str, Any]:
-        """Run the search agent.
+    def run_search_agent(self, extract_output: ExtractOutput) -> SearchOutput:
+        """
+        Run the search agent.
         It depends on the output of the extract agent.
         """
         search_input = SearchInput(
             problem_statement=self.inst["problem_statement"],
             extract_output=extract_output,
         )
-        self.repo_name = get_repo_dir(self.inst["repo"])
-        self.repo_path = os.path.join(self.base_path, self.repo_name)
+
         self.search_agent = SearchAgent(
             repo_path=self.repo_path,
             llm=self.llm,
@@ -129,13 +124,74 @@ class OrcarAgent:
         search_agent_chat_response: AgentChatResponse = self.search_agent.chat(
             search_input.get_content()
         )
-        self.logger.info(search_agent_chat_response.response)
-        search_output = json.loads(search_agent_chat_response.response)
-        search_json_obj = search_output
+        search_output = SearchOutput.model_validate_json(
+            search_agent_chat_response.response
+        )
+        self.logger.info(search_output)
+
         if self.output_to_file:
+            search_json_obj = json.loads(search_output.model_dump_json())
             with open(f"{self.output_dir}/searcher_{self.inst_id}.json", "w") as handle:
                 json.dump(search_json_obj, handle, indent=4)
+
         return search_output
+
+    def reset_cached_repo(self, repo_path):
+        proc = subprocess.Popen(
+            f"git reset --hard HEAD".split(" "),
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.wait()
+        proc = subprocess.Popen(
+            f"git clean -fdx".split(" "),
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.wait()
+
+    def check_commit_id(self):
+        result = subprocess.run(
+            f"git rev-parse HEAD".split(" "),
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.logger.info(
+            (
+                f"Confirmed commit id: {result.stdout.strip()} at {self.repo_path};\n"
+                f" Base commit id: {self.inst['base_commit']}"
+            )
+        )
+
+    def run_edit_agent(self, search_output: SearchOutput) -> str:
+        """
+        Run the edit agent.
+        It depends on the output of the search agent.
+        """
+        edit_input = EditInput(
+            problem_statement=self.inst["problem_statement"],
+            bug_locations=search_output.bug_locations,
+        )
+        self.edit_agent = EditAgent(
+            repo_path=self.repo_path,
+            llm=self.llm,
+            edit_input=edit_input,
+            # verbose=False,
+        )
+        chat_response: AgentChatResponse = self.edit_agent.chat(message="placeholders")
+        edit_output = chat_response.response  # Patch output not finished yet
+        self.logger.info(edit_output)
+        self.reset_cached_repo(self.repo_path)
+
+        if self.output_to_file:
+            with open(f"{self.output_dir}/editor_{self.inst_id}.patch", "w") as handle:
+                handle.write(edit_output)
+
+        return edit_output
 
     def run(self, instance: Dict[str, Any]) -> str:
         """Config the output redirection to run agents."""
@@ -143,6 +199,8 @@ class OrcarAgent:
         self.inst_id = self.inst["instance_id"]
         self.log_dir = f"./log/{self.inst_id}"
         self.output_dir = f"./output/{self.inst_id}"
+        self.repo_name = get_repo_dir(self.inst["repo"])
+        self.repo_path = os.path.join(self.base_path, self.repo_name)
         set_log_dir(self.log_dir)
 
         os.makedirs(self.output_dir, exist_ok=True)
@@ -190,9 +248,19 @@ class OrcarAgent:
         except Exception:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            search_output = {}
+            search_output = SearchOutput()
         if self.final_stage <= Stage.SEARCH:
             return json.dumps(search_output, indent=4)
+
+        try:
+            edit_output = self.run_edit_agent(search_output)
+        except Exception:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            edit_output = {}
+        if self.final_stage <= Stage.EDIT:
+            return json.dumps(edit_output, indent=4)
+
         return f"Invalid final_stage: {self.final_stage}"  # Shouldn't got here
 
     def __call__(self, text: str) -> str:

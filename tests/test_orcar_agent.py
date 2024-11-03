@@ -19,7 +19,7 @@ args_dict = {
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
-    # "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
     # "filter_instance": ".*",
@@ -66,38 +66,38 @@ args_dict = {
     #    ")$"
     # ),
     # Tracer test
-    "filter_instance": (
-        "^("
-        "astropy__astropy-12907|"
-        "pydata__xarray-4094|"
-        "sympy__sympy-18189|"
-        "sympy__sympy-18199|"
-        "sympy__sympy-21847|"
-        "sympy__sympy-24066|"
-        "django__django-11815|"
-        "scikit-learn__scikit-learn-14983|"
-        "sympy__sympy-13647|"
-        "sympy__sympy-15345|"
-        "sympy__sympy-12419|"
-        "sympy__sympy-13031|"
-        "sympy__sympy-21379|"
-        "sympy__sympy-23262|"
-        "astropy__astropy-14995|"
-        "django__django-14787|"
-        "django__django-16595|"
-        "matplotlib__matplotlib-23299|"
-        "matplotlib__matplotlib-24149|"
-        "sympy__sympy-13480|"
-        "sympy__sympy-17139|"
-        "sympy__sympy-17655|"
-        "astropy__astropy-14182|"
-        "astropy__astropy-14365|"
-        "scikit-learn__scikit-learn-10297|"
-        "sympy__sympy-22714|"
-        "matplotlib__matplotlib-25332|"
-        "sympy__sympy-17630"
-        ")$"
-    ),
+    # "filter_instance": (
+    #    "^("
+    #    "astropy__astropy-12907|"
+    #    "pydata__xarray-4094|"
+    #    "sympy__sympy-18189|"
+    #    "sympy__sympy-18199|"
+    #    "sympy__sympy-21847|"
+    #    "sympy__sympy-24066|"
+    #    "django__django-11815|"
+    #    "scikit-learn__scikit-learn-14983|"
+    #    "sympy__sympy-13647|"
+    #    "sympy__sympy-15345|"
+    #    "sympy__sympy-12419|"
+    #    "sympy__sympy-13031|"
+    #    "sympy__sympy-21379|"
+    #    "sympy__sympy-23262|"
+    #    "astropy__astropy-14995|"
+    #    "django__django-14787|"
+    #    "django__django-16595|"
+    #    "matplotlib__matplotlib-23299|"
+    #    "matplotlib__matplotlib-24149|"
+    #    "sympy__sympy-13480|"
+    #    "sympy__sympy-17139|"
+    #    "sympy__sympy-17655|"
+    #    "astropy__astropy-14182|"
+    #    "astropy__astropy-14365|"
+    #    "scikit-learn__scikit-learn-10297|"
+    #    "sympy__sympy-22714|"
+    #    "matplotlib__matplotlib-25332|"
+    #    "sympy__sympy-17630"
+    #    ")$"
+    # ),
 }
 
 
@@ -108,7 +108,8 @@ def test_agent():
     ds = load_filter_hf_dataset(args)
 
     # final_stage = "extract"
-    final_stage = "search"
+    # final_stage = "search"
+    final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
     agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
