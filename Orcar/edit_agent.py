@@ -339,6 +339,7 @@ class EditWorker(BaseAgentWorker):
         edit_action_step = EditActionStep(
             action_input=edit_output.action_input,
         )
+        task.extra_state["token_cnts"].append(("edit", token_cnt))
         is_done = self._get_is_done(edit_output)
         task.extra_state["is_done"] = is_done
 
