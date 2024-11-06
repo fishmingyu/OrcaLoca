@@ -33,6 +33,7 @@ from llama_index.core.tools import BaseTool, FunctionTool, ToolOutput
 from llama_index.core.tools.types import AsyncBaseTool
 from llama_index.llms.openai import OpenAI
 
+from .code_scorer import CodeScorer
 from .formatter import SearchChatFormatter, TokenCount, TokenCounter
 from .log_utils import get_logger
 from .output_parser import SearchOutputParser
@@ -106,6 +107,7 @@ class SearchWorker(BaseAgentWorker):
     ) -> None:
         self._llm = llm
         self._search_input = search_input
+        self._problem_statement = search_input.problem_statement
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self.top_k_search = 12
@@ -372,6 +374,56 @@ class SearchWorker(BaseAgentWorker):
 
         return True
 
+    def _class_methods_ranking(
+        self,
+        action: SearchActionStep,
+    ) -> List[SearchActionStep]:
+        """Ranking the class methods."""
+        # if the action is search_class_skeleton, we should rank the class methods
+        if action.action == "search_class_skeleton":
+            class_name = action.action_input["class_name"]
+            class_methods, methods_code = self._search_manager._get_class_methods(
+                class_name
+            )
+            # package the list of methods into a list of ChatMessage
+            chat_messages: List[List[ChatMessage]] = []
+            for method in methods_code:
+                chat_messages.append(
+                    [ChatMessage(role=MessageRole.USER, content=method)]
+                )
+            code_scorer = CodeScorer(
+                llm=self._llm, problem_statement=self._problem_statement
+            )
+            # score the list of methods
+            scores = code_scorer.score_batch(chat_messages)
+            # combine the scores with the method names
+            results = []
+            for i, method in enumerate(class_methods):
+                results.append({"method_name": method, "score": scores[i]})
+            sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+            # prune scores less than 50
+            sorted_results = [
+                result for result in sorted_results if result["score"] > 50
+            ]
+            # get top 3 methods
+            top_k = 3
+            if len(sorted_results) < top_k:
+                top_k = len(sorted_results)
+            search_steps = []
+            for i in range(top_k):
+                method_name = sorted_results[i]["method_name"].split("::")[-1]
+                search_steps.append(
+                    SearchActionStep(
+                        action="search_method_in_class",
+                        action_input={
+                            "method_name": method_name,
+                            "class_name": class_name,
+                        },
+                    )
+                )
+            return search_steps
+        return []
+
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
         memory.reset()
@@ -525,8 +577,19 @@ class SearchWorker(BaseAgentWorker):
         head_search_step = task.extra_state["search_queue"].popleft()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(task, tools, search_step)
+        top_class_methods = self._class_methods_ranking(search_step)
+        # add top class methods to the left of the queue
+        for class_method in top_class_methods:
+            if not self._check_action_valid(
+                class_method, task.extra_state["action_history"]
+            ):
+                continue
+            task.extra_state["search_queue"].appendleft(class_method)
+            task.extra_state["action_history"].append(class_method)
+        logger.info(f"Top class methods: {top_class_methods}")
         # logger.info(f"Next Search Input: {search_result}")
 
+        # get the agent response, decide the next step input
         agent_response = self._get_response(search_result)
         # logger.info(f"Agent response: {agent_response.response}")
 
@@ -539,7 +602,9 @@ class SearchWorker(BaseAgentWorker):
                 heuristic_search_result.heuristic >= 0
             ):  # if the heuristic is greater than 0, we should add it to the current search
                 # add search steps to task state
-                task.extra_state["current_search"].append(search_result)
+                # also avoid search_step = search_class_skeleton
+                if search_step.action != "search_class_skeleton":
+                    task.extra_state["current_search"].append(search_result)
 
         search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
         # every step recalcuate the heuristic of the search result

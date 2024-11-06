@@ -1,7 +1,7 @@
 import ast
 import os
 import re
-from typing import Tuple
+from typing import List, Tuple
 
 import pandas as pd
 
@@ -165,6 +165,24 @@ class SearchManager:
             Loc: The location of the method definition.
         """
         return self.kg.dfs_search_method_in_class(class_name, method_name)
+
+    def _get_class_methods(self, class_name: str) -> Tuple[List[str], List[str]]:
+        """Return
+        1. The list of method names in the class.
+        2. The list of method code snippets in the class.
+        """
+
+        output_methods = []
+        output_code_snippets = []
+        list_loc = self.kg.get_class_methods(class_name)
+        for loc in list_loc:
+            file_name = loc.file_name
+            node_name = loc.node_name
+            joined_path = os.path.join(self.repo_path, file_name)
+            content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
+            output_methods.append(node_name)
+            output_code_snippets.append(content)
+        return output_methods, output_code_snippets
 
     #################
     # Interface methods
