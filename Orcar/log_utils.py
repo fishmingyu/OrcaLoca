@@ -4,6 +4,8 @@ from typing import Dict
 
 from rich.logging import RichHandler
 
+logging.basicConfig(level=logging.INFO)
+
 
 class LoggingManager:
     def __init__(self):
