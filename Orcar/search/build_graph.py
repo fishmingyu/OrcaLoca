@@ -2,7 +2,7 @@ import ast
 import json
 import os
 from collections import namedtuple
-from typing import Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -277,6 +277,29 @@ class RepoGraph:
             snapshot += f"Docstring: {method_snapshot.docstring}\n"
 
         return loc, snapshot
+
+    def get_class_methods(self, class_name) -> List[Loc] | None:
+        root = self.root_node
+        stack = [root]
+        visited = set()
+        methods = []
+        kg_query_name = class_name
+
+        while stack:
+            node = stack.pop()
+            if node not in visited:
+                visited.add(node)
+                current_prefix = self.extract_prefix(node)
+                if current_prefix is not None:
+                    kg_query_name = current_prefix + "::" + class_name
+                if node == kg_query_name:
+                    # this is class node
+                    # get all neighbors of this node means all methods
+                    for method in self.graph.neighbors(node):
+                        if self.graph.nodes[method]["type"] == "method":
+                            methods.append(self.graph.nodes[method]["loc"])
+                stack.extend(self.graph.neighbors(node))
+        return methods
 
     # dfs search for contents in a file
     def dfs_search_file_skeleton(self, file_name) -> Tuple[Loc, str] | None:
