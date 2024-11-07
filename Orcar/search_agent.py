@@ -45,6 +45,7 @@ from .types import (
     SearchInput,
     SearchResult,
 )
+from .utils import check_observation_similarity
 
 logger = get_logger(__name__)
 dispatcher = get_dispatcher(__name__)
@@ -424,6 +425,31 @@ class SearchWorker(BaseAgentWorker):
             return search_steps
         return []
 
+    def _early_stop(self, task: Task) -> bool:
+        """Early stop."""
+        observation_history = task.extra_state["new_memory"].get_all()
+        # get last 2 observations
+        if len(observation_history) < 2:
+            return False
+        last_observation = observation_history[-1].content
+        second_last_observation = observation_history[-2].content
+        # check similarity
+        _, is_similar = check_observation_similarity(
+            last_observation, second_last_observation
+        )
+        logger.info(f"[Early Stop]last observation: {last_observation}")
+        return is_similar
+
+    def _judge_is_complete(self, task: Task) -> bool:
+        """Judge if the task is complete."""
+        # first check _early_stop
+        if self._early_stop(task):
+            return True
+        # then check if the search_queue is empty
+        if len(task.extra_state["search_queue"]) == 0:
+            return True
+        return False
+
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
         memory.reset()
@@ -559,11 +585,11 @@ class SearchWorker(BaseAgentWorker):
         logger.info(
             f"Current search queue size: {len(task.extra_state['search_queue'])}"
         )
-        is_complete = len(task.extra_state["search_queue"]) == 0
 
         task.extra_state["new_memory"].put(
             ChatMessage(content=observation, role=MessageRole.ASSISTANT)
         )
+        is_complete = self._judge_is_complete(task)
         if is_complete:
             task.extra_state["is_done"] = True
             return self._get_task_step_response(

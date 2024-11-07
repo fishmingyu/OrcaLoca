@@ -100,6 +100,7 @@ You are a professional software engineer that uses editor tools to revise code s
 Your task is to analyze the problem statement and the code snippets, and then decide which commands to use to revise the code snippets.
 Here is the API call you can use to revise the code snippets:
 {tool_desc}
+You can view the whole file if you find the context is not enough to revise the code snippets.
 We will provide you with the problem statement and the code snippets that need to be revised.
 <INPUT>
 You will receive the code snippets in the following JSON format:

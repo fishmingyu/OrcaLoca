@@ -1,169 +1,57 @@
-"""Utils for LLM Compiler.
-Revised from https://github.com/run-llama/llama_index/blob/main/llama-index-integrations/agent/llama-index-agent-llm-compiler/llama_index/agent/llm_compiler/utils.py
-"""
-
-import ast
-import re
-from typing import Any, Dict, List, Sequence, Tuple, Union
-
-from llama_index.core.tools.function_tool import FunctionTool
-from llama_index.core.tools.types import BaseTool, adapt_to_async_tool
-
-from .schema import LLMCompilerParseResult, LLMCompilerTask
-
-# $1 or ${1} -> 1
-ID_PATTERN = r"\$\{?(\d+)\}?"
+import torch
+import torch.nn.functional as F
+from transformers import AutoModel, AutoTokenizer
 
 
-def default_dependency_rule(idx: int, args: str) -> bool:
-    """Default dependency rule."""
-    matches = re.findall(ID_PATTERN, args)
-    numbers = [int(match) for match in matches]
-    return idx in numbers
+def get_bert_embedding(text, model, tokenizer, device="cuda"):
+    """Get BERT embeddings for a given text."""
+    # Tokenize and move to device
+    inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    # Get BERT embeddings
+    with torch.no_grad():
+        outputs = model(**inputs)
+        embeddings = outputs.last_hidden_state
+
+        # Use mean pooling to get sentence embedding
+        attention_mask = inputs["attention_mask"]
+        mask = attention_mask.unsqueeze(-1).expand(embeddings.size()).float()
+        masked_embeddings = embeddings * mask
+        summed = torch.sum(masked_embeddings, 1)
+        sentence_embedding = summed / torch.clamp(mask.sum(1), min=1e-9)
+
+        # Normalize embeddings
+        sentence_embedding = F.normalize(sentence_embedding, p=2, dim=1)
+
+    return sentence_embedding[0]
 
 
-def parse_llm_compiler_action_args(args: str) -> Union[List, Tuple]:
-    """Parse arguments from a string."""
-    # This will convert the string into a python object
-    # e.g. '"Ronaldo number of kids"' -> ("Ronaldo number of kids", )
-    # '"I can answer the question now.", [3]' -> ("I can answer the question now.", [3])
-    if args == "":
-        return ()
-    try:
-        eval_args: Union[List, Tuple, str] = ast.literal_eval(args)
-    except Exception:
-        eval_args = args
-    if not isinstance(eval_args, list) and not isinstance(eval_args, tuple):
-        new_args: Union[List, Tuple] = (eval_args,)
-    else:
-        new_args = eval_args
-    return new_args
-
-
-def _find_tool(tool_name: str, tools: Sequence[BaseTool]) -> BaseTool:
-    """Find a tool by name.
-
-    Args:
-        tool_name: Name of the tool to find.
-
-    Returns:
-        Tool or StructuredTool.
+def check_observation_similarity(
+    text1, text2, threshold=0.95, model_name="bert-base-uncased"
+):
     """
-    for tool in tools:
-        if tool.metadata.name == tool_name:
-            return tool
-    raise ValueError(f"Tool {tool_name} not found.")
+    Check similarity between two paragraphs using BERT embeddings.
+    Returns similarity score and boolean indicating if paragraphs are similar.
 
-
-def _get_dependencies_from_graph(idx: int, tool_name: str, args: str) -> List[int]:
-    """Get dependencies from a graph."""
-    if tool_name == "join":
-        # depends on the previous step
-        dependencies = list(range(1, idx))
-    else:
-        # define dependencies based on the dependency rule in tool_definitions.py
-        dependencies = [i for i in range(1, idx) if default_dependency_rule(i, args)]
-
-    return dependencies
-
-
-def instantiate_new_step(
-    tools: Sequence[BaseTool],
-    idx: int,
-    tool_name: str,
-    args: str,
-    thought: str,
-) -> LLMCompilerTask:
-    """Instantiate a new step."""
-    dependencies = _get_dependencies_from_graph(idx, tool_name, args)
-    args_list = parse_llm_compiler_action_args(args)
-    if tool_name == "join":
-        # tool: Optional[BaseTool] = None
-        # assume that the only tool that returns None is join
-        tool: BaseTool = FunctionTool.from_defaults(fn=lambda x: None)
-    else:
-        tool = _find_tool(tool_name, tools)
-
-    return LLMCompilerTask(
-        idx=idx,
-        name=tool_name,
-        tool=adapt_to_async_tool(tool),
-        args=args_list,
-        dependencies=dependencies,
-        # TODO: look into adding a stringify rule
-        # stringify_rule=stringify_rule,
-        thought=thought,
-        is_join=tool_name == "join",
-    )
-
-
-def get_graph_dict(
-    parse_results: List[LLMCompilerParseResult],
-    tools: Sequence[BaseTool],
-) -> Dict[int, Any]:
-    """Get graph dict."""
-    graph_dict = {}
-
-    for parse_result in parse_results:
-        # idx = 1, function = "search", args = "Ronaldo number of kids"
-        # thought will be the preceding thought, if any, otherwise an empty string
-        # thought, idx, tool_name, args, _ = match
-        idx = int(parse_result.idx)
-
-        task = instantiate_new_step(
-            tools=tools,
-            idx=idx,
-            tool_name=parse_result.tool_name,
-            args=parse_result.args,
-            thought=parse_result.thought,
-        )
-
-        graph_dict[idx] = task
-        if task.is_join:
-            break
-
-    return graph_dict
-
-
-def generate_context_for_replanner(
-    tasks: Dict[int, LLMCompilerTask], joiner_thought: str
-) -> str:
-    """Generate context for replanning.
-
-    Formatted like this.
-    ```
-    1. action 1
-    Observation: xxx
-    2. action 2
-    Observation: yyy
-    ...
-    Thought: joinner_thought
-    ```
+    Parameters:
+    - text1, text2: Input paragraphs to compare
+    - threshold: Optional float between 0 and 1. If None, returns only similarity score
+    - model_name: Name of the BERT model to use
     """
-    previous_plan_and_observations = "\n".join(
-        [
-            task.get_thought_action_observation(
-                include_action=True, include_action_idx=True
-            )
-            for task in tasks.values()
-            if not task.is_join
-        ]
-    )
-    joiner_thought = f"Thought: {joiner_thought}"
-    # use f-string instead
-    return f"{previous_plan_and_observations}\n\n{joiner_thought}"
+    # Initialize model and tokenizer
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name).to(device)
 
+    # Get embeddings
+    emb1 = get_bert_embedding(text1, model, tokenizer, device)
+    emb2 = get_bert_embedding(text2, model, tokenizer, device)
 
-def format_contexts(contexts: Sequence[str]) -> str:
-    """Format contexts.
+    # Calculate dot product as similarity score
+    similarity = torch.dot(emb1, emb2).item()
 
-    Taken from https://github.com/SqueezeAILab/LLMCompiler/blob/main/src/llm_compiler/llm_compiler.py
+    if threshold is None:
+        return similarity
 
-    Contexts is a list of context.
-    Each context is formatted as the description of generate_context_for_replanner
-    """
-    formatted_contexts = ""
-    for context in contexts:
-        formatted_contexts += f"Previous Plan:\n\n{context}\n\n"
-    formatted_contexts += "Current Plan:\n\n"
-    return formatted_contexts
+    return similarity, similarity >= threshold

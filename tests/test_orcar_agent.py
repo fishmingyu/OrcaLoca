@@ -15,10 +15,10 @@ args_dict = {
     "split": "test",
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23314)$",
-    "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(django__django-15814)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
