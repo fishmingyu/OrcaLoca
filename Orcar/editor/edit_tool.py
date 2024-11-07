@@ -93,7 +93,7 @@ class Editor:
         Usage:
         1. editor_execute(command="view", path="/path/to/file", view_range=[1, 10])
             View the content of a file.
-            Arg view_range is optional and should be a list of two integers.
+            Arg view_range is optional and should be a list of two integers. Leave it as None to view the entire file.
         2. editor_execute(command="create", path="/path/to/file", file_text="file content")
             Create a new file with the given content.
         3. editor_execute(command="str_replace", path="/path/to/file", old_str="old string", new_str="new string")
