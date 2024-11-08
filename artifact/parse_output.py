@@ -136,19 +136,19 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
                 output_dict[inst_id]["status"] = "Json invalid"
             else:
                 for loc in model_searcher_output["bug_locations"]:
-                    file_name = loc["file"]
+                    file_name = loc["file_name"]
                     if file_name and file_name[0] == "/":
                         file_name = file_name[1:]
                     model_file_set.add(file_name)
-                    keyword = loc["file"] + ":"
-                    if not (bool(loc["class"]) or bool(loc["method"])):
+                    keyword = loc["file_name"] + ":"
+                    if not (bool(loc["class_name"]) or bool(loc["method_name"])):
                         continue
-                    elif not loc["class"]:
-                        keyword += loc["method"]
-                    elif not loc["method"]:
-                        keyword += loc["class"]
+                    elif not loc["class_name"]:
+                        keyword += loc["method_name"]
+                    elif not loc["method_name"]:
+                        keyword += loc["class_name"]
                     else:
-                        keyword += loc["class"] + "." + loc["method"]
+                        keyword += loc["class_name"] + "." + loc["method_name"]
                     model_keyword_set.add(keyword)
                 if file_set.issubset(model_file_set):
                     file_match += 1
