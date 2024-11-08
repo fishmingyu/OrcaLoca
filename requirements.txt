@@ -16,4 +16,6 @@ rich
 swebench
 termcolor
 tiktoken
+torch
+transformers
 types-PyYAML
