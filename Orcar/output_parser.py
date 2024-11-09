@@ -76,15 +76,19 @@ def extract_final_response(input_text: str) -> Tuple[str, str]:
     return thought, answer
 
 
-def escape_newlines_in_json_strings(json_str):
-    # Find all strings in the JSON and replace \n within them
-    def replace_newline(match):
-        # Replace \n with \\n inside the string
-        return match.group(0).replace("\n", "\\n")
+def load_with_escape(input_text: str) -> dict:
+    # if input_text contains \s, replace it with __ESCAPED_S__
+    input_text = input_text.replace(r"\s", "__ESCAPED_S__")
 
-    # Regular expression to match strings in the JSON
-    json_str = re.sub(r"\"(.*?)\"", replace_newline, json_str, flags=re.DOTALL)
-    return json_str
+    # Parse JSON
+    data = json.loads(input_text)
+
+    # Replace escaped characters only for observation_feedback
+    data["observation_feedback"] = data["observation_feedback"].replace(
+        "__ESCAPED_S__", r"\s"
+    )
+
+    return data
 
 
 class SearchOutputParser(BaseOutputParser):
@@ -135,7 +139,9 @@ class SearchOutputParser(BaseOutputParser):
             action_list: List[SearchActionStep] = []
             bug_list: List[BugLocations] = []
             # cast the output to SearchActionStep
-            json_str = json.loads(output)
+            # escape \s in the json string
+
+            json_str = load_with_escape(output)
             observation_json = json_str["observation_feedback"]
             # add <Observation> and </Observation> to the observation
             observation = f"<Observation>\n{observation_json}\n</Observation>"
