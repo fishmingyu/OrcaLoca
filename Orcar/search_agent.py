@@ -188,6 +188,7 @@ class SearchWorker(BaseAgentWorker):
         action_history: List[SearchActionStep] = []
         current_search: List[SearchResult] = []
         search_cache: List[SearchResult] = []
+        similarity_cache: List[bool] = []
         # temporary memory for new messages
         new_memory = ChatMemoryBuffer.from_defaults()
         instruct_memory = ChatMemoryBuffer.from_defaults()
@@ -200,6 +201,7 @@ class SearchWorker(BaseAgentWorker):
             "action_history": action_history,
             "current_search": current_search,
             "search_cache": search_cache,
+            "similarity_cache": similarity_cache,
             "new_memory": new_memory,
             "instruct_memory": instruct_memory,
             "token_cnts": list(),
@@ -437,8 +439,18 @@ class SearchWorker(BaseAgentWorker):
         _, is_similar = check_observation_similarity(
             last_observation, second_last_observation
         )
-        logger.info(f"[Early Stop]last observation: {last_observation}")
-        return is_similar
+        # add is_similar to the similarity_cache
+        task.extra_state["similarity_cache"].append(is_similar)
+        # use sliding window to check the similarity, window size is 8
+        if len(task.extra_state["similarity_cache"]) > 10:
+            task.extra_state["similarity_cache"].pop(0)
+        # if all the observations in the window are similar and size is 8, we should early stop
+        if len(task.extra_state["similarity_cache"]) == 10:
+            early_stop = all(task.extra_state["similarity_cache"])
+        else:
+            early_stop = False
+        logger.info(f"Is early stop: {early_stop}")
+        return early_stop
 
     def _judge_is_complete(self, task: Task) -> bool:
         """Judge if the task is complete."""
@@ -590,6 +602,7 @@ class SearchWorker(BaseAgentWorker):
             ChatMessage(content=observation, role=MessageRole.ASSISTANT)
         )
         is_complete = self._judge_is_complete(task)
+        logger.info(f"Is complete: {is_complete}")
         if is_complete:
             task.extra_state["is_done"] = True
             return self._get_task_step_response(
