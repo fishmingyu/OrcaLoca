@@ -167,7 +167,7 @@ class EditWorker(BaseAgentWorker):
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return edit_output
 
-    def _process_edit_input(self, input: EditInput) -> Tuple[str, str]:
+    def _process_edit_input(self, input: EditInput) -> Tuple[str, str, str]:
         """Process edit input."""
         problem_statement = input.problem_statement
         bug_locations = input.bug_locations
@@ -187,11 +187,27 @@ class EditWorker(BaseAgentWorker):
         ]
         """
         bug_info = []
-
+        ref_info = []
         for bug in bug_locations:
             revise_info = self._edit_manager._get_bug_code(
                 bug.method_name, bug.file_name
             )
+            if bug.class_name != "":
+                reference_class_name = bug.class_name
+                reference_class_info = self._edit_manager._get_bug_code(
+                    reference_class_name, bug.file_name
+                )
+                start_line = reference_class_info.start_line
+                end_line = reference_class_info.end_line
+                range_str = f"{start_line}-{end_line}"
+                ref_info.append(
+                    {
+                        "file_name": reference_class_info.file,
+                        "class_name": bug.class_name,
+                        "range": range_str,
+                    }
+                )
+
             start_line = revise_info.start_line
             end_line = revise_info.end_line
             range_str = f"{start_line}-{end_line}"
@@ -203,7 +219,8 @@ class EditWorker(BaseAgentWorker):
                 }
             )
         bug_info_json = json.dumps({"bug_info": bug_info})
-        return problem_statement, bug_info_json
+        ref_info_json = json.dumps({"references": ref_info})
+        return problem_statement, bug_info_json, ref_info_json
 
     def _process_editor_tool(
         self,
@@ -312,13 +329,16 @@ class EditWorker(BaseAgentWorker):
             )
 
         tools = self.get_tools(task.input)
-        problem_statement, bug_code_input = self._process_edit_input(self._edit_input)
+        problem_statement, bug_code_input, ref_code_input = self._process_edit_input(
+            self._edit_input
+        )
         # add task input to chat history
         input_chat = self._edit_formatter.format(
             tools=tools,
             chat_history=task.extra_state["new_memory"].get_all(),
             problem_statement=problem_statement,
             bug_code_input=bug_code_input,
+            reference_code=ref_code_input,
         )
         logger.info(f"Input chat: {input_chat}")
 
