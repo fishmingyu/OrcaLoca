@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 
@@ -22,23 +23,8 @@ args_dict = {
     # "filter_instance": "^(django__django-15814)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-6938)$",
-    "filter_instance": "^(astropy__astropy-12907)$",
-}
-
-test_bug_locations = {
-    "bug_locations": [
-        {
-            "file_name": "astropy/modeling/separable.py",
-            "class_name": "",
-            "method_name": "_cstack",
-        },
-        {
-            "file_name": "astropy/modeling/separable.py",
-            "class_name": "",
-            "method_name": "_separable",
-        },
-    ]
+    "filter_instance": "^(astropy__astropy-6938)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
 }
 
 
@@ -78,7 +64,14 @@ def test_agent():
         reset_cached_repo(repo_path, base_commit)
 
         # extract test bug locations
-        bug_locations = test_bug_locations["bug_locations"]
+        # open the file ./output/instance_id/search_instance_id.json
+        # and extract the bug locations
+        search_output_path = (
+            f"./output/{inst['instance_id']}/searcher_{inst['instance_id']}.json"
+        )
+        with open(search_output_path, "r") as f:
+            search_output = json.load(f)
+        bug_locations = search_output["bug_locations"]
         edit_input = EditInput(
             problem_statement=problem_statement, bug_locations=bug_locations
         )

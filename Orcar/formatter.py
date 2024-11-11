@@ -346,6 +346,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
         chat_history: List[ChatMessage],
         problem_statement: str,
         bug_code_input: str,
+        reference_code: str,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         format_args = {
@@ -366,6 +367,11 @@ class EditChatFormatter(BaseAgentChatFormatter):
             content=f"""<Bug Code>\n{bug_code_input}\n</Bug Code>""",
         )
 
+        reference_code_msg = ChatMessage(
+            role=MessageRole.USER,
+            content=f"""<Reference Code>\n{reference_code}\n</Reference Code>""",
+        )
+
         output_format: str = "".join(json.dumps(EDIT_OUTPUT, indent=4))
         fmt_control_msg = ChatMessage(
             role=MessageRole.USER,
@@ -383,6 +389,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
             *chat_history,
             user_msg,
             bug_code_msg,
+            reference_code_msg,
             fmt_control_msg,
         ]
 
