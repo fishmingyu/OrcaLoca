@@ -77,7 +77,7 @@ def test_agent():
         )
         edit_agent = EditAgent(llm=llm, edit_input=edit_input, repo_path=repo_path)
 
-        response = edit_agent.chat(message="placeholders")
+        response = edit_agent.chat(message=problem_statement)
         print(response)
 
         # reset to base commit

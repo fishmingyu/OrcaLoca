@@ -10,6 +10,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from ..environment.benchmark import BenchmarkEnv, get_repo_dir
+from .inverted_index import InvertedIndex
 
 Loc = namedtuple("Loc", ["file_name", "node_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
@@ -77,6 +78,8 @@ class RepoGraph:
         elif repo_path is not None:
             self.swe_env = None
             self.repo_path = repo_path  # Path to the repository (absolute path)
+
+        self.inverted_index = InvertedIndex()
 
         self.save_log = save_log
         self.log_path = log_path  # Name of the output log directory
@@ -543,7 +546,9 @@ class RepoGraph:
             tree = ast.parse(file.read())
 
         # Build the graph for this file's content
-        visitor = AstVistor(self, file_node_name, self.function_definitions)
+        visitor = AstVistor(
+            self, file_node_name, self.function_definitions, self.inverted_index
+        )
         visitor.visit(tree)
 
     def build_attribute_from_env_file(self, file_path, file_node_name):
@@ -552,7 +557,9 @@ class RepoGraph:
         tree = ast.parse(file)
 
         # Build the graph for this file's content
-        visitor = AstVistor(self, file_node_name, self.function_definitions)
+        visitor = AstVistor(
+            self, file_node_name, self.function_definitions, self.inverted_index
+        )
         visitor.visit(tree)
 
     def build_references(self, repo_path):
@@ -718,12 +725,15 @@ class RepoGraph:
 
 
 class AstVistor(ast.NodeVisitor):
-    def __init__(self, graph_builder, file_node_name, function_definitions):
+    def __init__(
+        self, graph_builder, file_node_name, function_definitions, inverted_index
+    ):
         self.graph_builder = graph_builder
         self.function_definitions = function_definitions
         self.current_class = None
         self.current_function = None
         self.current_file = file_node_name
+        self.inverted_index = inverted_index
 
     def visit_FunctionDef(self, node):
         function_name = node.name
