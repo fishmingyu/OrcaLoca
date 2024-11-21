@@ -167,9 +167,8 @@ class EditWorker(BaseAgentWorker):
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return edit_output
 
-    def _process_edit_input(self, input: EditInput) -> Tuple[str, str, str]:
+    def _process_edit_input(self, input: EditInput) -> Tuple[str, str]:
         """Process edit input."""
-        problem_statement = input.problem_statement
         bug_locations = input.bug_locations
         # concat bug locations into a json like this
         """
@@ -220,7 +219,7 @@ class EditWorker(BaseAgentWorker):
             )
         bug_info_json = json.dumps({"bug_info": bug_info})
         ref_info_json = json.dumps({"references": ref_info})
-        return problem_statement, bug_info_json, ref_info_json
+        return bug_info_json, ref_info_json
 
     def _process_editor_tool(
         self,
@@ -312,7 +311,11 @@ class EditWorker(BaseAgentWorker):
         if "is_first" in step.step_state and step.step_state["is_first"]:
             memory = task.extra_state["new_memory"]
             # logger.info("step input: \n" + step.input)
-            memory.put(ChatMessage(content=step.input, role=MessageRole.USER))
+            # the first the problem statement
+            problem_statement = (
+                f"""<Problem Statement>{step.input}</Problem Statement>"""
+            )
+            memory.put(ChatMessage(content=problem_statement, role=MessageRole.USER))
             step.step_state["is_first"] = False
 
     def _run_step(
@@ -329,14 +332,11 @@ class EditWorker(BaseAgentWorker):
             )
 
         tools = self.get_tools(task.input)
-        problem_statement, bug_code_input, ref_code_input = self._process_edit_input(
-            self._edit_input
-        )
+        bug_code_input, ref_code_input = self._process_edit_input(self._edit_input)
         # add task input to chat history
         input_chat = self._edit_formatter.format(
             tools=tools,
             chat_history=task.extra_state["new_memory"].get_all(),
-            problem_statement=problem_statement,
             bug_code_input=bug_code_input,
             reference_code=ref_code_input,
         )

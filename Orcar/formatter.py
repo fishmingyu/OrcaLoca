@@ -344,7 +344,6 @@ class EditChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        problem_statement: str,
         bug_code_input: str,
         reference_code: str,
     ) -> List[ChatMessage]:
@@ -356,11 +355,6 @@ class EditChatFormatter(BaseAgentChatFormatter):
         }
 
         fmt_sys_header = self.system_header.format(**format_args)
-
-        user_msg = ChatMessage(
-            role=MessageRole.USER,
-            content=f"""<Problem Statement>\n{problem_statement}\n</Problem Statement>""",
-        )
 
         bug_code_msg = ChatMessage(
             role=MessageRole.USER,
@@ -387,7 +381,6 @@ class EditChatFormatter(BaseAgentChatFormatter):
         return [
             ChatMessage(role=MessageRole.SYSTEM, content=fmt_sys_header),
             *chat_history,
-            user_msg,
             bug_code_msg,
             reference_code_msg,
             fmt_control_msg,

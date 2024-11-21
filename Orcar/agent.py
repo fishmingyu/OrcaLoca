@@ -183,7 +183,9 @@ class OrcarAgent:
             # verbose=False,
         )
         self.reset_cached_repo(self.repo_path)
-        chat_response: AgentChatResponse = self.edit_agent.chat(message="placeholders")
+        chat_response: AgentChatResponse = self.edit_agent.chat(
+            message=edit_input.problem_statement
+        )
         edit_output = chat_response.response  # Patch output not finished yet
         self.logger.info(edit_output)
         self.reset_cached_repo(self.repo_path)
