@@ -191,6 +191,8 @@ class EditWorker(BaseAgentWorker):
             revise_info = self._edit_manager._get_bug_code(
                 bug.method_name, bug.file_name
             )
+            if revise_info is None:
+                continue
             if bug.class_name != "":
                 reference_class_name = bug.class_name
                 reference_class_info = self._edit_manager._get_bug_code(

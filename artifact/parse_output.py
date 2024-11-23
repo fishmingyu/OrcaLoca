@@ -121,6 +121,7 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
 
         # is_searcher_match = False
         json_dir = f"{output_dir}/{inst_id}/searcher_{inst_id}.json"
+        print(f"Checking {inst_id}")
         model_file_set = set()
         model_keyword_set = set()
         # print(inst_id)
@@ -223,7 +224,7 @@ def main():
         "-l",
         "--output_dir",
         default="./output",
-        help=f"The directory of the output dir",
+        help=f"The directory of the output dir(agent's output)",
     )
     args = parser.parse_args()
     output_dir: str = args.output_dir

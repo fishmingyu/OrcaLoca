@@ -322,12 +322,14 @@ class Editor:
             + "\n"
         )
 
-    def _get_bug_code(self, bug_query: str, file_path: str) -> ReviseInfo:
+    def _get_bug_code(self, bug_query: str, file_path: str) -> ReviseInfo | None:
         """Get the code snippet in the file."""
         # Get the code snippet in the file
+        # print(f"Searcing for bug query: {bug_query}, in file: {file_path}")
         locinfo: LocInfo = self.search_manager._get_query_in_file(file_path, bug_query)
+        if locinfo is None:
+            return None
         loc = locinfo.loc
-
         joined_path = os.path.join(self.repo_path, loc.file_name)
         content = self.search_manager._get_code_snippet(
             joined_path, loc.start_line, loc.end_line
