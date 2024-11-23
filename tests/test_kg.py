@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from Orcar.editor import Editor
 from Orcar.environment.benchmark import BenchmarkEnv
 from Orcar.environment.utils import ContainerBash, get_container
 from Orcar.load_cache_dataset import load_filter_hf_dataset
@@ -143,6 +144,20 @@ def test_search_callable_in_file():
     print(res)
 
 
+def test_editor_get_bug_code():
+    repo_path = "~/.orcar/django__django/"
+    expand_repo_path = os.path.expanduser(repo_path)
+    editor = Editor(repo_path=expand_repo_path)
+    bug_code = editor._get_bug_code(
+        "Command", "django/core/management/commands/sqlmigrate.py"
+    )
+    bug_code_handle = editor._get_bug_code(
+        "handle", "django/core/management/commands/sqlmigrate.py"
+    )
+    print(bug_code)
+    print(bug_code_handle)
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -151,5 +166,6 @@ if __name__ == "__main__":
     # test_env_build_graph()
     # test_fitsrec()
     # test_fitsrec_source_code()
-    test_search_callable_in_file()
+    # test_search_callable_in_file()
     # print_search_priority()
+    test_editor_get_bug_code()

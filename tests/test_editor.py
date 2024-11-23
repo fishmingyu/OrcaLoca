@@ -23,7 +23,7 @@ args_dict = {
     # "filter_instance": "^(django__django-15814)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(django__django-11039)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
 }
 
@@ -77,8 +77,13 @@ def test_agent():
         )
         edit_agent = EditAgent(llm=llm, edit_input=edit_input, repo_path=repo_path)
 
-        response = edit_agent.chat(message=problem_statement)
-        print(response)
+        chat_response = edit_agent.chat(message=problem_statement)
+        edit_output = chat_response.response
+
+        with open(
+            f"./output/{inst['instance_id']}/editor_{inst['instance_id']}.patch", "w"
+        ) as handle:
+            handle.write(edit_output)
 
         # reset to base commit
         reset_cached_repo(repo_path, base_commit)
