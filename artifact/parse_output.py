@@ -121,6 +121,7 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
 
         # is_searcher_match = False
         json_dir = f"{output_dir}/{inst_id}/searcher_{inst_id}.json"
+        print(f"Checking {inst_id}")
         model_file_set = set()
         model_keyword_set = set()
         # print(inst_id)
@@ -136,19 +137,19 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
                 output_dict[inst_id]["status"] = "Json invalid"
             else:
                 for loc in model_searcher_output["bug_locations"]:
-                    file_name = loc["file"]
+                    file_name = loc["file_name"]
                     if file_name and file_name[0] == "/":
                         file_name = file_name[1:]
                     model_file_set.add(file_name)
-                    keyword = loc["file"] + ":"
-                    if not (bool(loc["class"]) or bool(loc["method"])):
+                    keyword = loc["file_name"] + ":"
+                    if not (bool(loc["class_name"]) or bool(loc["method_name"])):
                         continue
-                    elif not loc["class"]:
-                        keyword += loc["method"]
-                    elif not loc["method"]:
-                        keyword += loc["class"]
+                    elif not loc["class_name"]:
+                        keyword += loc["method_name"]
+                    elif not loc["method_name"]:
+                        keyword += loc["class_name"]
                     else:
-                        keyword += loc["class"] + "." + loc["method"]
+                        keyword += loc["class_name"] + "." + loc["method_name"]
                     model_keyword_set.add(keyword)
                 if file_set.issubset(model_file_set):
                     file_match += 1
@@ -223,7 +224,7 @@ def main():
         "-l",
         "--output_dir",
         default="./output",
-        help=f"The directory of the output dir",
+        help=f"The directory of the output dir(agent's output)",
     )
     args = parser.parse_args()
     output_dir: str = args.output_dir
