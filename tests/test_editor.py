@@ -23,7 +23,7 @@ args_dict = {
     # "filter_instance": "^(django__django-15814)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    "filter_instance": "^(django__django-11039)$",
+    "filter_instance": "^(django__django-11099)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
 }
 
