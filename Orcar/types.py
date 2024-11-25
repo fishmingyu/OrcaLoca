@@ -58,14 +58,14 @@ class SearchResult(BaseReasoningStep):
     def get_search_input(self) -> str:
         """Get query."""
         """Different search_action
-            self.search_class_skeleton,
+            self.search_class,
             self.search_method_in_class,
             self.search_file_skeleton,
             self.search_callable,
             self.search_source_code,
         """
         search_input = ""
-        if self.search_action == "search_class_skeleton":
+        if self.search_action == "search_class":
             search_input = self.search_action_input["class_name"]
         elif self.search_action == "search_method_in_class":
             search_input = f"{self.search_action_input['class_name']}::{self.search_action_input['method_name']}"

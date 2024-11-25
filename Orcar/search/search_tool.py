@@ -23,7 +23,7 @@ class SearchManager:
     def get_search_functions(self) -> list:
         """Return a list of search functions."""
         return [
-            self.search_class_skeleton,
+            self.search_class,
             self.search_method_in_class,
             self.search_file_skeleton,
             self.search_callable,
@@ -143,7 +143,7 @@ class SearchManager:
         """
         return self.kg.dfs_search_callable_def(callable)
 
-    def _get_class_skeleton(self, class_name: str) -> Tuple[Loc, str] | None:
+    def _get_class(self, class_name: str) -> Tuple[Loc, str] | None:
         """Search the class in the knowledge graph.
 
         Args:
@@ -191,7 +191,7 @@ class SearchManager:
     def search_file_skeleton(self, file_name: str) -> str:
         """API to search the file skeleton
             If you want to see the structure of the file, including class and function signatures.
-            Be sure to call search_class_skeleton and search_func to get detailed information in the file.
+            Be sure to call search_class and search_func to get detailed information in the file.
 
         Args:
             file_name (str): The file name to search. Usage: search_file_contents("example.py")
@@ -220,22 +220,42 @@ class SearchManager:
         {res}
         """
 
-    def search_class_skeleton(self, class_name: str) -> str:
-        """API to search the class skeleton in given repo.
+    def search_class(self, class_name: str) -> str:
+        """API to search the class in given repo.
 
         Args:
             class_name (str): The class name to search.
 
         Returns:
-            str: The file path and the class skeleton.
+            str: The file path and the class content. If the content exceeds 100 lines, we will use class skeleton.
             Please call search_method_in_class to get detailed information of the method after skeleton search.
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
-        loc, snapshot = self._get_class_skeleton(class_name)
+        loc, snapshot = self._get_class(class_name)
         if loc is None:
-            return f"Cannot find the class skeleton of {class_name}"
+            return f"Cannot find the class name: {class_name}"
+        start_line = loc.start_line
+        end_line = loc.end_line
+        if end_line - start_line <= 100:
+            joined_path = os.path.join(self.repo_path, loc.file_name)
+            content = self._get_code_snippet(joined_path, start_line, end_line)
+            new_row = {
+                "search_action": "search_class",
+                "search_input": class_name,
+                "search_query": loc.node_name,
+                "search_content": content,
+            }
+            self.history = pd.concat(
+                [self.history, pd.DataFrame([new_row])], ignore_index=True
+            )
+            return f"""
+            File Path: {loc.file_name} \n
+            Class Content: \n
+            {content}
+            """
+
         new_row = {
-            "search_action": "search_class_skeleton",
+            "search_action": "search_class",
             "search_input": class_name,
             "search_query": loc.node_name,
             "search_content": snapshot,
@@ -251,7 +271,7 @@ class SearchManager:
 
     def search_method_in_class(self, class_name: str, method_name: str) -> str:
         """API to search the method in the class in given repo.
-        Don't try to use this API until you have already tried search_class_skeleton to get the class skeleton.
+        Don't try to use this API until you have already tried search_class to get the class skeleton.
         If you know the class name and method name.
 
         Args:
@@ -340,7 +360,7 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         # if type is class, we use the class snapshot
         if type == "class":
-            return self.search_class_skeleton(query)
+            return self.search_class(query)
 
         content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
         new_row = {
