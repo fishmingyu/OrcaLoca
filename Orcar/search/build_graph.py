@@ -265,7 +265,7 @@ class RepoGraph:
                         self.graph.nodes[node]["docstring"],
                         self.graph.nodes[node]["signature"],
                     )
-                    loc = self.graph.nodes[node]["loc"]
+                    loc = self.graph.nodes[node]["loc"]  # class loc
                 stack.extend(self.graph.neighbors(node))
         # setup the snapshot
         snapshot = ""

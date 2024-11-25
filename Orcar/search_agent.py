@@ -368,7 +368,7 @@ class SearchWorker(BaseAgentWorker):
                 return False
         # if we search_query is in the history, we don't need to call search_callable or search_class or search_func
         search_query = ""
-        if action.action == "search_class_skeleton":
+        if action.action == "search_class":
             search_query = action.action_input["class_name"]
         for history_action in action_history:
             if history_action.action == "search_callable":
@@ -382,12 +382,14 @@ class SearchWorker(BaseAgentWorker):
         action: SearchActionStep,
     ) -> List[SearchActionStep]:
         """Ranking the class methods."""
-        # if the action is search_class_skeleton, we should rank the class methods
-        if action.action == "search_class_skeleton":
+        # if the action is search_class, we should rank the class methods
+        if action.action == "search_class":
             class_name = action.action_input["class_name"]
             class_methods, methods_code = self._search_manager._get_class_methods(
                 class_name
             )
+            if len(class_methods) == 0:
+                return []
             # package the list of methods into a list of ChatMessage
             chat_messages: List[List[ChatMessage]] = []
             for method in methods_code:
@@ -641,8 +643,8 @@ class SearchWorker(BaseAgentWorker):
                 heuristic_search_result.heuristic >= 0
             ):  # if the heuristic is greater than 0, we should add it to the current search
                 # add search steps to task state
-                # also avoid search_step = search_class_skeleton
-                if search_step.action != "search_class_skeleton":
+                # also avoid search_step = search_class
+                if search_step.action != "search_class":
                     task.extra_state["current_search"].append(search_result)
 
         search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
