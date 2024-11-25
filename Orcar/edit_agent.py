@@ -188,12 +188,20 @@ class EditWorker(BaseAgentWorker):
         bug_info = []
         ref_info = []
         for bug in bug_locations:
-            revise_info = self._edit_manager._get_bug_code(
-                bug.method_name, bug.file_name
-            )
+            # first check if the bug is class
+            bug_is_class = False
+            if bug.method_name == "":
+                revise_info = self._edit_manager._get_bug_code(
+                    bug.class_name, bug.file_name
+                )
+                bug_is_class = True
+            else:
+                revise_info = self._edit_manager._get_bug_code(
+                    bug.method_name, bug.file_name
+                )
             if revise_info is None:
                 continue
-            if bug.class_name != "":
+            if bug.class_name != "" and not bug_is_class:
                 reference_class_name = bug.class_name
                 reference_class_info = self._edit_manager._get_bug_code(
                     reference_class_name, bug.file_name
