@@ -2,6 +2,7 @@ import glob
 import json
 import os
 from argparse import ArgumentParser, Namespace
+from typing import Set
 
 import swebench.harness.utils
 from swebench.harness.run_evaluation import main as run_evaluation_main
@@ -9,6 +10,8 @@ from swebench.harness.run_evaluation import main as run_evaluation_main
 from Orcar.log_utils import get_logger
 
 logger = get_logger(__name__)
+
+MODEL_NAME = "orcar"
 
 
 def get_args() -> Namespace:
@@ -75,15 +78,22 @@ def get_args() -> Namespace:
         help="Path to orcar root. Will collect output from root/output and write result to root/artifact/assets",
         required=True,
     )
+    parser.add_argument(
+        "--rerun_all_evaluations",
+        type=swebench.harness.utils.str2bool,
+        default=True,
+        help="Force rerun all evaluations by removing previous results",
+    )
     return parser.parse_args()
 
 
-def parse_output(output_path: str, prediction_path: str) -> None:
+def parse_output(output_path: str, prediction_path: str) -> Set[str]:
     # Get all patch files
     patch_files = glob.glob(
         os.path.join(output_path, "**/editor_*.patch"), recursive=True
     )
 
+    insts_found = set()
     # Process each file and write to jsonl
     with open(prediction_path, "w") as f:
         for patch_file in patch_files:
@@ -101,12 +111,24 @@ def parse_output(output_path: str, prediction_path: str) -> None:
             # Create output entry
             entry = {
                 "instance_id": instance_id,
-                "model_name_or_path": "orcar",
+                "model_name_or_path": MODEL_NAME,
                 "model_patch": patch_content,
             }
 
             # Write to jsonl file
             f.write(json.dumps(entry) + "\n")
+            insts_found.add(instance_id)
+    return insts_found
+
+
+def clear_previous_logs(assets_path: str, insts_found: Set[str]):
+    previous_log_folder = os.path.join(
+        assets_path, f"logs/run_evaluation/test/{MODEL_NAME}/"
+    )
+    for inst in insts_found:
+        previous_inst_folder = os.path.join(previous_log_folder, inst)
+        if os.path.exists(previous_inst_folder):
+            os.system(f"rm -rf {previous_inst_folder}")
 
 
 def main():
@@ -117,7 +139,10 @@ def main():
     prediction_path = os.path.abspath(os.path.join(assets_path, "all_preds.jsonl"))
     args.predictions_path = prediction_path
     output_path = os.path.join(orcar_root_path, "output")
-    parse_output(output_path, prediction_path)
+    insts_found = parse_output(output_path, prediction_path)
+    if args.rerun_all_evaluations:
+        clear_previous_logs(assets_path, insts_found)
+        delattr(args, "rerun_all_evaluations")
     original_cwd = os.getcwd()
     try:
         os.chdir(assets_path)
