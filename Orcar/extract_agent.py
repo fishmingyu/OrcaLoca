@@ -484,11 +484,11 @@ class ExtractWorker(BaseAgentWorker):
         for cmd in [
             f"cd /{repo_dir}",
             f"conda activate {repo_dir + '__' + inst['version']}",
-            f"git reset --hard {inst['base_commit']}",
         ]:
             self.env.run_with_handle(
                 cmd=cmd, err_msg=f"Inst {inst['instance_id']} failed at {cmd=}"
             )
+        self.env.reset_env_repo(f"/{repo_dir}", inst["base_commit"])
 
     def gen_output(self, task: Task) -> ExtractOutput:
         suspicious_code_from_tracer: List[CodeInfo] = task.extra_state[

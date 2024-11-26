@@ -1,6 +1,5 @@
 import ast
 import os
-import subprocess
 from ast import ClassDef, FunctionDef, Module
 from typing import List
 
@@ -10,6 +9,8 @@ from datasets import load_dataset
 from pydantic import BaseModel
 from tqdm import tqdm
 from unidiff import PatchSet
+
+from Orcar.environment.benchmark import reset_cached_repo
 
 
 class DiffNode(BaseModel):
@@ -181,16 +182,11 @@ def parse_patch(
     diff_locs: List[DiffLoc] = []
     repo = repo.split("/")[-1]
 
-    assert os.path.exists(
-        f"{base}/{repo}"
-    ), f"[Error] parse_patch: Cannot find {repo} at {base} (Repos should be cloned before running, try first run python dataset/repo_clone.py)"
-    proc = subprocess.Popen(
-        f"git reset --hard {base_commit}".split(" "),
-        cwd=f"{base}/{repo}",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    assert os.path.exists(f"{base}/{repo}"), (
+        f"[Error] parse_patch: Cannot find {repo} at {base}"
+        " (Repos should be cloned before running, try first run python dataset/repo_clone.py)"
     )
-    proc.wait()
+    reset_cached_repo(f"{base}/{repo}", base_commit)
 
     try:
         patch_set = PatchSet(patch)

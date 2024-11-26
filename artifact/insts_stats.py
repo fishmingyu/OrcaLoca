@@ -4,7 +4,7 @@ import os
 import subprocess
 from typing import Any, Dict
 
-from Orcar.environment.benchmark import get_repo_dir
+from Orcar.environment.benchmark import get_repo_dir, reset_cached_repo
 from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
 from Orcar.log_utils import get_logger
 from Orcar.search.build_graph import RepoGraph
@@ -24,9 +24,7 @@ def examine_inst(inst: Dict[str, Any], assets_path: str) -> Dict[str, Any]:
     to_dir = f"{assets_path}/{get_repo_dir(repo=inst['repo'])}"
     clone_repo(repo=inst["repo"], to_dir=to_dir)
     # git reset to commit
-    subprocess.run(
-        f"git reset --hard {inst['base_commit']}", shell=True, check=True, cwd=to_dir
-    )
+    reset_cached_repo(repo_path=to_dir, base_commit=inst["base_commit"])
     # calculate LoC
     lines_of_code = subprocess.run(
         "find . -name '*.py' | xargs cat | wc -l",

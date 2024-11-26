@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import traceback
 from enum import IntEnum
@@ -12,7 +11,7 @@ from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
 from Orcar.edit_agent import EditAgent
-from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir
+from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir, reset_cached_repo
 from Orcar.environment.utils import (
     ContainerBash,
     get_container,
@@ -136,50 +135,6 @@ class OrcarAgent:
 
         return search_output
 
-    def reset_cached_repo(self, repo_path):
-        """
-        Reset the repo to the base commit.
-        """
-        # Reset the repo
-        proc = subprocess.Popen(
-            f"git reset --hard HEAD".split(" "),
-            cwd=repo_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        proc.wait()
-        # Clean the repo
-        proc = subprocess.Popen(
-            f"git clean -fdx".split(" "),
-            cwd=repo_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        proc.wait()
-        # Update submodules
-        proc = subprocess.Popen(
-            f"git submodule update --init --recursive --force".split(" "),
-            cwd=repo_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        proc.wait()
-
-    def check_commit_id(self):
-        result = subprocess.run(
-            f"git rev-parse HEAD".split(" "),
-            cwd=self.repo_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        self.logger.info(
-            (
-                f"Confirmed commit id: {result.stdout.strip()} at {self.repo_path};\n"
-                f" Base commit id: {self.inst['base_commit']}"
-            )
-        )
-
     def run_edit_agent(self, search_output: SearchOutput) -> str:
         """
         Run the edit agent.
@@ -195,13 +150,13 @@ class OrcarAgent:
             edit_input=edit_input,
             # verbose=False,
         )
-        self.reset_cached_repo(self.repo_path)
+        reset_cached_repo(self.repo_path)
         chat_response: AgentChatResponse = self.edit_agent.chat(
             message=edit_input.problem_statement
         )
         edit_output = chat_response.response  # Patch output not finished yet
         self.logger.info(edit_output)
-        self.reset_cached_repo(self.repo_path)
+        reset_cached_repo(self.repo_path)
 
         if self.output_to_file:
             with open(f"{self.output_dir}/editor_{self.inst_id}.patch", "w") as handle:

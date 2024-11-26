@@ -1,10 +1,9 @@
 import argparse
 import json
 import os
-import subprocess
 
 from Orcar import EditAgent
-from Orcar.environment.benchmark import get_repo_dir
+from Orcar.environment.benchmark import get_repo_dir, reset_cached_repo
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.log_utils import get_logger, set_log_dir, switch_log_to_file
@@ -37,23 +36,6 @@ args_dict = {
     ),
     # "filter_instance": "^(astropy__astropy-12907)$",
 }
-
-
-def reset_cached_repo(repo_path, base_commit):
-    proc = subprocess.Popen(
-        f"git reset --hard {base_commit}".split(" "),
-        cwd=repo_path,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    proc.wait()
-    proc = subprocess.Popen(
-        f"git clean -fdx".split(" "),
-        cwd=repo_path,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    proc.wait()
 
 
 def test_agent():
