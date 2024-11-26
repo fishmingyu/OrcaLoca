@@ -26,6 +26,61 @@ def get_repo_dir(repo: str) -> str:
     return repo.replace("/", "__")
 
 
+def reset_cached_repo(repo_path, base_commit="HEAD"):
+    """
+    Reset the repo to the base commit.
+    """
+    cmds = [
+        f"git reset --hard {base_commit}",
+        f"git submodule deinit -f --all",
+        f"rm -rf .git/modules/*",
+        f"git clean -fdx",
+        f"git submodule update --init --recursive --force",
+    ]
+    for cmd in cmds:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=repo_path,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.wait()
+        out = proc.stdout.read().decode()
+        err = proc.stderr.read().decode()
+    # Assert git diff has no output
+    proc = subprocess.Popen(
+        f"git diff",
+        cwd=repo_path,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    proc.wait()
+    out = proc.stdout.read().decode()
+    err = proc.stderr.read().decode()
+    assert (not out) and (not err), (
+        f"Git diff has output after resetting repo {repo_path} to commit {base_commit}:\n"
+        "Output {out}\n"
+        "Error {err}\n"
+    )
+    # Check commit ID
+    if base_commit != "HEAD":
+        result_raw = subprocess.run(
+            f"git rev-parse HEAD",
+            cwd=repo_path,
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        result = result_raw.stdout.strip()
+        assert result == base_commit, (
+            f"Failed to reset repo {repo_path} to commit {base_commit}:\n"
+            f"Current commit: {result}\n"
+        )
+
+
 class BenchmarkEnv:
     def __init__(self, args, ctr_bash: ContainerBash):
         super().__init__()
@@ -66,15 +121,27 @@ class BenchmarkEnv:
             subprocess.run(cmd, shell=True, check=True)
         # git checkout to base commit
         base_commit = inst["base_commit"]
-        cmd = f"cd {host_path}; git reset --hard {base_commit}"
-        logger.info(f"Checking out to base commit: {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
+        logger.info(f"Checking out {host_path} to base commit: {base_commit}")
+        reset_cached_repo(host_path, base_commit)
 
     def remove_cache_repo(self, repo_name: str) -> None:
         repo_path = get_repo_dir(repo_name)
         host_path = os.path.join(self.cache_dir, repo_path)
         if os.path.exists(host_path):
             os.rmdir(host_path)
+
+    def reset_env_repo(self, repo_dir, commit):
+        for cmd in [
+            f"cd {repo_dir}",
+            f"git reset --hard {commit}",
+            f"git submodule deinit -f --all",
+            f"rm -rf .git/modules/*",
+            f"git clean -fdx",
+            f"git submodule update --init --recursive --force",
+        ]:
+            self.run_with_handle(
+                cmd=cmd, err_msg=f"Git failed in {repo_dir} with {cmd}"
+            )
 
     def read_text_file(self, path: str, timeout: int = 5) -> str:
         """
@@ -130,13 +197,8 @@ class BenchmarkEnv:
                 timeout=LONG_TIMEOUT,
                 output_log=True,
             )
-        for cmd in [
-            f"cd /{repo_dir}",
-            "git status",
-            f"git reset --hard {inst['environment_setup_commit']}",
-            "cd /",
-        ]:
-            self.run_with_handle(cmd=cmd, err_msg=f"Git failed in {repo_dir}")
+        self.reset_env_repo(f"/{repo_dir}", inst["environment_setup_commit"])
+        self.run(f"cd /")
 
     def get_cur_conda_envs(self):
         output = self.run("conda env list")

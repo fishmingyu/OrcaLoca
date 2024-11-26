@@ -125,7 +125,7 @@ def main():
         required=True,
         help=f"The ID of target instance",
     )
-    default_dataset = "princeton-nlp/SWE-bench_Verified"
+    default_dataset = "princeton-nlp/SWE-bench_Lite"
     parser.add_argument(
         "-d",
         "--dataset",

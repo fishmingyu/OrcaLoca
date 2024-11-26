@@ -458,3 +458,9 @@ Below is the issue for you to summarize:
 </input_description>
 """,
 }
+
+FORMAT_ORDER_PROMPT = r"""
+Your output should strictly follow the format below.
+{output_format}
+DO NOT SPEAK ANY REDUNDANT WORDS (like 'json', 'output', etc.)
+"""

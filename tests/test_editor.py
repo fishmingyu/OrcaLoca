@@ -1,13 +1,15 @@
 import argparse
 import json
 import os
-import subprocess
 
 from Orcar import EditAgent
-from Orcar.environment.benchmark import get_repo_dir
+from Orcar.environment.benchmark import get_repo_dir, reset_cached_repo
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
+from Orcar.log_utils import get_logger, set_log_dir, switch_log_to_file
 from Orcar.types import EditInput
+
+logger = get_logger(__name__)
 
 args_dict = {
     "model": "claude-3-5-sonnet-20241022",
@@ -23,26 +25,17 @@ args_dict = {
     # "filter_instance": "^(django__django-15814)$",
     # "filter_instance": "^(astropy__astropy-14182)$",
     # Long Issue Test
-    "filter_instance": "^(django__django-11099)$",
+    "filter_instance": (
+        "^("
+        "astropy__astropy-14995|django__django-12983|django__django-12700"
+        "|django__django-13590|django__django-15789|psf__requests-2674"
+        "|matplotlib__matplotlib-24149|django__django-14016|matplotlib__matplotlib-23913"
+        "|django__django-14999|django__django-11815|django__django-11848"
+        "|django__django-15790|astropy__astropy-6938"
+        ")$"
+    ),
     # "filter_instance": "^(astropy__astropy-12907)$",
 }
-
-
-def reset_cached_repo(repo_path, base_commit):
-    proc = subprocess.Popen(
-        f"git reset --hard {base_commit}".split(" "),
-        cwd=repo_path,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    proc.wait()
-    proc = subprocess.Popen(
-        f"git clean -fdx".split(" "),
-        cwd=repo_path,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    proc.wait()
 
 
 def test_agent():
@@ -53,7 +46,8 @@ def test_agent():
 
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
-
+        set_log_dir(f"./log/{inst['instance_id']}")
+        switch_log_to_file()
         repo_name = get_repo_dir(inst["repo"])
         problem_statement = inst["problem_statement"]
         base_dir = os.path.expanduser("~/.orcar")
