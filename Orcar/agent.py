@@ -137,6 +137,10 @@ class OrcarAgent:
         return search_output
 
     def reset_cached_repo(self, repo_path):
+        """
+        Reset the repo to the base commit.
+        """
+        # Reset the repo
         proc = subprocess.Popen(
             f"git reset --hard HEAD".split(" "),
             cwd=repo_path,
@@ -144,8 +148,17 @@ class OrcarAgent:
             stderr=subprocess.PIPE,
         )
         proc.wait()
+        # Clean the repo
         proc = subprocess.Popen(
             f"git clean -fdx".split(" "),
+            cwd=repo_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.wait()
+        # Update submodules
+        proc = subprocess.Popen(
+            f"git submodule update --init --recursive --force".split(" "),
             cwd=repo_path,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
