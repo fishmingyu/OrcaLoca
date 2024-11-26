@@ -105,6 +105,8 @@ class ExtractWorker(BaseAgentWorker):
             "inst": dict(),
             "token_cnts": list(),
             "reproducer_path": "",
+            "reproducer_pass": False,
+            "reproducer_code": "",
             "reproduce_remaining_trial": 3,
         }
         task.extra_state.update(task_state)
@@ -213,6 +215,7 @@ class ExtractWorker(BaseAgentWorker):
         repo_dir = get_repo_dir(inst["repo"])
         reproducer_path = f"/{repo_dir}/reproducer_{inst['instance_id']}.py"
         task.extra_state["reproducer_path"] = reproducer_path
+        task.extra_state["reproducer_code"] = issue_reproducer
         output_path = f"/tmp/tracer_output_{inst['instance_id']}.json"
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
@@ -322,6 +325,8 @@ class ExtractWorker(BaseAgentWorker):
         is_end = judge_step.is_successful or (
             task.extra_state["reproduce_remaining_trial"] == 0
         )
+        if judge_step.is_successful:
+            task.extra_state["reproducer_pass"] = True
 
         next_step_names = []
         if not is_end:
@@ -508,6 +513,9 @@ class ExtractWorker(BaseAgentWorker):
             suspicious_code=list(suspicious_code),
             suspicious_code_from_tracer=suspicious_code_from_tracer,
             related_source_code=related_source_code,
+            is_reproduce_pass=task.extra_state["reproducer_pass"],
+            reproduce_code=task.extra_state["reproducer_code"],
+            env_reproduce_path=task.extra_state["reproducer_path"],
         )
 
     def _run_step(self, step: TaskStep, task: Task) -> TaskStepOutput:

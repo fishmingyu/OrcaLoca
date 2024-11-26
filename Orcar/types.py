@@ -184,6 +184,9 @@ class ExtractOutput(BaseModel):
     suspicious_code: List[CodeInfo] = []
     suspicious_code_from_tracer: List[CodeInfo] = []
     related_source_code: str = ""
+    is_reproduce_pass: bool = False
+    reproduce_code: str = ""
+    env_reproduce_path: str = ""
 
 
 class SearchInput(BaseModel):
