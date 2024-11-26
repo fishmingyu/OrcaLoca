@@ -24,6 +24,7 @@ from .prompts import (
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
+    FORMAT_ORDER_PROMPT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
@@ -408,10 +409,9 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
             }
             fmt_example = example.format(**example_format_args)
             user_msg = EXTRACT_PROMPTS[handler]
+            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
             format_args = {
-                "output_format": "".join(
-                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
-                ),
+                "output_format": output_format,
                 "output_fields": EXTRACT_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
@@ -420,9 +420,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 ),
             }
             fmt_user_msg = user_msg.format(**format_args)
+            format_order_message = ChatMessage(
+                role=MessageRole.USER,
+                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+            )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+                format_order_message,
             ]
         elif handler == "parse":
             step_name = step.step_state["name"]
@@ -442,26 +447,29 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
             }
             fmt_example = example.format(**example_format_args)
             user_msg = EXTRACT_PROMPTS[handler]
+            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
             format_args = {
-                "output_format": "".join(
-                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
-                ),
+                "output_format": output_format,
                 "output_fields": EXTRACT_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["slices"][step_name],
             }
             fmt_user_msg = user_msg.format(**format_args)
+            format_order_message = ChatMessage(
+                role=MessageRole.USER,
+                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+            )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+                format_order_message,
             ]
         elif handler == "judge":
             user_msg = EXTRACT_PROMPTS[handler]
+            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
             format_args = {
-                "output_format": "".join(
-                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
-                ),
+                "output_format": output_format,
                 "output_fields": EXTRACT_FIELDS[handler],
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
@@ -471,9 +479,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "reproducer_log": task.extra_state["slices"]["reproduce_log_parse"],
             }
             fmt_user_msg = user_msg.format(**format_args)
+            format_order_message = ChatMessage(
+                role=MessageRole.USER,
+                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+            )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+                format_order_message,
             ]
         elif handler == "summarize":
             user_msg = EXTRACT_PROMPTS[handler]
@@ -491,18 +504,22 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 ),
             }
             fmt_example = example.format(**example_format_args)
+            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
             format_args = {
-                "output_format": "".join(
-                    json.dumps(EXTRACT_FORMATS[handler], indent=4)
-                ),
+                "output_format": output_format,
                 "output_fields": EXTRACT_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
             }
             fmt_user_msg = user_msg.format(**format_args)
+            format_order_message = ChatMessage(
+                role=MessageRole.USER,
+                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+            )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
+                format_order_message,
             ]
         raise NotImplementedError
