@@ -32,10 +32,9 @@ def reset_cached_repo(repo_path, base_commit="HEAD"):
     """
     cmds = [
         f"git reset --hard {base_commit}",
+        f"git submodule update --init --recursive --force",
         f"git submodule deinit -f --all",
         f"rm -rf .git/modules/*",
-        f"git clean -fdx",
-        f"git submodule update --init --recursive --force",
     ]
     for cmd in cmds:
         proc = subprocess.Popen(
@@ -134,10 +133,9 @@ class BenchmarkEnv:
         for cmd in [
             f"cd {repo_dir}",
             f"git reset --hard {commit}",
+            f"git submodule update --init --recursive --force",
             f"git submodule deinit -f --all",
             f"rm -rf .git/modules/*",
-            f"git clean -fdx",
-            f"git submodule update --init --recursive --force",
         ]:
             self.run_with_handle(
                 cmd=cmd, err_msg=f"Git failed in {repo_dir} with {cmd}"
