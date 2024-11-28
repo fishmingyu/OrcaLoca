@@ -14,9 +14,9 @@ args_dict = {
     "container_name": "test_0",
     "split": "test",
     # Short Issue Test
-    # "filter_instance": "^(matplotlib__matplotlib-23314)$",
-    # "filter_instance": "^(django__django-15814)$",
-    "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
+    # "filter_instance": "^(matplotlib__matplotlib-26020)$",
+    "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
@@ -107,11 +107,11 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    final_stage = "extract"
-    # final_stage = "search"
+    # final_stage = "extract"
+    final_stage = "search"
     # final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    # agent.set_redirect_log(True)
+    agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))

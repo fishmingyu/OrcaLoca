@@ -307,6 +307,13 @@ class SearchWorker(BaseAgentWorker):
 
         return search_result
 
+    def _check_search_result_skeleton(self, search_result: SearchResult) -> bool:
+        """Check if the search result is a Class Skeleton:"""
+        search_content = search_result.get_content()
+        if "Class Skeleton:" in search_content:
+            return True
+        return False
+
     def _concat_search_results(self, search_results: List[SearchResult]) -> str:
         """Join and Concatenate search results."""
         search_results_str = ""
@@ -464,6 +471,39 @@ class SearchWorker(BaseAgentWorker):
             return True
         return False
 
+    def _process_search_result(
+        self,
+        search_result: SearchResult,
+        task: Task,
+        search_step: SearchActionStep,
+        potential_bugs: List[BugLocations],
+    ) -> AgentChatResponse:
+        """Process search result."""
+        # calculate the heuristic of the search result
+        if search_result is not None:
+            heuristic_search_result = self._search_result_heuristic(
+                search_result, potential_bugs
+            )
+            if (
+                heuristic_search_result.heuristic >= 0
+            ):  # if the heuristic is greater than 0, we should add it to the current search
+                # add search steps to task state
+                # if action is search class, use special format
+                if search_step.action == "search_class":
+                    # check if the search result is a class skeleton
+                    check_skeleton = self._check_search_result_skeleton(search_result)
+                    # if the search result is a class skeleton
+                    if check_skeleton:
+                        # truncate the search result to first 100 characters
+                        search_result.search_content = search_result.search_content[
+                            :100
+                        ]
+                        search_result.search_content += "..."
+
+                task.extra_state["current_search"].append(search_result)
+
+        return self._get_response(search_result)
+
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
         memory.reset()
@@ -548,7 +588,7 @@ class SearchWorker(BaseAgentWorker):
             current_search=task.extra_state["search_cache"],
             current_queue=task.extra_state["search_queue"],
         )
-        logger.info(f"search cache: {task.extra_state['search_cache']}")
+        logger.info(f"Search cache: {task.extra_state['search_cache']}")
         logger.debug(f"Search content: {task.extra_state['instruct_memory'].get_all()}")
         # if task.extra_state["is_done"]:
         #     logger.info(input_chat)
@@ -630,22 +670,10 @@ class SearchWorker(BaseAgentWorker):
         logger.info(f"Top class methods: {top_class_methods}")
         # logger.info(f"Next Search Input: {search_result}")
 
-        # get the agent response, decide the next step input
-        agent_response = self._get_response(search_result)
-        # logger.info(f"Agent response: {agent_response.response}")
-
-        # calculate the heuristic of the search result
-        if search_result is not None:
-            heuristic_search_result = self._search_result_heuristic(
-                search_result, potential_bugs
-            )
-            if (
-                heuristic_search_result.heuristic >= 0
-            ):  # if the heuristic is greater than 0, we should add it to the current search
-                # add search steps to task state
-                # also avoid search_step = search_class
-                if search_step.action != "search_class":
-                    task.extra_state["current_search"].append(search_result)
+        # get the agent response
+        agent_response = self._process_search_result(
+            search_result, task, search_step, potential_bugs
+        )
 
         search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
         # every step recalcuate the heuristic of the search result
@@ -659,11 +687,9 @@ class SearchWorker(BaseAgentWorker):
         for _ in range(min(self.top_k_search, search_cache.qsize())):
             task.extra_state["search_cache"].append(search_cache.get().search_result)
 
-        # alternatively run search and observation steps
         task.extra_state["next_step_input"] = agent_response.response
         # logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
         # logger.info(f"Searched: {search_result.get_content()}")
-        # task.extra_state["next_step"] = self._assign_next_step(is_complete)
 
         return self._get_task_step_response(
             agent_response, step, "explore", task.extra_state["next_step_input"], False

@@ -158,6 +158,22 @@ def test_editor_get_bug_code():
     print(bug_code_handle)
 
 
+def test_matplotlib_axesgrid():
+    repo_path = "~/.orcar/matplotlib__matplotlib/"
+    expand_repo_path = os.path.expanduser(repo_path)
+    graph_builder = RepoGraph(
+        repo_path=expand_repo_path, save_log=True, log_path="log", build_kg=True
+    )
+    node = graph_builder.dfs_search_callable_def("AxesGrid")
+    if node:
+        print(
+            f"Snapshot of class AxesGrid: \
+            \n {node}"
+        )
+    else:
+        print("Class snapshot not found")
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -168,4 +184,5 @@ if __name__ == "__main__":
     # test_fitsrec_source_code()
     # test_search_callable_in_file()
     # print_search_priority()
-    test_editor_get_bug_code()
+    # test_editor_get_bug_code()
+    test_matplotlib_axesgrid()

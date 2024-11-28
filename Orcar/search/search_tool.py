@@ -232,7 +232,30 @@ class SearchManager:
             If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
         """
         loc, snapshot = self._get_class(class_name)
-        if loc is None:
+        if loc is None:  # first fall back to check if exists global variable
+            loc_gv_info = self.kg.dfs_search_callable_def(class_name)
+            if loc_gv_info is not None:  # if exists, return the global variable
+                # this is because the class name can be a global variable e.g. AxesGrid = ImageGrid
+                # ImageGrid is a class in matplotlib, but AxesGrid is a global variable
+                loc_gv = loc_gv_info.loc
+                start_line = loc_gv.start_line
+                end_line = loc_gv.end_line
+                joined_path = os.path.join(self.repo_path, loc_gv.file_name)
+                content = self._get_code_snippet(joined_path, start_line, end_line)
+                new_row = {
+                    "search_action": "search_class",
+                    "search_input": class_name,
+                    "search_query": loc_gv.node_name,
+                    "search_content": content,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""
+                File Path: {loc_gv.file_name} \n
+                Class Content: \n
+                {content}
+                """
             return f"Cannot find the class name: {class_name}"
         start_line = loc.start_line
         end_line = loc.end_line
