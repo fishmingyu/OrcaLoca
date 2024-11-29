@@ -118,6 +118,12 @@ DO NOT add any title or description outside the JSON structure.
 </OUTPUT FORMAT>
 """
 
+EDIT_REQUIREMENTS = r"""
+The revised code snippets should respect the requirements below:
+1. The revised code snippets should fix the issue mentioned in the problem statement.
+2. The code should be unit-test friendly. Specifically, the error messages should be deterministic.
+"""
+
 EXTRACT_FORMATS = {
     "slice": {
         "traceback_warning_log_slice": "log_slice_string",
@@ -459,7 +465,7 @@ Below is the issue for you to summarize:
 """,
 }
 
-FORMAT_ORDER_PROMPT = r"""
+FMT_CONTROL_PROMPT = r"""
 Your output should strictly follow the format below.
 {output_format}
 DO NOT SPEAK ANY REDUNDANT WORDS (like 'json', 'output', etc.)

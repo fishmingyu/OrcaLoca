@@ -19,12 +19,13 @@ from .prompts import (
     BUG_CODE_INPUT,
     BUG_OUTPUT,
     EDIT_OUTPUT,
+    EDIT_REQUIREMENTS,
     EDIT_SYSTEM_HEADER,
     EXTRACT_EXAMPLES,
     EXTRACT_FIELDS,
     EXTRACT_FORMATS,
     EXTRACT_PROMPTS,
-    FORMAT_ORDER_PROMPT,
+    FMT_CONTROL_PROMPT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
@@ -370,7 +371,8 @@ class EditChatFormatter(BaseAgentChatFormatter):
         output_format: str = "".join(json.dumps(EDIT_OUTPUT, indent=4))
         fmt_control_msg = ChatMessage(
             role=MessageRole.USER,
-            content=(
+            content=EDIT_REQUIREMENTS
+            + (
                 f"Please generate next step STRICTLY following given format:"
                 "<Output Format>"
                 f"{output_format}"
@@ -420,14 +422,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 ),
             }
             fmt_user_msg = user_msg.format(**format_args)
-            format_order_message = ChatMessage(
+            fmt_control_msg = ChatMessage(
                 role=MessageRole.USER,
-                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+                content=FMT_CONTROL_PROMPT.format(**{"output_format": output_format}),
             )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
-                format_order_message,
+                fmt_control_msg,
             ]
         elif handler == "parse":
             step_name = step.step_state["name"]
@@ -456,14 +458,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "input_description": task.extra_state["slices"][step_name],
             }
             fmt_user_msg = user_msg.format(**format_args)
-            format_order_message = ChatMessage(
+            fmt_control_msg = ChatMessage(
                 role=MessageRole.USER,
-                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+                content=FMT_CONTROL_PROMPT.format(**{"output_format": output_format}),
             )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
-                format_order_message,
+                fmt_control_msg,
             ]
         elif handler == "judge":
             user_msg = EXTRACT_PROMPTS[handler]
@@ -479,14 +481,14 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "reproducer_log": task.extra_state["slices"]["reproduce_log_parse"],
             }
             fmt_user_msg = user_msg.format(**format_args)
-            format_order_message = ChatMessage(
+            fmt_control_msg = ChatMessage(
                 role=MessageRole.USER,
-                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+                content=FMT_CONTROL_PROMPT.format(**{"output_format": output_format}),
             )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
-                format_order_message,
+                fmt_control_msg,
             ]
         elif handler == "summarize":
             user_msg = EXTRACT_PROMPTS[handler]
@@ -513,13 +515,13 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 "input_description": task.extra_state["inst"]["problem_statement"],
             }
             fmt_user_msg = user_msg.format(**format_args)
-            format_order_message = ChatMessage(
+            fmt_control_msg = ChatMessage(
                 role=MessageRole.USER,
-                content=FORMAT_ORDER_PROMPT.format(**{"output_format": output_format}),
+                content=FMT_CONTROL_PROMPT.format(**{"output_format": output_format}),
             )
             return [
                 sysheader,
                 ChatMessage(role=MessageRole.USER, content=fmt_user_msg),
-                format_order_message,
+                fmt_control_msg,
             ]
         raise NotImplementedError

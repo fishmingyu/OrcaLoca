@@ -252,3 +252,19 @@ class EditOutput(BaseModel):
     def get_content(self) -> str:
         """Get content."""
         return f"Feedback: {self.feedback}\n" f"Action Input: {self.action_input}"
+
+
+class VerifyOutput(BaseModel):
+    """The output of the Verify prompt."""
+
+    is_error: bool
+    error_msg: str
+    verify_log: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return (
+            f"is_error: {self.is_error}\n"
+            f"Error Message: {self.error_msg}\n"
+            f"Verify Log: {self.verify_log}"
+        )

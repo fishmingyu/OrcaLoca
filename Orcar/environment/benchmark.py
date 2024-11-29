@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from swebench.harness.constants import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.utils import get_environment_yml, get_requirements
@@ -136,6 +136,7 @@ class BenchmarkEnv:
             f"git submodule update --init --recursive --force",
             f"git submodule deinit -f --all",
             f"rm -rf .git/modules/*",
+            f"cd -",
         ]:
             self.run_with_handle(
                 cmd=cmd, err_msg=f"Git failed in {repo_dir} with {cmd}"
@@ -181,6 +182,13 @@ class BenchmarkEnv:
             raise RuntimeError(f"ErrCode: {exit_code}, {err_msg}")
         return output
 
+    def run_with_exit_code(
+        self, cmd: str, timeout: int = 5, output_log: bool = False
+    ) -> Tuple[str, int]:
+        output = self.run(cmd, timeout, output_log)
+        exit_code = get_exit_code(self.ctr_bash, timeout)
+        return output, exit_code
+
     def clone_repo(self, inst: Dict[str, Any]):
         self.run("cd /")
         cur_folders = self.run("ls").split("\n")
@@ -196,7 +204,6 @@ class BenchmarkEnv:
                 output_log=True,
             )
         self.reset_env_repo(f"/{repo_dir}", inst["environment_setup_commit"])
-        self.run(f"cd /")
 
     def get_cur_conda_envs(self):
         output = self.run("conda env list")
