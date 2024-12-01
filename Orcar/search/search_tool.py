@@ -19,6 +19,7 @@ class SearchManager:
     def _setup_graph(self):
         graph_builder = RepoGraph(repo_path=self.repo_path)
         self.kg = graph_builder
+        self.inverted_index = graph_builder.inverted_index
 
     def get_search_functions(self) -> list:
         """Return a list of search functions."""
@@ -401,3 +402,22 @@ class SearchManager:
         Code Snippet or Skeleton (if class): \n
         {content}
         """
+
+    # def fuzzy_search(self, query: str) -> str:
+    #     """API to search the query with fuzzy search.
+    #         Use this API when you are not sure about the query type, query's file path.
+
+    #     Args:
+    #         query (str): The query to search.
+
+    #     Returns:
+    #         str: The file path and the code snippet of the query. If query type is class, return the class skeleton.
+    #     """
+    #     locinfo = self.kg.fuzzy_search(query)
+    #     if locinfo is None:
+    #         return f"Cannot find the definition of {query}"
+    #     loc = locinfo.loc
+    #     type = locinfo.type
+
+    #     joined_path = os.path.join(self.repo_path, loc.file_name)
+    #     # if type is class, we use the

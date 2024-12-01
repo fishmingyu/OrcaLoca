@@ -174,6 +174,16 @@ def test_matplotlib_axesgrid():
         print("Class snapshot not found")
 
 
+def test_inverted_index():
+    repo_path = "~/.orcar/matplotlib__matplotlib/"
+    expand_repo_path = os.path.expanduser(repo_path)
+    graph_builder = RepoGraph(
+        repo_path=expand_repo_path, save_log=True, log_path="log", build_kg=True
+    )
+    inverted_index = graph_builder.inverted_index
+    print(inverted_index.search("AxesGrid"))
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -185,4 +195,5 @@ if __name__ == "__main__":
     # test_search_callable_in_file()
     # print_search_priority()
     # test_editor_get_bug_code()
-    test_matplotlib_axesgrid()
+    # test_matplotlib_axesgrid()
+    test_inverted_index()

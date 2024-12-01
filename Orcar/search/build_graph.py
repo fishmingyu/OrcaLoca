@@ -10,7 +10,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from ..environment.benchmark import BenchmarkEnv
-from .inverted_index import InvertedIndex
+from .inverted_index import IndexValue, InvertedIndex
 
 Loc = namedtuple("Loc", ["file_name", "node_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
@@ -78,6 +78,8 @@ class RepoGraph:
         )  # Map to store function definitions by their qualified name
         if build_kg:
             self.build_whole_graph(repo_path)
+            # remove single value key
+            self.inverted_index.remove_single_value_key()
 
     @staticmethod
     def extract_prefix(func_name):
@@ -457,7 +459,7 @@ class RepoGraph:
 
         return self.graph
 
-    def build_attribute_from_file(self, file_path, file_node_name):
+    def build_attribute_from_file(self, file_path: str, file_node_name: str):
         """Build a graph from a single file."""
         with open(file_path, "r") as file:
             tree = ast.parse(file.read())
@@ -489,6 +491,13 @@ class RepoGraph:
             if self.nodes_num < 100:  # only save the graph if it's small
                 self.save_graph()
             # self.save_graph()
+
+    def get_histogram_inv_index(self):
+        """Get the histogram of the inverted index."""
+        histogram = {}
+        for key, value in self.inverted_index.index.items():
+            histogram[key] = len(value)
+        return histogram
 
     def dump_graph(self):
         """Dump the graph as a dictionary."""
@@ -611,7 +620,11 @@ class RepoGraph:
 
 class AstVistor(ast.NodeVisitor):
     def __init__(
-        self, graph_builder, file_node_name, function_definitions, inverted_index
+        self,
+        graph_builder: RepoGraph,
+        file_node_name: str,
+        function_definitions: dict,
+        inverted_index: InvertedIndex,
     ):
         self.graph_builder = graph_builder
         self.function_definitions = function_definitions
@@ -632,6 +645,14 @@ class AstVistor(ast.NodeVisitor):
             else f"{self.current_class}::{function_name}"
         )
         self.function_definitions[function_name] = node_name
+        # Add the function to the inverted index
+        if self.current_class is None:
+            self.inverted_index.add(function_name, IndexValue(self.current_file))
+        else:  # method
+            self.inverted_index.add(
+                function_name,
+                IndexValue(self.current_file, self.current_class),
+            )
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
             file_name=self.current_file,
@@ -668,6 +689,8 @@ class AstVistor(ast.NodeVisitor):
             start_line=node.lineno,
             end_line=node.end_lineno,
         )
+        # Add the class to the inverted index
+        self.inverted_index.add(class_name, IndexValue(self.current_file))
         self.graph_builder.add_node(node_name, "class", class_name, docstring, node_loc)
 
         # Link class to the file node
@@ -694,6 +717,8 @@ class AstVistor(ast.NodeVisitor):
                         start_line=node.lineno,
                         end_line=node.end_lineno,
                     )
+                    # Add the global variable to the inverted index
+                    self.inverted_index.add(var_name, IndexValue(self.current_file))
                     self.graph_builder.add_node(
                         node_name, "global_variable", var_name, None, node_loc
                     )
