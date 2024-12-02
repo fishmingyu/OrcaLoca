@@ -12,12 +12,13 @@ logger = get_logger(__name__)
 
 
 def test_build_graph():
-    repo_path = "../../django"
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
     graph_builder = RepoGraph(
-        repo_path=repo_path, save_log=True, log_path="log", build_kg=True
+        repo_path=expand_repo_path, save_log=True, log_path="log", build_kg=True
     )
     # try to search function "add" in the graph
-    node = graph_builder.get_class_snapshot("ModelChoiceField")
+    node = graph_builder.dfs_get_class_snapshot("ModelChoiceField")
     if node:
         print(f"Snapshot of class ModelChoice   Field: \n {node}")
     else:
@@ -25,36 +26,39 @@ def test_build_graph():
 
 
 def test_search_manager():
-    repo_path = "../../django"
-    search_manager = SearchManager(repo_path=repo_path)
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
     # try to search function "to_python" in ModelChoiceField class
-    file_path, code_snippet = search_manager.search_method_in_class(
-        "ModelChoiceField", "to_python"
+    fuzzy_search_result = search_manager.fuzzy_search("ModelChoiceField")
+    print(fuzzy_search_result)
+    dataframe = search_manager.get_frame_from_history(
+        action="fuzzy_search", input="ModelChoiceField"
     )
-    print(code_snippet)
+    file_path = dataframe["file_path"].values[0]
+
+    # try exact search
+    exact_search_result = search_manager.exact_search(
+        query="to_python", file_path=file_path, containing_class="ModelChoiceField"
+    )
+    print(exact_search_result)
 
 
-def test_local_build_graph():
-    repo_graph = "./test_repo"
-    graph_builder = RepoGraph(
-        repo_path=repo_graph, save_log=True, log_path="log", build_kg=True
+def test_exact_search():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    # try to search function "to_python" in ModelChoiceField class
+    exact_search_result = search_manager.exact_search(
+        query="ModelChoiceField",
+        file_path="django/forms/models.py",
+        containing_class="ModelChoiceField",
     )
-    # try to search function "add" in the graph
-    node = graph_builder.get_class_snapshot("B")
-    if node:
-        print(f"Snapshot of class B: \n {node}")
-    else:
-        print("Class snapshot not found")
-    node_get_sum = graph_builder.dfs_search_method_in_class("B", "sss")
-    if node_get_sum:
-        print(f"Found the function definition at {node_get_sum}")
-    else:
-        print("Function definition not found")
-    file_content = graph_builder.dfs_search_file_skeleton("a.py")
-    if file_content:
-        print(f"File content of a.py: \n {file_content}")
-    else:
-        print("File content not found")
+    print(exact_search_result)
+    exact_search_result = search_manager.exact_search(
+        query="ASCIIUsernameValidator", file_path="django/contrib/auth/validators.py"
+    )
+    print(exact_search_result)
 
 
 def test_env_build_graph():
@@ -82,7 +86,7 @@ def test_env_build_graph():
         graph_builder = RepoGraph(
             repo_path=env.cache_dir, save_log=True, log_path="log", build_kg=True
         )
-        node = graph_builder.get_class_snapshot("ModelChoiceField")
+        node = graph_builder.dfs_get_class_snapshot("ModelChoiceField")
         if node:
             print(f"Snapshot of class ModelChoice   Field: \n {node}")
         else:
@@ -102,7 +106,7 @@ def test_fitsrec():
     else:
         print("File contents not found")
 
-    class_ = graph_builder.get_class_snapshot("FITS_rec")
+    class_ = graph_builder.dfs_get_class_snapshot("FITS_rec")
     if class_:
         print(
             f"Snapshot of class FITS_rec: \
@@ -133,13 +137,16 @@ def test_search_callable_in_file():
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
     callable_name = "_scale_back_ascii"
-    code_snippet = search_manager.search_callable(
-        callable_name, file_path="astropy/io/fits/fitsrec.py"
+    code_snippet = search_manager.exact_search(
+        query=callable_name,
+        file_path="astropy/io/fits/fitsrec.py",
+        containing_class="FITS_rec",
     )
+
     print(code_snippet)
 
     res = search_manager.get_query_from_history(
-        action="search_callable", input="_scale_back_ascii"
+        action="exact_search", input=callable_name
     )
     print(res)
 
@@ -184,10 +191,19 @@ def test_inverted_index():
     print(inverted_index.search("AxesGrid"))
 
 
+def test_disambuiguate():
+    repo_path = "~/.orcar/matplotlib__matplotlib/"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    res = search_manager.fuzzy_search("AxesGrid")
+    print(res)
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
     # test_search_manager()
+    test_exact_search()
     # test_local_build_graph()
     # test_env_build_graph()
     # test_fitsrec()
@@ -196,4 +212,5 @@ if __name__ == "__main__":
     # print_search_priority()
     # test_editor_get_bug_code()
     # test_matplotlib_axesgrid()
-    test_inverted_index()
+    # test_inverted_index()
+    # test_disambuiguate()

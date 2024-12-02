@@ -280,6 +280,41 @@ class RepoGraph:
 
         return loc, snapshot
 
+    def direct_get_class_snapshot_from_node(self, class_node: str) -> str | None:
+        """Get the snapshot of a class from the node name of the class."""
+        # check if the node exists in the graph
+        if not self.check_node_exists(class_node):
+            return None
+        # Get the class node
+        class_node_data = self.graph.nodes[class_node]
+        # Check if the node is a class
+        if class_node_data["type"] != "class":
+            return None
+        # class snapshot
+        class_snapshot = Snapshot(
+            class_node_data["docstring"], class_node_data["signature"]
+        )
+        # Get all the methods in the class
+        methods = {}
+        for method_node in self.graph.neighbors(class_node):
+            method_name = method_node.split("::")[-1]
+            method_data = self.graph.nodes[method_node]
+            method_snapshot = Snapshot(
+                method_data["docstring"], method_data["signature"]
+            )
+            methods[method_name] = method_snapshot
+
+        # setup the snapshot
+        snapshot = ""
+        snapshot += f"Class Signature: {class_snapshot.signature}\n"
+        snapshot += f"Docstring: {class_snapshot.docstring}\n"
+        for method_name, method_snapshot in methods.items():
+            snapshot += f"\nMethod: {method_name}\n"
+            snapshot += f"Method Signature: {method_snapshot.signature}\n"
+            snapshot += f"Docstring: {method_snapshot.docstring}\n"
+
+        return snapshot
+
     def get_class_methods(self, class_name) -> List[Loc] | None:
         root = self.root_node
         stack = [root]
