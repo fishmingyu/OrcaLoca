@@ -181,6 +181,17 @@ class RepoGraph:
     def nodes_num(self):
         return self.graph.number_of_nodes()
 
+    # exact get query
+    def get_query(self, query) -> LocInfo | None:
+        # query is in node name format
+        for node in self.graph.nodes:
+            if node == query:
+                return LocInfo(
+                    loc=self.graph.nodes[node]["loc"],
+                    type=self.graph.nodes[node]["type"],
+                )
+        return None
+
     # high level search for the callable function or class definition in the graph
     def dfs_search_callable_def(self, query) -> LocInfo | None:
         root = self.root_node
@@ -223,7 +234,7 @@ class RepoGraph:
         return None
 
     # dfs search for the methods in a class and its docstring
-    def get_class_snapshot(self, class_name) -> Tuple[Loc, str] | None:
+    def dfs_get_class_snapshot(self, class_name) -> Tuple[Loc, str] | None:
         root = self.root_node
         stack = [root]
         visited = set()
