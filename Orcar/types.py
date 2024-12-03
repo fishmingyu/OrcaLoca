@@ -58,24 +58,31 @@ class SearchResult(BaseReasoningStep):
     def get_search_input(self) -> str:
         """Get query."""
         """Different search_action
-            self.search_class,
-            self.search_method_in_class,
+            self.exact_search,
+            self.fuzzy_search,
             self.search_file_skeleton,
-            self.search_callable,
             self.search_source_code,
         """
         search_input = ""
-        if self.search_action == "search_class":
-            search_input = self.search_action_input["class_name"]
-        elif self.search_action == "search_method_in_class":
-            search_input = f"{self.search_action_input['class_name']}::{self.search_action_input['method_name']}"
+        if self.search_action == "exact_search":
+            # check contains containing_class
+            if "containing_class" in self.search_action_input:
+                # avoid query==containing_class
+                if (
+                    self.search_action_input["query"]
+                    == self.search_action_input["containing_class"]
+                ):
+                    search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['query']}"
+                else:
+                    search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['containing_class']}::{self.search_action_input['query']}"
+            else:
+                search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['query']}"
+        elif self.search_action == "fuzzy_search":
+            search_input = self.search_action_input["query"]
         elif self.search_action == "search_file_skeleton":
             search_input = self.search_action_input["file_name"]
-        elif self.search_action == "search_callable":
-            search_input = self.search_action_input["query"]
         elif self.search_action == "search_source_code":
-            search_input = self.search_action_input["file_path"]
-
+            search_input = self.search_action_input["query"]
         return search_input
 
 

@@ -480,6 +480,7 @@ class SearchWorker(BaseAgentWorker):
     ) -> AgentChatResponse:
         """Process search result."""
         # calculate the heuristic of the search result
+        agent_response = self._get_response(search_result)
         if search_result is not None:
             heuristic_search_result = self._search_result_heuristic(
                 search_result, potential_bugs
@@ -501,8 +502,8 @@ class SearchWorker(BaseAgentWorker):
                         search_result.search_content += "..."
 
                 task.extra_state["current_search"].append(search_result)
-
-        return self._get_response(search_result)
+        # return the original search result
+        return agent_response
 
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
@@ -670,7 +671,7 @@ class SearchWorker(BaseAgentWorker):
         logger.info(f"Top class methods: {top_class_methods}")
         # logger.info(f"Next Search Input: {search_result}")
 
-        # get the agent response
+        # get the agent response; decide the current_search.
         agent_response = self._process_search_result(
             search_result, task, search_step, potential_bugs
         )

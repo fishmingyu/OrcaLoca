@@ -9,8 +9,8 @@ import networkx as nx
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ..environment.benchmark import BenchmarkEnv, get_repo_dir
-from .inverted_index import InvertedIndex
+from ..environment.benchmark import BenchmarkEnv
+from .inverted_index import IndexValue, InvertedIndex
 
 Loc = namedtuple("Loc", ["file_name", "node_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
@@ -47,16 +47,12 @@ exclude_patterns = [
 class RepoGraph:
     def __init__(
         self,
-        swe_env: BenchmarkEnv = None,
         repo_path: str = None,
         save_log: bool = False,
         log_path: str = None,
         build_kg: bool = True,
     ):
         """
-        swe_env: BenchmarkEnv
-            The environment to build the graph (Caution: we don't recommend using this option,
-            since it's extremely slow due to low rate of serial communication)
         repo_path: str
             The path to the repository to build the graph
         save_log: bool
@@ -68,15 +64,9 @@ class RepoGraph:
         """
         self.graph = nx.DiGraph()
         # Check that at least one of swe_env or repo_path is provided
-        if swe_env is None and repo_path is None:
-            raise ValueError("Either 'swe_env' or 'repo_path' must be provided.")
-        # check swe_env is an instance of BenchmarkEnv
-        if not isinstance(swe_env, BenchmarkEnv) and swe_env is not None:
-            raise ValueError("swe_env must be an instance of BenchmarkEnv")
-        if swe_env is not None:
-            self.swe_env = swe_env
-        elif repo_path is not None:
-            self.swe_env = None
+        if repo_path is None:
+            raise ValueError("repo_path must be provided")
+        else:
             self.repo_path = repo_path  # Path to the repository (absolute path)
 
         self.inverted_index = InvertedIndex()
@@ -87,11 +77,9 @@ class RepoGraph:
             {}
         )  # Map to store function definitions by their qualified name
         if build_kg:
-            if self.swe_env is not None:
-                self.repo_path = "/" + get_repo_dir(self.swe_env.ds.iloc[0]["repo"])
-                self.build_whole_graph_from_env(self.repo_path, swe_env)
-            else:
-                self.build_whole_graph(repo_path)
+            self.build_whole_graph(repo_path)
+            # remove single value key
+            self.inverted_index.remove_single_value_key()
 
     @staticmethod
     def extract_prefix(func_name):
@@ -193,6 +181,17 @@ class RepoGraph:
     def nodes_num(self):
         return self.graph.number_of_nodes()
 
+    # exact get query
+    def get_query(self, query) -> LocInfo | None:
+        # query is in node name format
+        for node in self.graph.nodes:
+            if node == query:
+                return LocInfo(
+                    loc=self.graph.nodes[node]["loc"],
+                    type=self.graph.nodes[node]["type"],
+                )
+        return None
+
     # high level search for the callable function or class definition in the graph
     def dfs_search_callable_def(self, query) -> LocInfo | None:
         root = self.root_node
@@ -235,7 +234,7 @@ class RepoGraph:
         return None
 
     # dfs search for the methods in a class and its docstring
-    def get_class_snapshot(self, class_name) -> Tuple[Loc, str] | None:
+    def dfs_get_class_snapshot(self, class_name) -> Tuple[Loc, str] | None:
         root = self.root_node
         stack = [root]
         visited = set()
@@ -280,6 +279,41 @@ class RepoGraph:
             snapshot += f"Docstring: {method_snapshot.docstring}\n"
 
         return loc, snapshot
+
+    def direct_get_class_snapshot_from_node(self, class_node: str) -> str | None:
+        """Get the snapshot of a class from the node name of the class."""
+        # check if the node exists in the graph
+        if not self.check_node_exists(class_node):
+            return None
+        # Get the class node
+        class_node_data = self.graph.nodes[class_node]
+        # Check if the node is a class
+        if class_node_data["type"] != "class":
+            return None
+        # class snapshot
+        class_snapshot = Snapshot(
+            class_node_data["docstring"], class_node_data["signature"]
+        )
+        # Get all the methods in the class
+        methods = {}
+        for method_node in self.graph.neighbors(class_node):
+            method_name = method_node.split("::")[-1]
+            method_data = self.graph.nodes[method_node]
+            method_snapshot = Snapshot(
+                method_data["docstring"], method_data["signature"]
+            )
+            methods[method_name] = method_snapshot
+
+        # setup the snapshot
+        snapshot = ""
+        snapshot += f"Class Signature: {class_snapshot.signature}\n"
+        snapshot += f"Docstring: {class_snapshot.docstring}\n"
+        for method_name, method_snapshot in methods.items():
+            snapshot += f"\nMethod: {method_name}\n"
+            snapshot += f"Method Signature: {method_snapshot.signature}\n"
+            snapshot += f"Docstring: {method_snapshot.docstring}\n"
+
+        return snapshot
 
     def get_class_methods(self, class_name) -> List[Loc] | None:
         root = self.root_node
@@ -471,90 +505,10 @@ class RepoGraph:
 
         return self.graph
 
-    def build_attribute_from_env_repo(self, repo_path):
-        """Build a graph from a repository in the environment."""
-        for root, dirs, files in self.swe_env.walk(repo_path):
-            # Add a node for the directory
-            dir_node_name = os.path.relpath(root, repo_path)
-            loc = Loc(
-                file_name=dir_node_name,
-                node_name=dir_node_name,
-                start_line=0,
-                end_line=0,
-            )
-            self.add_node(dir_node_name, "directory", loc=loc)
-
-            # Skip directories that match any exclude pattern
-            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
-                continue
-
-            dirs[:] = [
-                sub_dir
-                for sub_dir in dirs
-                if not any(
-                    os.path.join(dir_node_name, sub_dir).startswith(pattern)
-                    for pattern in exclude_patterns
-                )
-            ]
-
-            # Process each subdirectory
-            for sub_dir in dirs:
-                sub_dir_path = os.path.join(root, sub_dir)
-                sub_dir_node_name = os.path.relpath(sub_dir_path, repo_path)
-
-                # Add a node for each subdirectory
-                loc = Loc(
-                    file_name=sub_dir_node_name,
-                    node_name=sub_dir_node_name,
-                    start_line=0,
-                    end_line=0,
-                )
-                self.add_node(sub_dir_node_name, "directory")
-                self.add_edge(dir_node_name, sub_dir_node_name, "contains")
-
-            for file in files:
-                # now only consider python files
-                if file.endswith(".py"):
-                    file_path = os.path.join(root, file)
-                    file_node_name = os.path.relpath(file_path, repo_path)
-
-                    # Skip files that match any exclude pattern
-                    if any(
-                        file_node_name.startswith(pattern)
-                        for pattern in exclude_patterns
-                    ):
-                        continue
-
-                    # Add a node for the file and link it to the directory
-                    loc = Loc(
-                        file_name=file_node_name,
-                        node_name=file_node_name,
-                        start_line=0,
-                        end_line=0,
-                    )
-                    self.add_node(file_node_name, "file", loc=loc)
-                    self.add_edge(dir_node_name, file_node_name, "contains")
-
-                    # Build the graph for the file's content
-                    self.build_attribute_from_env_file(file_path, file_node_name)
-
-        return self.graph
-
-    def build_attribute_from_file(self, file_path, file_node_name):
+    def build_attribute_from_file(self, file_path: str, file_node_name: str):
         """Build a graph from a single file."""
         with open(file_path, "r") as file:
             tree = ast.parse(file.read())
-
-        # Build the graph for this file's content
-        visitor = AstVistor(
-            self, file_node_name, self.function_definitions, self.inverted_index
-        )
-        visitor.visit(tree)
-
-    def build_attribute_from_env_file(self, file_path, file_node_name):
-        """Build a graph from a single file in the environment."""
-        file = self.swe_env.read_text_file(file_path)
-        tree = ast.parse(file)
 
         # Build the graph for this file's content
         visitor = AstVistor(
@@ -570,14 +524,6 @@ class RepoGraph:
         )
         self.reference_builder.build_references(repo_path)
 
-    def build_references_from_env(self, repo_path, swe_env: BenchmarkEnv):
-        """Build reference edges between functions in the graph."""
-        knowledge_graph = self.graph
-        self.reference_builder = ReferenceBuilder(
-            knowledge_graph, self.function_definitions, swe_env
-        )
-        self.reference_builder.build_references_from_env(repo_path)
-
     def build_whole_graph(self, repo_path):
         """Build the whole graph from a repository."""
         self.build_attribute_from_repo(repo_path)
@@ -592,18 +538,12 @@ class RepoGraph:
                 self.save_graph()
             # self.save_graph()
 
-    def build_whole_graph_from_env(self, repo_path, swe_env: BenchmarkEnv):
-        """Build the whole graph from a repository in the environment."""
-        self.build_attribute_from_env_repo(repo_path)
-        self.build_references_from_env(repo_path, swe_env)
-        if self.save_log:
-            if self.log_path is None:
-                self.log_path = "log"
-            if not os.path.exists(self.log_path):
-                os.makedirs(self.log_path)
-            self.dump_graph()
-            if self.nodes_num < 100:
-                self.save_graph()
+    def get_histogram_inv_index(self):
+        """Get the histogram of the inverted index."""
+        histogram = {}
+        for key, value in self.inverted_index.index.items():
+            histogram[key] = len(value)
+        return histogram
 
     def dump_graph(self):
         """Dump the graph as a dictionary."""
@@ -726,7 +666,11 @@ class RepoGraph:
 
 class AstVistor(ast.NodeVisitor):
     def __init__(
-        self, graph_builder, file_node_name, function_definitions, inverted_index
+        self,
+        graph_builder: RepoGraph,
+        file_node_name: str,
+        function_definitions: dict,
+        inverted_index: InvertedIndex,
     ):
         self.graph_builder = graph_builder
         self.function_definitions = function_definitions
@@ -747,6 +691,14 @@ class AstVistor(ast.NodeVisitor):
             else f"{self.current_class}::{function_name}"
         )
         self.function_definitions[function_name] = node_name
+        # Add the function to the inverted index
+        if self.current_class is None:
+            self.inverted_index.add(function_name, IndexValue(self.current_file))
+        else:  # method
+            self.inverted_index.add(
+                function_name,
+                IndexValue(self.current_file, self.current_class),
+            )
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
             file_name=self.current_file,
@@ -783,6 +735,8 @@ class AstVistor(ast.NodeVisitor):
             start_line=node.lineno,
             end_line=node.end_lineno,
         )
+        # Add the class to the inverted index
+        self.inverted_index.add(class_name, IndexValue(self.current_file))
         self.graph_builder.add_node(node_name, "class", class_name, docstring, node_loc)
 
         # Link class to the file node
@@ -809,6 +763,8 @@ class AstVistor(ast.NodeVisitor):
                         start_line=node.lineno,
                         end_line=node.end_lineno,
                     )
+                    # Add the global variable to the inverted index
+                    self.inverted_index.add(var_name, IndexValue(self.current_file))
                     self.graph_builder.add_node(
                         node_name, "global_variable", var_name, None, node_loc
                     )
@@ -846,28 +802,6 @@ class ReferenceBuilder:
                         continue
                     with open(file_path, "r") as file:
                         tree = ast.parse(file.read())
-                        self._visit_tree(tree, rel_file_path)
-
-    def build_references_from_env(self, repo_path):
-        """Build reference edges between functions in the graph."""
-        for root, _, files in self.swe_env.walk(repo_path):
-            # Relative path of the current directory
-            dir_node_name = os.path.relpath(root, repo_path)
-            # Skip directories that match any exclude pattern
-            if any(dir_node_name.startswith(pattern) for pattern in exclude_patterns):
-                continue
-            for file in files:
-                if file.endswith(".py"):
-                    file_path = os.path.join(root, file)
-                    rel_file_path = os.path.relpath(file_path, repo_path)
-                    # Skip files that match any exclude pattern
-                    if any(
-                        rel_file_path.startswith(pattern)
-                        for pattern in exclude_patterns
-                    ):
-                        continue
-                    with self.swe_env.read_text_file(file_path, "r") as file:
-                        tree = ast.parse(file)
                         self._visit_tree(tree, rel_file_path)
 
     def _visit_tree(self, tree, file_path):

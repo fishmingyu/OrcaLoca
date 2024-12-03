@@ -11,7 +11,14 @@ from .build_graph import Loc, LocInfo, RepoGraph
 class SearchManager:
     def __init__(self, repo_path) -> None:
         self.history = pd.DataFrame(
-            columns=["search_action", "search_input", "search_query", "search_content"]
+            columns=[
+                "search_action",
+                "search_input",
+                "search_query",
+                "search_content",
+                "query_type",
+                "file_path",
+            ]
         )
         self.repo_path = repo_path
         self._setup_graph()
@@ -19,16 +26,24 @@ class SearchManager:
     def _setup_graph(self):
         graph_builder = RepoGraph(repo_path=self.repo_path)
         self.kg = graph_builder
+        self.inverted_index = graph_builder.inverted_index
 
     def get_search_functions(self) -> list:
         """Return a list of search functions."""
         return [
-            self.search_class,
-            self.search_method_in_class,
             self.search_file_skeleton,
-            self.search_callable,
             self.search_source_code,
+            self.fuzzy_search,
+            self.exact_search,
         ]
+
+    def get_frame_from_history(self, action: str, input: str) -> pd.DataFrame:
+        # Get the search result from the history using the search_action and search_input
+        result = self.history[
+            (self.history["search_action"] == action)
+            & (self.history["search_input"] == input)
+        ]
+        return result
 
     def get_query_from_history(self, action: str, input: str) -> str | None:
         # Get the search_query from the history using the search_action and search_input
@@ -69,17 +84,16 @@ class SearchManager:
             lines = f.readlines()
             return "".join(lines[start - 1 : end])
 
-    def _get_query_in_file(self, file_path: str, query: str) -> LocInfo | None:
-        """Get the query definition in the file. Search the query in KG.
+    def _get_exact_loc(self, query: str) -> LocInfo | None:
+        """Get the exact location of the query in the knowledge graph.
 
         Args:
-            file_path (str): The file path to search.
-            query (str): The query to search. It can be a function, class, method or global variable.
+            query (str): The query to search.
 
         Returns:
-            LocInfo | None: The locinfo of the query.
+            LocInfo | None: The location of the query.
         """
-        return self.kg.dfs_search_query_in_file(file_path, query)
+        return self.kg.get_query(query)
 
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
@@ -127,7 +141,7 @@ class SearchManager:
             file_name (str): The file name to get the skeleton.
 
         Returns:
-            str | None: The skeleton of the file or None if not found.
+            Tuple[Loc, str] | None: The location of the file and the file skeleton.
         """
         return self.kg.dfs_search_file_skeleton(file_name)
 
@@ -139,32 +153,31 @@ class SearchManager:
             it can be a class or a function name (including methods).
 
         Returns:
-            Loc: The location of the function/class definition.
+            LocInfo: The location of the callable.
         """
         return self.kg.dfs_search_callable_def(callable)
 
-    def _get_class(self, class_name: str) -> Tuple[Loc, str] | None:
+    def _dfs_get_class(self, class_name: str) -> Tuple[Loc, str] | None:
         """Search the class in the knowledge graph.
 
         Args:
             class_name (str): The class name to search.
 
         Returns:
-            str | None: The skeleton of the class or None if not found.
+            Tuple[Loc, str] | None: The location of the class and the class skeleton.
         """
-        return self.kg.get_class_snapshot(class_name)
+        return self.kg.dfs_get_class_snapshot(class_name)
 
-    def _search_method_in_class_kg(self, class_name: str, method_name: str) -> Loc:
-        """Search the method in the knowledge graph.
+    def _direct_get_class(self, class_node_name: str) -> str | None:
+        """Search the class in the knowledge graph.
 
         Args:
-            class_name (str): The class name to search.
-            method_name (str): The method name to search.
-                It should be the method name without the class name.
+            class_node_name (str): The class node name to search.
+
         Returns:
-            Loc: The location of the method definition.
+            str | None: The class snapshot.
         """
-        return self.kg.dfs_search_method_in_class(class_name, method_name)
+        return self.kg.direct_get_class_snapshot_from_node(class_node_name)
 
     def _get_class_methods(self, class_name: str) -> Tuple[List[str], List[str]]:
         """Return
@@ -183,6 +196,52 @@ class SearchManager:
             output_methods.append(node_name)
             output_code_snippets.append(content)
         return output_methods, output_code_snippets
+
+    def _fuzzy_search_class(self, class_name: str) -> str:
+        """API for fuzzy search the class in the given repo.
+        It will only return one match. (Other matches will be ignored)
+
+        Args:
+            class_name (str): The class name to search.
+
+        Returns:
+            str: The file path and the class content. If the content exceeds 100 lines, we will use class skeleton.
+        """
+        loc, snapshot = self._dfs_get_class(class_name)
+        # we don't check whether loc is global variable, since fuzzy search will help to disambiguate
+        if loc is None:
+            return f"Cannot find the class {class_name}"
+        start_line = loc.start_line
+        end_line = loc.end_line
+        if end_line - start_line <= 100:
+            joined_path = os.path.join(self.repo_path, loc.file_name)
+            content = self._get_code_snippet(joined_path, start_line, end_line)
+            new_row = {
+                "search_action": "fuzzy_search",
+                "search_input": class_name,
+                "search_query": loc.node_name,
+                "search_content": content,
+                "query_type": "class",
+                "file_path": loc.file_name,
+            }
+            self.history = pd.concat(
+                [self.history, pd.DataFrame([new_row])], ignore_index=True
+            )
+            return f"""File Path: {loc.file_name} \nQuery Type: class \nClass Content: \n{content}"""
+
+        new_row = {
+            "search_action": "fuzzy_search",
+            "search_input": class_name,
+            "search_query": loc.node_name,
+            "search_content": snapshot,
+            "query_type": "class",
+            "file_path": loc.file_name,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
+
+        return f"""File Path: {loc.file_name} \nQuery Type: class \nClass Skeleton: \n{snapshot}"""
 
     #################
     # Interface methods
@@ -210,123 +269,13 @@ class SearchManager:
             "search_input": file_name,
             "search_query": loc.node_name,
             "search_content": res,
+            "query_type": "file",
+            "file_path": loc.file_name,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
         )
-        return f"""
-        File Path: {loc.file_name} \n
-        File Skeleton: \n
-        {res}
-        """
-
-    def search_class(self, class_name: str) -> str:
-        """API to search the class in given repo.
-
-        Args:
-            class_name (str): The class name to search.
-
-        Returns:
-            str: The file path and the class content. If the content exceeds 100 lines, we will use class skeleton.
-            Please call search_method_in_class to get detailed information of the method after skeleton search.
-            If the methods don't have docstrings, please make sure use search_method_in_class to get the method signature.
-        """
-        loc, snapshot = self._get_class(class_name)
-        if loc is None:  # first fall back to check if exists global variable
-            loc_gv_info = self.kg.dfs_search_callable_def(class_name)
-            if loc_gv_info is not None:  # if exists, return the global variable
-                # this is because the class name can be a global variable e.g. AxesGrid = ImageGrid
-                # ImageGrid is a class in matplotlib, but AxesGrid is a global variable
-                loc_gv = loc_gv_info.loc
-                start_line = loc_gv.start_line
-                end_line = loc_gv.end_line
-                joined_path = os.path.join(self.repo_path, loc_gv.file_name)
-                content = self._get_code_snippet(joined_path, start_line, end_line)
-                new_row = {
-                    "search_action": "search_class",
-                    "search_input": class_name,
-                    "search_query": loc_gv.node_name,
-                    "search_content": content,
-                }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
-                return f"""
-                File Path: {loc_gv.file_name} \n
-                Class Content: \n
-                {content}
-                """
-            return f"Cannot find the class name: {class_name}"
-        start_line = loc.start_line
-        end_line = loc.end_line
-        if end_line - start_line <= 100:
-            joined_path = os.path.join(self.repo_path, loc.file_name)
-            content = self._get_code_snippet(joined_path, start_line, end_line)
-            new_row = {
-                "search_action": "search_class",
-                "search_input": class_name,
-                "search_query": loc.node_name,
-                "search_content": content,
-            }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
-            return f"""
-            File Path: {loc.file_name} \n
-            Class Content: \n
-            {content}
-            """
-
-        new_row = {
-            "search_action": "search_class",
-            "search_input": class_name,
-            "search_query": loc.node_name,
-            "search_content": snapshot,
-        }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
-        return f"""
-        File Path: {loc.file_name} \n
-        Class Skeleton: \n
-        {snapshot}
-        """
-
-    def search_method_in_class(self, class_name: str, method_name: str) -> str:
-        """API to search the method in the class in given repo.
-        Don't try to use this API until you have already tried search_class to get the class skeleton.
-        If you know the class name and method name.
-
-        Args:
-            class_name (str): The class name to search.
-            method_name (str): The method name within the class.
-
-            Returns:
-                str: The file path and the method code snippet.
-                If not found, return the error message.
-        """
-        loc = self._search_method_in_class_kg(class_name, method_name)
-
-        if loc is None:
-            return (
-                f"Cannot find the definition of method:{method_name} in class:{class_name}",
-            )
-        joined_path = os.path.join(self.repo_path, loc.file_name)
-        content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
-        new_row = {
-            "search_action": "search_method_in_class",
-            "search_input": f"{class_name}::{method_name}",
-            "search_query": loc.node_name,
-            "search_content": content,
-        }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
-        return f"""
-        File Path: {loc.file_name} \n
-        Method Code Snippet: \n
-        {content}
-        """
+        return f"""File Path: {loc.file_name} \nFile Skeleton: \n{res}"""
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
         """API to search the source code in the file. If you want to search the code snippet in the file.
@@ -345,36 +294,49 @@ class SearchManager:
             "search_input": file_path,
             "search_query": source_code,
             "search_content": content,
+            "query_type": "source_code",
+            "file_path": file_path,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
         )
-        return f"""
-        File Path: {file_path} \n
-        Code Snippet: \n
-        {content}
-        """
+        return f"""File Path: {file_path} \nCode Snippet: \n{content}"""
 
-    def search_callable(self, query: str, file_path: str = None) -> str:
-        """API to search the callable definition in the file.
-        The query can be a function, class, method or global variable. Don't use this API to search source code in the file.
+    def fuzzy_search(self, query: str) -> str:
+        """API to search the query with fuzzy search.
+            Use this API when you are not sure about the query type, query's file path.
+            Notice you should only put the query name, not including any file path.
+            E.g. fuzzy_search("ModelChoiceField")
 
         Args:
-            query (str): The query to search. It can be a function, class, method or global variable.
-            The format should be only the name.
-            E.g. search_callable("function_name")
-
-            file_path (str): The file path to search. If not provided, search in the whole repo.
-            Provide the file path if you know the file for better performance.
-            This is optional. E.g. search_callable("function_name", "a/example.py")
+            query (str): The query to search.
 
         Returns:
-            str: The file path and the code snippet of the query. If query type is class, return the class skeleton.
+            str:
+            1. If we find multiple matches for a query, return the disambiguation message. The message contains the list of possible matches, where
+            each match contains the file path, containing class (if exists). You need to use exact_search to get the detailed information.
+            2. If we find only one match, return the file path, query type, and the code snippet. For class we have special treatment.
+                If the class content is less than 100 lines, we return the class content. Otherwise, we return the class skeleton.
+            3. If we cannot find the query, return the error message.
+
         """
-        if file_path is not None:
-            locinfo: LocInfo = self._get_query_in_file(file_path, query)
-        else:
-            locinfo: LocInfo = self._search_callable_kg(query)
+        # first check the inverted_index, the inverted_index does not contain single value key
+        # if the query is a single value key, we directly search in the knowledge graph
+        if query in self.inverted_index.index:
+            locs = self.inverted_index.search(query)
+            # len(locs) is always greater than 1
+            res = "Multiple matches found. Please use exact_search to get the detailed information.\n"
+            for loc in locs:
+                res += f"Possible Location {locs.index(loc)+1}:\n"
+                res += f"File Path: {loc.file_path}\n"
+                if loc.class_name:
+                    res += f"Containing Class: {loc.class_name}\n"
+                res += "\n"
+            # add <Disambiguation>res</Disambiguation>
+            ret_string = f"<Disambiguation>\n{res}</Disambiguation>"
+            return ret_string
+        # if the query is not in the inverted_index, we search in the knowledge graph
+        locinfo: LocInfo = self._search_callable_kg(query)
         if locinfo is None:
             return f"Cannot find the definition of {query}"
         loc = locinfo.loc
@@ -383,21 +345,96 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         # if type is class, we use the class snapshot
         if type == "class":
-            return self.search_class(query)
+            return self._fuzzy_search_class(query)
 
         content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
         new_row = {
-            "search_action": "search_callable",
+            "search_action": "fuzzy_search",
             "search_input": query,
             "search_query": loc.node_name,
             "search_content": content,
+            "query_type": type,
+            "file_path": loc.file_name,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
         )
 
-        return f"""
-        File Path: {loc.file_name} \n
-        Code Snippet or Skeleton (if class): \n
-        {content}
+        return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
+
+    def exact_search(
+        self, query: str, file_path: str, containing_class: str | None = None
+    ) -> str:
+        """API to search the query with exact search.
+            Use this API when you know the query's file path.
+            If you know the query is a method, please provide the containing class name.
+            E.g. exact_search("ModelChoiceField", "django/forms/models.py")
+                 exact_search("to_python", "django/forms/models.py", "ModelChoiceField")
+                 Adding the containing class name to avoid ambiguity.
+                 However, if the query is a class, you MUST leave the containing class as None.
+
+        Args:
+            query (str): The query to search.
+            file_path (str): The file path to search.
+            containing_class (str): The containing class name. If the query is a method, provide the containing class name.
+            Otherwise, leave it as None.
+
+        Returns:
+            str: The file path, and the code snippet.
         """
+        # we use the query node format
+        if containing_class is None:
+            node_name = f"{file_path}::{query}"
+        else:
+            node_name = f"{file_path}::{containing_class}::{query}"
+        loc_info = self._get_exact_loc(node_name)
+        if loc_info is None:
+            # sometimes the query is a class but the containing class is not None (LLM may misbehave)
+            # fall back to use node_name = file_path::query
+            loc_info = self._get_exact_loc(f"{file_path}::{query}")
+            if loc_info is None:  # still cannot find the query
+                return f"Cannot find the definition of {query} in {file_path}"
+        type = loc_info.type
+        loc = loc_info.loc
+        node_name = loc.node_name
+
+        joined_path = os.path.join(self.repo_path, loc.file_name)
+        content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
+
+        if type == "class":
+            # if the type is class, we use the class snapshot
+            snapshot = self._direct_get_class(node_name)
+            start_line = loc.start_line
+            end_line = loc.end_line
+            if end_line - start_line > 100:  # use class skeleton
+                new_row = {
+                    "search_action": "exact_search",
+                    "search_input": query,
+                    "search_query": node_name,
+                    "search_content": snapshot,
+                    "query_type": type,
+                    "file_path": loc.file_name,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""File Path: {loc.file_name} \nQuery Type: {type} \nClass Skeleton: \n{snapshot}"""
+
+        if type == "method":
+            search_input = f"{file_path}::{containing_class}::{query}"
+        else:
+            search_input = f"{file_path}::{query}"
+
+        new_row = {
+            "search_action": "exact_search",
+            "search_input": search_input,
+            "search_query": node_name,
+            "search_content": content,
+            "query_type": type,
+            "file_path": loc.file_name,
+        }
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
+
+        return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
