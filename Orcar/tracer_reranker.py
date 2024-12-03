@@ -8,8 +8,24 @@ from .code_scorer import CodeScorer
 from .formatter import TokenCounter
 from .log_utils import get_logger
 from .tracer import FuncScore, FuncSign
+from .types import CodeInfoWithClass
 
 logger = get_logger(__name__)
+
+
+class FuncSignWithClass(FuncSign):
+    classname: str
+
+    def to_str(self) -> str:
+        return f"{self.classname}::{self.funcname} ({self.filename}:{self.lineno})"
+
+    def to_codeinfo(self):
+        # Return a CodeInfoWithClass object
+        return CodeInfoWithClass(
+            keyword=self.funcname,
+            file_path=self.filename,
+            class_name=self.classname,
+        )
 
 
 class FunctionFinder(ast.NodeVisitor):
@@ -17,6 +33,18 @@ class FunctionFinder(ast.NodeVisitor):
         self.funcname = funcname
         self.lineno = lineno
         self.function_node = None
+        self.classname = ""  # To store the class name if the function is inside a class
+        self._current_class = None  # To track the current class during traversal
+
+    def visit_ClassDef(self, node):
+        # Get the most outer class name
+        if (self._current_class is None) and (self.function_node is None):
+            self.classname = node.name
+            self._current_class = node.name
+            self.generic_visit(node)  # Visit child nodes
+            self._current_class = None
+        else:
+            self.generic_visit(node)
 
     def visit_FunctionDef(self, node):
         if (
@@ -34,7 +62,7 @@ class FunctionFinder(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def get_func_content(input: FuncSign) -> str:
+def get_func_content_with_class(input: FuncSign) -> tuple[str, FuncSignWithClass]:
     with open(input.filename, "r") as f:
         lines = f.readlines()
 
@@ -43,9 +71,26 @@ def get_func_content(input: FuncSign) -> str:
     finder.visit(tree)
 
     if not finder.function_node:
-        return ""
+        # If no function is found, return empty content and an empty class
+        return "", FuncSignWithClass(
+            filename=input.filename,
+            lineno=input.lineno,
+            funcname=input.funcname,
+            classname="",
+        )
+
     end_lineno = finder.function_node.end_lineno
-    return "".join(lines[input.lineno - 1 : end_lineno])
+    content = "".join(lines[input.lineno - 1 : end_lineno])
+
+    # Create a FuncSignWithClass object using the found class name
+    func_sign_with_class = FuncSignWithClass(
+        filename=input.filename,
+        lineno=input.lineno,
+        funcname=input.funcname,
+        classname=finder.classname,
+    )
+
+    return content, func_sign_with_class
 
 
 def redirect_filepath_to_cache(
@@ -92,9 +137,10 @@ def rerank_func(
     output_sorted_list: List[int, FuncSign, FuncScore, int] = []
     input_message_lists: List[List[ChatMessage]] = []
     func_contents: List[str] = []
-    for _, t in enumerate(input):
+    for i, t in enumerate(input):
         func_sign, func_score = t
-        func_content = get_func_content(func_sign)
+        func_content, func_sign_with_class = get_func_content_with_class(func_sign)
+        input[i] = (func_sign_with_class, func_score)
 
         if not func_content:
             logger.warning("Cannot find function:")
