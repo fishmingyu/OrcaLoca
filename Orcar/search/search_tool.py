@@ -420,9 +420,14 @@ class SearchManager:
                 )
                 return f"""File Path: {loc.file_name} \nQuery Type: {type} \nClass Skeleton: \n{snapshot}"""
 
+        if type == "method":
+            search_input = f"{file_path}::{containing_class}::{query}"
+        else:
+            search_input = f"{file_path}::{query}"
+
         new_row = {
             "search_action": "exact_search",
-            "search_input": query,
+            "search_input": search_input,
             "search_query": node_name,
             "search_content": content,
             "query_type": type,
