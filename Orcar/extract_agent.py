@@ -19,6 +19,7 @@ from .tracer import gen_tracer_cmd, read_tracer_output
 from .tracer_reranker import redirect_filepath_to_cache, rerank_func
 from .types import (
     CodeInfo,
+    CodeInfoWithClass,
     ExtractJudgeStep,
     ExtractOutput,
     ExtractParseStep,
@@ -443,12 +444,21 @@ class ExtractWorker(BaseAgentWorker):
         for codeinfo in function_list_abs_path:
             abs_path_parts = codeinfo.file_path.split("/")
             repo_index = len(self.env.cache_dir.split("/")) + 1
-            function_list.append(
-                CodeInfo(
-                    keyword=codeinfo.keyword,
-                    file_path="/".join(abs_path_parts[repo_index:]),
+            if isinstance(codeinfo, CodeInfoWithClass):
+                function_list.append(
+                    CodeInfoWithClass(
+                        keyword=codeinfo.keyword,
+                        file_path="/".join(abs_path_parts[repo_index:]),
+                        class_name=codeinfo.class_name,
+                    )
                 )
-            )
+            else:
+                function_list.append(
+                    CodeInfo(
+                        keyword=codeinfo.keyword,
+                        file_path="/".join(abs_path_parts[repo_index:]),
+                    )
+                )
         # Path format: 'astropy/modeling/separable.py'
 
         if len(function_list) > max_size:

@@ -140,6 +140,12 @@ class CodeInfo(BaseModel, frozen=True):
     file_path: str
 
 
+class CodeInfoWithClass(CodeInfo):
+    """Code keyword and location info with class"""
+
+    class_name: str
+
+
 class ExtractParseStep(BaseReasoningStep):
     """Extract parse step"""
 
@@ -182,7 +188,7 @@ class ExtractOutput(BaseModel):
 
     summary: str = ""
     suspicious_code: List[CodeInfo] = []
-    suspicious_code_from_tracer: List[CodeInfo] = []
+    suspicious_code_from_tracer: List[CodeInfoWithClass] = []
     related_source_code: str = ""
     is_reproduce_pass: bool = False
     reproduce_code: str = ""
