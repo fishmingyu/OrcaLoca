@@ -42,7 +42,7 @@ class SearchActionStep(BaseReasoningStep):
         """
         search_input = ""
         if self.search_action == "exact_search":
-            # check contains containing_class
+            # check if containing_class is in search_action_input (Dict)
             if "containing_class" in self.search_action_input:
                 # avoid query==containing_class
                 if (

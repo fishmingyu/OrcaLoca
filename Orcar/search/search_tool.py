@@ -419,6 +419,11 @@ class SearchManager:
         joined_path = os.path.join(self.repo_path, loc.file_name)
         content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
 
+        if type == "method":
+            search_input = f"{file_path}::{containing_class}::{query}"
+        else:
+            search_input = f"{file_path}::{query}"
+
         if type == "class":
             # if the type is class, we use the class snapshot
             snapshot = self._direct_get_class(node_name)
@@ -427,7 +432,7 @@ class SearchManager:
             if end_line - start_line > 100:  # use class skeleton
                 new_row = {
                     "search_action": "exact_search",
-                    "search_input": query,
+                    "search_input": search_input,
                     "search_query": node_name,
                     "search_content": snapshot,
                     "query_type": type,
@@ -438,11 +443,6 @@ class SearchManager:
                     [self.history, pd.DataFrame([new_row])], ignore_index=True
                 )
                 return f"""File Path: {loc.file_name} \nQuery Type: {type} \nClass Skeleton: \n{snapshot}"""
-
-        if type == "method":
-            search_input = f"{file_path}::{containing_class}::{query}"
-        else:
-            search_input = f"{file_path}::{query}"
 
         new_row = {
             "search_action": "exact_search",
