@@ -315,27 +315,13 @@ class RepoGraph:
 
         return snapshot
 
-    def get_class_methods(self, class_name) -> List[Loc] | None:
-        root = self.root_node
-        stack = [root]
-        visited = set()
+    def get_class_methods(self, class_node_name: str) -> List[Loc] | None:
+        if not self.check_node_exists(class_node_name):
+            return None
         methods = []
-        kg_query_name = class_name
-
-        while stack:
-            node = stack.pop()
-            if node not in visited:
-                visited.add(node)
-                current_prefix = self.extract_prefix(node)
-                if current_prefix is not None:
-                    kg_query_name = current_prefix + "::" + class_name
-                if node == kg_query_name:
-                    # this is class node
-                    # get all neighbors of this node means all methods
-                    for method in self.graph.neighbors(node):
-                        if self.graph.nodes[method]["type"] == "method":
-                            methods.append(self.graph.nodes[method]["loc"])
-                stack.extend(self.graph.neighbors(node))
+        for method in self.graph.neighbors(class_node_name):
+            if self.graph.nodes[method]["type"] == "method":
+                methods.append(self.graph.nodes[method]["loc"])
         return methods
 
     # dfs search for contents in a file
