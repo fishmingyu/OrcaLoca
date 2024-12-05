@@ -156,7 +156,8 @@ class SearchOutputParser(BaseOutputParser):
             for action in json_str["new_search_actions"]:
                 action_list.append(
                     SearchActionStep(
-                        action=action["action"], action_input=action["action_input"]
+                        search_action=action["action"],
+                        search_action_input=action["action_input"],
                     )
                 )
             return observation, bug_list, action_list

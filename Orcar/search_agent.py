@@ -8,6 +8,7 @@ from collections import deque
 from queue import PriorityQueue
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
+import pandas as pd
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse, MessageRole
@@ -63,13 +64,13 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
             containing_class = code_info.class_name
             if containing_class == "":  # None
                 search_step = SearchActionStep(
-                    action="exact_search",
-                    action_input={"query": query, "file_path": file_path},
+                    search_action="exact_search",
+                    search_action_input={"query": query, "file_path": file_path},
                 )
             else:
                 search_step = SearchActionStep(
-                    action="exact_search",
-                    action_input={
+                    search_action="exact_search",
+                    search_action_input={
                         "query": query,
                         "file_path": file_path,
                         "containing_class": containing_class,
@@ -326,8 +327,8 @@ class SearchWorker(BaseAgentWorker):
         frame = self._search_manager.get_frame_from_history(action, search_input)
         # check frame's is_skeleton is True or False
         if frame is not None:
-            # check frame["is_skeleton"] is True
-            if frame["is_skeleton"]:
+            is_skeleton = frame["is_skeleton"].values[0]
+            if is_skeleton:
                 return True
         return False
 
@@ -336,10 +337,13 @@ class SearchWorker(BaseAgentWorker):
         action = search_action.search_action
         search_input = search_action.get_search_input()
         # use get_frame_from_history to get the frame of the search result
-        frame = self._search_manager.get_frame_from_history(action, search_input)
+        frame: pd.DataFrame = self._search_manager.get_frame_from_history(
+            action, search_input
+        )
         # check frame's query_type is "class"
         if frame is not None:
-            if frame["query_type"] == "class":
+            query_type = frame["query_type"].values[0]
+            if query_type == "class":
                 return True
         return False
 
@@ -402,15 +406,6 @@ class SearchWorker(BaseAgentWorker):
         for history_action in action_history:
             if history_action == action:
                 return False
-        # if we search_query is in the history, we don't need to call search_callable or search_class or search_func
-        search_query = ""
-        if action.action == "search_class":
-            search_query = action.action_input["class_name"]
-        for history_action in action_history:
-            if history_action.action == "search_callable":
-                if search_query == history_action.action_input["query"]:
-                    return False
-
         return True
 
     def _class_methods_ranking(
@@ -420,13 +415,14 @@ class SearchWorker(BaseAgentWorker):
         """Ranking the class methods."""
         # if the action is search_class, we should rank the class methods
         search_action = action.search_action
-        search_action_input = action.search_action_input  # Dict
+        search_action_input = action.search_action_input
         frame = self._search_manager.get_frame_from_history(
             search_action, action.get_search_input()
         )
         is_class = self._check_search_action_is_class(action)
         if is_class:
-            search_query = frame["search_query"]
+            search_query = frame["search_query"].values[0]
+            file_path = frame["file_path"].values[0]
             class_methods, methods_code = self._search_manager._get_class_methods(
                 search_query
             )
@@ -438,6 +434,7 @@ class SearchWorker(BaseAgentWorker):
                 chat_messages.append(
                     [ChatMessage(role=MessageRole.USER, content=method)]
                 )
+            logger.info(f"Class methods number: {len(class_methods)}")
             code_scorer = CodeScorer(
                 llm=self._llm, problem_statement=self._problem_statement
             )
@@ -461,10 +458,10 @@ class SearchWorker(BaseAgentWorker):
                 method_name = sorted_results[i]["method_name"].split("::")[-1]
                 search_steps.append(
                     SearchActionStep(
-                        action="exact_search",
-                        action_input={
+                        search_action="exact_search",
+                        search_action_input={
                             "query": method_name,
-                            "file_path": search_action_input["file_path"],
+                            "file_path": file_path,
                             "containing_class": search_action_input["query"],
                         },
                     )
@@ -694,13 +691,13 @@ class SearchWorker(BaseAgentWorker):
         search_result = self._process_search(task, tools, search_step)
         top_class_methods = self._class_methods_ranking(search_step)
         # add top class methods to the left of the queue
-        for class_method in top_class_methods:
+        for class_method_action in top_class_methods:
             if not self._check_action_valid(
-                class_method, task.extra_state["action_history"]
+                class_method_action, task.extra_state["action_history"]
             ):
                 continue
-            task.extra_state["search_queue"].appendleft(class_method)
-            task.extra_state["action_history"].append(class_method)
+            task.extra_state["search_queue"].appendleft(class_method_action)
+            task.extra_state["action_history"].append(class_method_action)
         logger.info(f"Top class methods: {top_class_methods}")
         # logger.info(f"Next Search Input: {search_result}")
 
