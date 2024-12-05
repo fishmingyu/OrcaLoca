@@ -17,43 +17,20 @@ class BaseReasoningStep(BaseModel):
 class SearchActionStep(BaseReasoningStep):
     """Search action reasoning step."""
 
-    action: str
-    action_input: Dict
+    search_action: str
+    search_action_input: Dict
 
     def get_content(self) -> str:
         """Get content."""
         return (
-            f"Search Action: {self.action}\n"
-            f"Search Action Input: {self.action_input}"
+            f"Search Action: {self.search_action}\n"
+            f"Search Action Input: {self.search_action_input}"
         )
 
     def __eq__(self, other):
-        return self.action == other.action and self.action_input == other.action_input
-
-
-class EditActionStep(BaseReasoningStep):
-    """Edit action reasoning step."""
-
-    action_input: Dict
-
-    def get_content(self) -> str:
-        """Get content."""
-        return f"Edit Action Input: {self.action_input}"
-
-
-class SearchResult(BaseReasoningStep):
-    """Search result reasoning step."""
-
-    search_action: str
-    search_action_input: Dict
-    search_content: str
-
-    def get_content(self) -> str:
-        """Get content."""
-        return f"""<Search Result>\n
-            Search Action: {self.search_action}\n
-            Search Action Input: {self.search_action_input}\n
-            {self.search_content}\n</Search Result>"""
+        return (self.search_action == other.search_action) and (
+            self.search_action_input == other.search_action_input
+        )
 
     def get_search_input(self) -> str:
         """Get query."""
@@ -84,6 +61,32 @@ class SearchResult(BaseReasoningStep):
         elif self.search_action == "search_source_code":
             search_input = self.search_action_input["query"]
         return search_input
+
+
+class EditActionStep(BaseReasoningStep):
+    """Edit action reasoning step."""
+
+    action_input: Dict
+
+    def get_content(self) -> str:
+        """Get content."""
+        return f"Edit Action Input: {self.action_input}"
+
+
+class SearchResult(SearchActionStep):
+    """Search result reasoning step."""
+
+    search_content: str
+
+    def get_content(self) -> str:
+        """Get content."""
+        return f"""<Search Result>\n
+            Search Action: {self.search_action}\n
+            Search Action Input: {self.search_action_input}\n
+            {self.search_content}\n</Search Result>"""
+
+    def __eq__(self, other):  # not used
+        pass
 
 
 class HeuristicSearchResult(BaseModel):

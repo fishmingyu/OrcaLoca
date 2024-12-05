@@ -60,10 +60,21 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
         for code_info in suspicious_code_from_tracer:
             query = code_info.keyword
             file_path = code_info.file_path
-            search_step = SearchActionStep(
-                action="search_callable",
-                action_input={"query": query, "file_path": file_path},
-            )
+            containing_class = code_info.class_name
+            if containing_class == "":  # None
+                search_step = SearchActionStep(
+                    action="exact_search",
+                    action_input={"query": query, "file_path": file_path},
+                )
+            else:
+                search_step = SearchActionStep(
+                    action="exact_search",
+                    action_input={
+                        "query": query,
+                        "file_path": file_path,
+                        "containing_class": containing_class,
+                    },
+                )
             task.extra_state["search_queue"].append(search_step)
             task.extra_state["action_history"].append(search_step)
 
@@ -264,44 +275,44 @@ class SearchWorker(BaseAgentWorker):
             tool.metadata.get_name(): tool for tool in tools
         }
         # try to call the tools
-        if search_step.action in tools_dict:
-            tool = tools_dict[search_step.action]
+        if search_step.search_action in tools_dict:
+            tool = tools_dict[search_step.search_action]
             with self.callback_manager.event(
                 CBEventType.FUNCTION_CALL,
                 payload={
-                    EventPayload.FUNCTION_CALL: search_step.action_input,
+                    EventPayload.FUNCTION_CALL: search_step.search_action_input,
                     EventPayload.TOOL: tool.metadata,
                 },
             ) as event:
                 try:
                     dispatcher.event(
                         AgentToolCallEvent(
-                            arguments=json.dumps({**search_step.action_input}),
+                            arguments=json.dumps({**search_step.search_action_input}),
                             tool=tool.metadata,
                         )
                     )
-                    tool_output = tool.call(**search_step.action_input)
+                    tool_output = tool.call(**search_step.search_action_input)
 
                 except Exception as e:
                     tool_output = ToolOutput(
                         content=f"Error: {e!s}",
                         tool_name=tool.metadata.name,
-                        raw_input={"kwargs": search_step.action_input},
+                        raw_input={"kwargs": search_step.search_action_input},
                         raw_output=e,
                         is_error=True,
                     )
                 event.on_end(payload={EventPayload.FUNCTION_OUTPUT: str(tool_output)})
         else:
             tool_output = ToolOutput(
-                content=f"Error: Tool {search_step.action} not found.",
-                tool_name=search_step.action,
-                raw_input={"kwargs": search_step.action_input},
+                content=f"Error: Tool {search_step.search_action} not found.",
+                tool_name=search_step.search_action,
+                raw_input={"kwargs": search_step.search_action_input},
                 raw_output=None,
                 is_error=True,
             )
         search_result = SearchResult(
-            search_action=search_step.action,
-            search_action_input=search_step.action_input,
+            search_action=search_step.search_action,
+            search_action_input=search_step.search_action_input,
             search_content=tool_output.content,
         )
 
@@ -309,9 +320,27 @@ class SearchWorker(BaseAgentWorker):
 
     def _check_search_result_skeleton(self, search_result: SearchResult) -> bool:
         """Check if the search result is a Class Skeleton:"""
-        search_content = search_result.get_content()
-        if "Class Skeleton:" in search_content:
-            return True
+        action = search_result.search_action
+        search_input = search_result.get_search_input()
+        # use get_frame_from_history to get the frame of the search result
+        frame = self._search_manager.get_frame_from_history(action, search_input)
+        # check frame's is_skeleton is True or False
+        if frame is not None:
+            # check frame["is_skeleton"] is True
+            if frame["is_skeleton"]:
+                return True
+        return False
+
+    def _check_search_action_is_class(self, search_action: SearchActionStep) -> bool:
+        """Check if the search action is searching for a class."""
+        action = search_action.search_action
+        search_input = search_action.get_search_input()
+        # use get_frame_from_history to get the frame of the search result
+        frame = self._search_manager.get_frame_from_history(action, search_input)
+        # check frame's query_type is "class"
+        if frame is not None:
+            if frame["query_type"] == "class":
+                return True
         return False
 
     def _concat_search_results(self, search_results: List[SearchResult]) -> str:
@@ -390,10 +419,16 @@ class SearchWorker(BaseAgentWorker):
     ) -> List[SearchActionStep]:
         """Ranking the class methods."""
         # if the action is search_class, we should rank the class methods
-        if action.action == "search_class":
-            class_name = action.action_input["class_name"]
+        search_action = action.search_action
+        search_action_input = action.search_action_input  # Dict
+        frame = self._search_manager.get_frame_from_history(
+            search_action, action.get_search_input()
+        )
+        is_class = self._check_search_action_is_class(action)
+        if is_class:
+            search_query = frame["search_query"]
             class_methods, methods_code = self._search_manager._get_class_methods(
-                class_name
+                search_query
             )
             if len(class_methods) == 0:
                 return []
@@ -426,10 +461,11 @@ class SearchWorker(BaseAgentWorker):
                 method_name = sorted_results[i]["method_name"].split("::")[-1]
                 search_steps.append(
                     SearchActionStep(
-                        action="search_method_in_class",
+                        action="exact_search",
                         action_input={
-                            "method_name": method_name,
-                            "class_name": class_name,
+                            "query": method_name,
+                            "file_path": search_action_input["file_path"],
+                            "containing_class": search_action_input["query"],
                         },
                     )
                 )
@@ -475,12 +511,13 @@ class SearchWorker(BaseAgentWorker):
         self,
         search_result: SearchResult,
         task: Task,
-        search_step: SearchActionStep,
         potential_bugs: List[BugLocations],
     ) -> AgentChatResponse:
         """Process search result."""
         # calculate the heuristic of the search result
         agent_response = self._get_response(search_result)
+        is_skeleton = self._check_search_result_skeleton(search_result)
+
         if search_result is not None:
             heuristic_search_result = self._search_result_heuristic(
                 search_result, potential_bugs
@@ -489,17 +526,13 @@ class SearchWorker(BaseAgentWorker):
                 heuristic_search_result.heuristic >= 0
             ):  # if the heuristic is greater than 0, we should add it to the current search
                 # add search steps to task state
-                # if action is search class, use special format
-                if search_step.action == "search_class":
-                    # check if the search result is a class skeleton
-                    check_skeleton = self._check_search_result_skeleton(search_result)
-                    # if the search result is a class skeleton
-                    if check_skeleton:
-                        # truncate the search result to first 100 characters
-                        search_result.search_content = search_result.search_content[
-                            :100
-                        ]
-                        search_result.search_content += "..."
+                # if the search result is a skeleton
+                if is_skeleton:
+                    # truncate the search result to first 100 characters
+                    # since the full content has been seen by LLM before
+                    # we don't need to show the full content again
+                    search_result.search_content = search_result.search_content[:100]
+                    search_result.search_content += "..."
 
                 task.extra_state["current_search"].append(search_result)
         # return the original search result
@@ -673,7 +706,7 @@ class SearchWorker(BaseAgentWorker):
 
         # get the agent response; decide the current_search.
         agent_response = self._process_search_result(
-            search_result, task, search_step, potential_bugs
+            search_result, task, potential_bugs
         )
 
         search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()

@@ -18,6 +18,7 @@ class SearchManager:
                 "search_content",
                 "query_type",
                 "file_path",
+                "is_skeleton",
             ]
         )
         self.repo_path = repo_path
@@ -179,7 +180,7 @@ class SearchManager:
         """
         return self.kg.direct_get_class_snapshot_from_node(class_node_name)
 
-    def _get_class_methods(self, class_name: str) -> Tuple[List[str], List[str]]:
+    def _get_class_methods(self, class_node_name: str) -> Tuple[List[str], List[str]]:
         """Return
         1. The list of method names in the class.
         2. The list of method code snippets in the class.
@@ -187,7 +188,7 @@ class SearchManager:
 
         output_methods = []
         output_code_snippets = []
-        list_loc = self.kg.get_class_methods(class_name)
+        list_loc = self.kg.get_class_methods(class_node_name)
         for loc in list_loc:
             file_name = loc.file_name
             node_name = loc.node_name
@@ -223,6 +224,7 @@ class SearchManager:
                 "search_content": content,
                 "query_type": "class",
                 "file_path": loc.file_name,
+                "is_skeleton": False,
             }
             self.history = pd.concat(
                 [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -236,6 +238,7 @@ class SearchManager:
             "search_content": snapshot,
             "query_type": "class",
             "file_path": loc.file_name,
+            "is_skeleton": True,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -271,6 +274,7 @@ class SearchManager:
             "search_content": res,
             "query_type": "file",
             "file_path": loc.file_name,
+            "is_skeleton": True,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -296,6 +300,7 @@ class SearchManager:
             "search_content": content,
             "query_type": "source_code",
             "file_path": file_path,
+            "is_skeleton": False,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -334,6 +339,18 @@ class SearchManager:
                 res += "\n"
             # add <Disambiguation>res</Disambiguation>
             ret_string = f"<Disambiguation>\n{res}</Disambiguation>"
+            new_row = {
+                "search_action": "fuzzy_search",
+                "search_input": query,
+                "search_query": query,
+                "search_content": res,
+                "query_type": "disambiguation",
+                "file_path": "",
+                "is_skeleton": False,
+            }
+            self.history = pd.concat(
+                [self.history, pd.DataFrame([new_row])], ignore_index=True
+            )
             return ret_string
         # if the query is not in the inverted_index, we search in the knowledge graph
         locinfo: LocInfo = self._search_callable_kg(query)
@@ -355,6 +372,7 @@ class SearchManager:
             "search_content": content,
             "query_type": type,
             "file_path": loc.file_name,
+            "is_skeleton": False,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -414,6 +432,7 @@ class SearchManager:
                     "search_content": snapshot,
                     "query_type": type,
                     "file_path": loc.file_name,
+                    "is_skeleton": True,
                 }
                 self.history = pd.concat(
                     [self.history, pd.DataFrame([new_row])], ignore_index=True
@@ -432,6 +451,7 @@ class SearchManager:
             "search_content": content,
             "query_type": type,
             "file_path": loc.file_name,
+            "is_skeleton": False,
         }
         self.history = pd.concat(
             [self.history, pd.DataFrame([new_row])], ignore_index=True
