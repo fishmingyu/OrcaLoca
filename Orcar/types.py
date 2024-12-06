@@ -59,7 +59,7 @@ class SearchActionStep(BaseReasoningStep):
         elif self.search_action == "search_file_skeleton":
             search_input = self.search_action_input["file_name"]
         elif self.search_action == "search_source_code":
-            search_input = self.search_action_input["query"]
+            search_input = self.search_action_input["source_code"]
         return search_input
 
 

@@ -326,7 +326,7 @@ class SearchWorker(BaseAgentWorker):
         # use get_frame_from_history to get the frame of the search result
         frame = self._search_manager.get_frame_from_history(action, search_input)
         # check frame's is_skeleton is True or False
-        if frame is not None:
+        if not frame.empty:
             is_skeleton = frame["is_skeleton"].values[0]
             if is_skeleton:
                 return True
@@ -340,8 +340,9 @@ class SearchWorker(BaseAgentWorker):
         frame: pd.DataFrame = self._search_manager.get_frame_from_history(
             action, search_input
         )
-        # check frame's query_type is "class"
-        if frame is not None:
+        # check frame is empty or not
+        if not frame.empty:
+            # logger.info(f"Frame: {frame}")
             query_type = frame["query_type"].values[0]
             if query_type == "class":
                 return True
@@ -416,11 +417,12 @@ class SearchWorker(BaseAgentWorker):
         # if the action is search_class, we should rank the class methods
         search_action = action.search_action
         search_action_input = action.search_action_input
-        frame = self._search_manager.get_frame_from_history(
-            search_action, action.get_search_input()
-        )
+
         is_class = self._check_search_action_is_class(action)
         if is_class:
+            frame = self._search_manager.get_frame_from_history(
+                search_action, action.get_search_input()
+            )
             search_query = frame["search_query"].values[0]
             file_path = frame["file_path"].values[0]
             class_methods, methods_code = self._search_manager._get_class_methods(

@@ -295,7 +295,7 @@ class SearchManager:
         content = self._search_source_code(file_path, source_code)
         new_row = {
             "search_action": "search_source_code",
-            "search_input": file_path,
+            "search_input": source_code,
             "search_query": source_code,
             "search_content": content,
             "query_type": "source_code",
