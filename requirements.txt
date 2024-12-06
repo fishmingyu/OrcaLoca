@@ -2,8 +2,9 @@ anthropic
 config
 datasets
 docker
+fsspec[http]<=2024.9.0,>=2023.1.0
 gdown
-httpx
+httpx<1,>=0.23.0
 llama-index-agent-llm-compiler
 llama-index-core
 llama-index-embeddings-openai
@@ -11,7 +12,7 @@ llama-index-llms-anthropic
 llama-index-llms-openai
 matplotlib
 pre-commit
-pydantic
+pydantic<2.10.0,>=2.7.0
 rich
 swebench
 termcolor
