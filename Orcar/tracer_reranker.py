@@ -5,7 +5,7 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.llms.llm import LLM
 
 from .code_scorer import CodeScorer
-from .formatter import TokenCounter
+from .formatter import TokenCount, TokenCounter
 from .log_utils import get_logger
 from .tracer import FuncScore, FuncSign
 from .types import CodeInfoWithClass
@@ -130,7 +130,7 @@ def rerank_func(
     llm: LLM,
     token_counter: TokenCounter,
     problem_statement: str,
-) -> List[FuncSign]:
+) -> Tuple[List[FuncSign], TokenCount]:
     scorer = CodeScorer(
         llm=llm, token_counter=token_counter, problem_statement=problem_statement
     )
@@ -202,4 +202,4 @@ def rerank_func(
     #    logger.info(x[2].get_score())
     logger.info([(x[1].funcname, x[3]) for x in output_sorted_list])
 
-    return [x[1] for x in output_sorted_list]
+    return [x[1] for x in output_sorted_list], scorer.get_sum_cnt()

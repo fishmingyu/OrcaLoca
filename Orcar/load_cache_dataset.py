@@ -8,9 +8,16 @@ from datasets import Features, Value
 
 
 def load_filter_hf_dataset(args) -> datasets.arrow_dataset.Dataset:
-    return load_filter_hf_dataset_explicit(
+
+    ret = load_filter_hf_dataset_explicit(
         dataset=args.dataset, filter_instance=args.filter_instance, split=args.split
     )
+    start_idx = max(0, args.start_idx) if hasattr(args, "start_idx") else 0
+    end_idx = min(len(ret), args.end_idx) if hasattr(args, "end_idx") else len(ret)
+    assert (
+        start_idx < end_idx
+    ), f"start_idx {start_idx} should be less than end_idx {end_idx}"
+    return ret.select(range(start_idx, end_idx))
 
 
 def load_filter_hf_dataset_explicit(
