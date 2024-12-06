@@ -13,10 +13,10 @@ STEP_EXAMPLE = {
         },
     ],
     "new_search_actions": [
-        {"action": "search_func", "action_input": {"func_name": "str"}},
+        {"action": "fuzzy_search", "action_input": {"query": "str"}},
         {
-            "action": "search_method_in_class",
-            "action_input": {"class_name": "str", "method_name": "str"},
+            "action": "exact_search",
+            "action_input": {"query": "str", "file_path": "path/to/file"},
         },
     ],
 }
