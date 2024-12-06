@@ -221,7 +221,7 @@ class OrcarAgent:
             traceback.print_exception(*exc_info)
             search_output = SearchOutput()
         if self.final_stage <= Stage.SEARCH:
-            return json.dumps(search_output, indent=4)
+            return search_output.model_dump_json(indent=4)
 
         try:
             edit_output = self.run_edit_agent(search_output)

@@ -79,7 +79,11 @@ class TokenCounter:
     def __init__(self, llm: LLM) -> None:
         model = llm.metadata.model_name
         if isinstance(llm, OpenAI):
-            self.encoding = tiktoken.encoding_for_model(model)
+
+            def openai_encoding(text: str):
+                return len(tiktoken.encoding_for_model(model).encode(text))
+
+            self.encoding = openai_encoding
         elif isinstance(llm, Anthropic):
             self.encoding = llm.tokenizer
         else:
@@ -89,7 +93,7 @@ class TokenCounter:
     def count(self, string: str) -> int:
         if self.encoding is None:
             return 0
-        return len(self.encoding.encode(string))
+        return self.encoding(string)
 
     def count_chat(
         self, messages: List[ChatMessage], llm: LLM
