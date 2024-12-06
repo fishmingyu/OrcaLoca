@@ -411,6 +411,7 @@ class SearchWorker(BaseAgentWorker):
     def _class_methods_ranking(
         self,
         action: SearchActionStep,
+        task: Task,
     ) -> List[SearchActionStep]:
         """Ranking the class methods."""
         # if the action is search_class, we should rank the class methods
@@ -440,6 +441,9 @@ class SearchWorker(BaseAgentWorker):
             )
             # score the list of methods
             scores = code_scorer.score_batch(chat_messages)
+            task.extra_state["token_cnts"].append(
+                ("Methods Score", code_scorer.get_sum_cnt())
+            )
             # combine the scores with the method names
             results = []
             for i, method in enumerate(class_methods):
@@ -689,7 +693,7 @@ class SearchWorker(BaseAgentWorker):
         head_search_step = task.extra_state["search_queue"].popleft()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(task, tools, search_step)
-        top_class_methods = self._class_methods_ranking(search_step)
+        top_class_methods = self._class_methods_ranking(search_step, task)
         # add top class methods to the left of the queue
         for class_method_action in top_class_methods:
             if not self._check_action_valid(

@@ -432,12 +432,13 @@ class ExtractWorker(BaseAgentWorker):
             input=funcsign_score_list, cache_dir=self.env.cache_dir
         )  # Path format: '/home/dbmw/.orcar/astropy__astropy/astropy/modeling/separable.py'
         logger.info(f"funcsign_score_list: {funcsign_score_list}")
-        funcsign_list = rerank_func(
+        funcsign_list, token_cnt = rerank_func(
             input=funcsign_score_list,
             llm=self._llm,
             token_counter=self._token_counter,
             problem_statement=task.extra_state["inst"]["problem_statement"],
         )
+        task.extra_state["token_cnts"].append(("tracer_rerank", token_cnt))
 
         function_list_abs_path = [x.to_codeinfo() for x in funcsign_list]
         function_list = []
