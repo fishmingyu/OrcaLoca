@@ -110,22 +110,30 @@ class CodeScorer:
             ret.append(int(response.message.content))
         return ret
 
-    def log_token_stats(self) -> None:
+    def clear_sum_cnt(self) -> None:
+        self._token_cnts = []
+
+    def get_sum_cnt(self, display: bool = False) -> TokenCount:
         if isinstance(self._token_counter, TokenCounterCached):
             sum_cnt = sum(
                 self._token_cnts,
                 start=TokenCountCached(in_token_cnt=0, out_token_cnt=0),
             )
-            logger.info(f"{'Total cached cnt':<25}: " + str(sum_cnt))
+            if display:
+                logger.info(f"{'Total Scorer cached cnt':<25}: " + str(sum_cnt))
             sum_cnt = self._token_counter.equivalent_cost(sum_cnt)
         else:
             sum_cnt = sum(
                 self._token_cnts,
                 start=TokenCount(in_token_cnt=0, out_token_cnt=0),
             )
+        return sum_cnt
+
+    def log_token_stats(self) -> None:
+        sum_cnt = self.get_sum_cnt(display=True)
         logger.info(
             (
-                f"{'Total cnt':<25}: "
+                f"{'Total Scorer cnt':<25}: "
                 f"in {sum_cnt.in_token_cnt:>6} tokens, "
                 f"out {sum_cnt.out_token_cnt:>6} tokens"
             )

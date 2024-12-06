@@ -13,6 +13,8 @@ args_dict = {
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
+    "start_idx": 0,
+    "end_idx": 1,
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23314)$",
     # "filter_instance": "^(django__django-15814)$",
