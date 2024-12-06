@@ -100,7 +100,7 @@ class CodeScorer:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         start_time = time.time()
-        # add a buffer
+        # add a buffer avoid too many requests
         results = []
         for i in range(0, len(chat_inputs), 10):
             results += loop.run_until_complete(
