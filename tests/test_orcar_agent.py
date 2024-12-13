@@ -113,7 +113,7 @@ def test_agent():
     final_stage = "search"
     # final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    # agent.set_redirect_log(True)
+    agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
