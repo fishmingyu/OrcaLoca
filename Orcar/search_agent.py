@@ -196,6 +196,7 @@ class SearchWorker(BaseAgentWorker):
         """Initialize step from task."""
         is_done = False
         next_step_input: str = ""
+        last_observation: str = ""
         search_queue: deque = deque()
         action_history: List[SearchActionStep] = []
         current_search: List[SearchResult] = []
@@ -215,6 +216,7 @@ class SearchWorker(BaseAgentWorker):
             "search_cache": search_cache,
             "similarity_cache": similarity_cache,
             "new_memory": new_memory,
+            "last_observation": last_observation,
             "instruct_memory": instruct_memory,
             "token_cnts": list(),
         }
@@ -248,7 +250,7 @@ class SearchWorker(BaseAgentWorker):
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, potential_bugs, explore_step
 
-    def _bug_location_calibrate(self, output_str: str) -> str:
+    def _search_output_parser(self, output_str: str, last_observation: str) -> str:
         """Calibrate bug location."""
         data = self._output_parser.parse_bug_report(output_str)
         for bug in data["bug_locations"]:
@@ -264,7 +266,12 @@ class SearchWorker(BaseAgentWorker):
                 file_path = file_path[file_path.find("/") + 1 :]
                 bug["file_name"] = file_path
         # logger.info(f"Bug location: {data}")
-        return json.dumps(data)
+        # cat last observation and bug location
+        search_output = {
+            "conclusion": last_observation,
+            "bug_locations": data["bug_locations"],
+        }
+        return json.dumps(search_output)
 
     def _process_search(
         self,
@@ -486,10 +493,10 @@ class SearchWorker(BaseAgentWorker):
         # add is_similar to the similarity_cache
         task.extra_state["similarity_cache"].append(is_similar)
         # use sliding window to check the similarity, window size is 8
-        if len(task.extra_state["similarity_cache"]) > 10:
+        if len(task.extra_state["similarity_cache"]) > 8:
             task.extra_state["similarity_cache"].pop(0)
         # if all the observations in the window are similar and size is 8, we should early stop
-        if len(task.extra_state["similarity_cache"]) == 10:
+        if len(task.extra_state["similarity_cache"]) == 8:
             early_stop = all(task.extra_state["similarity_cache"])
         else:
             early_stop = False
@@ -647,9 +654,11 @@ class SearchWorker(BaseAgentWorker):
         logger.info(f"Chat response: {chat_response}")
         if task.extra_state["is_done"]:
             # convert the chat response to str
-            cali_str = self._bug_location_calibrate(chat_response.message.content)
+            search_output_str = self._search_output_parser(
+                chat_response.message.content, task.extra_state["last_observation"]
+            )
             return self._get_task_step_response(
-                AgentChatResponse(response=cali_str, sources=[]),
+                AgentChatResponse(response=search_output_str, sources=[]),
                 step,
                 None,
                 None,
@@ -676,6 +685,7 @@ class SearchWorker(BaseAgentWorker):
         task.extra_state["new_memory"].put(
             ChatMessage(content=observation, role=MessageRole.ASSISTANT)
         )
+        task.extra_state["last_observation"] = observation
         is_complete = self._judge_is_complete(task)
         logger.info(f"Is complete: {is_complete}")
         if is_complete:

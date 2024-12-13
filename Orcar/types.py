@@ -247,6 +247,7 @@ class SearchOutput(BaseModel):
     search_agent output
     """
 
+    conclusion: str = ""
     bug_locations: List[BugLocations] = []
 
 
