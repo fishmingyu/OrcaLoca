@@ -13,18 +13,18 @@ args_dict = {
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
-    "start_idx": 0,
-    "end_idx": 1,
+    "idx_list": [0, 3],
+    # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-26020)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
     # Long Issue Test
-    "filter_instance": "^(astropy__astropy-6938)$",
+    # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
@@ -109,11 +109,11 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    # final_stage = "extract"
-    final_stage = "search"
+    final_stage = "extract"
+    # final_stage = "search"
     # final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    agent.set_redirect_log(True)
+    # agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
