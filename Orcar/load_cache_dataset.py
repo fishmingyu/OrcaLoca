@@ -6,18 +6,43 @@ from pathlib import Path
 import datasets
 from datasets import Features, Value
 
+from .log_utils import get_logger
+
+logger = get_logger(__name__)
+
 
 def load_filter_hf_dataset(args) -> datasets.arrow_dataset.Dataset:
 
     ret = load_filter_hf_dataset_explicit(
         dataset=args.dataset, filter_instance=args.filter_instance, split=args.split
     )
-    start_idx = max(0, args.start_idx) if hasattr(args, "start_idx") else 0
-    end_idx = min(len(ret), args.end_idx) if hasattr(args, "end_idx") else len(ret)
-    assert (
-        start_idx < end_idx
-    ), f"start_idx {start_idx} should be less than end_idx {end_idx}"
-    return ret.select(range(start_idx, end_idx))
+    # Cannot has both idx_list and idx_range
+    assert not (
+        hasattr(args, "idx_list") and hasattr(args, "idx_range")
+    ), "Cannot has both idx_list and idx_range in arguments"
+    if hasattr(args, "idx_list"):
+        if args.filter_instance != ".*":
+            logger.info(
+                (
+                    "Running idx_list on a filtered (non-full) dataset."
+                    "Please make sure this is expected."
+                )
+            )
+        return ret.select(args.idx_list)
+    elif hasattr(args, "idx_range"):
+        if args.filter_instance != ".*":
+            logger.info(
+                (
+                    "Running idx_range on a filtered (non-full) dataset."
+                    "Please make sure this is expected."
+                )
+            )
+        start_idx = args.idx_range[0]
+        end_idx = args.idx_range[1]
+        assert start_idx < end_idx, "start_idx should be smaller than end_idx"
+        return ret.select(range(start_idx, end_idx))
+    else:
+        return ret
 
 
 def load_filter_hf_dataset_explicit(

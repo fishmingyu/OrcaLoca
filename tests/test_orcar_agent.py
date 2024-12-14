@@ -13,8 +13,8 @@ args_dict = {
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
-    "start_idx": 0,
-    "end_idx": 1,
+    "idx_list": [0, 3],
+    # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23314)$",
     # "filter_instance": "^(django__django-15814)$",
@@ -24,7 +24,7 @@ args_dict = {
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
