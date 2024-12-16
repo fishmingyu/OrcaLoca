@@ -142,6 +142,7 @@ class OrcarAgent:
         """
         edit_input = EditInput(
             problem_statement=self.inst["problem_statement"],
+            hint=search_output.conclusion,
             bug_locations=search_output.bug_locations,
         )
         self.edit_agent = EditAgent(
