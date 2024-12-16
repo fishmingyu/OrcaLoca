@@ -1,6 +1,10 @@
 # Agent formatter
 
+import asyncio
 import json
+import sys
+import time
+import traceback
 from abc import abstractmethod
 from typing import List, Optional, Sequence, Tuple
 
@@ -89,6 +93,8 @@ class TokenCounter:
         else:
             raise Exception(f"gen_config: No tokenizer for model {model}")
         logger.info(f"Found tokenizer for model '{model}'")
+        self.max_retry = 3
+        self.retry_delay = 1
 
     def count(self, string: str) -> int:
         if self.encoding is None:
@@ -99,7 +105,23 @@ class TokenCounter:
         self, messages: List[ChatMessage], llm: LLM
     ) -> Tuple[ChatResponse, TokenCount]:
         in_token_cnt = self.count(llm.messages_to_prompt(messages))
-        response = llm.chat(messages)
+        # response = llm.chat(messages)
+        # Due to possible 500 internal error thrown by LLM API, we need to retry
+        # Respect self.max_retry and self.retry_delay
+        for i in range(self.max_retry):
+            try:
+                response = llm.chat(messages)
+                break
+            except Exception as e:
+                exc_info = sys.exc_info()
+                # Capture the exception details as a string
+                exception_string = "".join(traceback.format_exception(*exc_info))
+                logger.warning(
+                    f"count_chat retry {i+1}/{self.max_retry}: \n{exception_string}"
+                )
+                if i == self.max_retry - 1:
+                    raise e
+                time.sleep(self.retry_delay)
         out_token_cnt = self.count(response.message.content)
         return (
             response,
@@ -110,7 +132,23 @@ class TokenCounter:
         self, messages: List[ChatMessage], llm: LLM
     ) -> Tuple[ChatResponse, TokenCount]:
         in_token_cnt = self.count(llm.messages_to_prompt(messages))
-        response = await llm.achat(messages)
+        # response = await llm.achat(messages)
+        # Due to possible 500 internal error thrown by LLM API, we need to retry
+        # Respect self.max_retry and self.retry_delay
+        for i in range(self.max_retry):
+            try:
+                response = await llm.achat(messages)
+                break
+            except Exception as e:
+                exc_info = sys.exc_info()
+                # Capture the exception details as a string
+                exception_string = "".join(traceback.format_exception(*exc_info))
+                logger.warning(
+                    f"count_achat retry {i+1}/{self.max_retry}: \n{exception_string}"
+                )
+                if i == self.max_retry - 1:
+                    raise e
+                await asyncio.sleep(self.retry_delay)
         out_token_cnt = self.count(response.message.content)
         return (
             response,
@@ -146,9 +184,28 @@ class TokenCounterCached(TokenCounter):
     def count_chat(
         self, messages: List[ChatMessage], llm: LLM
     ) -> Tuple[ChatResponse, TokenCountCached]:
-        response = llm.chat(
-            messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
-        )
+        # response = llm.chat(
+        #     messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
+        # )
+        # Due to possible 500 internal error thrown by LLM API, we need to retry
+        # Respect self.max_retry and self.retry_delay
+        for i in range(self.max_retry):
+            try:
+                response = llm.chat(
+                    messages,
+                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
+                )
+                break
+            except Exception as e:
+                exc_info = sys.exc_info()
+                # Capture the exception details as a string
+                exception_string = "".join(traceback.format_exception(*exc_info))
+                logger.warning(
+                    f"count_chat retry {i+1}/{self.max_retry}: \n{exception_string}"
+                )
+                if i == self.max_retry - 1:
+                    raise e
+                time.sleep(self.retry_delay)
         usage = response.raw["usage"]
         assert isinstance(usage, Usage), f"Unknown usage type: {type(usage)}"
         return (
@@ -172,9 +229,28 @@ class TokenCounterCached(TokenCounter):
     async def count_achat(
         self, messages: List[ChatMessage], llm: LLM
     ) -> Tuple[ChatResponse, TokenCountCached]:
-        response = await llm.achat(
-            messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
-        )
+        # response = await llm.achat(
+        #     messages, extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"}
+        # )
+        # Due to possible 500 internal error thrown by LLM API, we need to retry
+        # Respect self.max_retry and self.retry_delay
+        for i in range(self.max_retry):
+            try:
+                response = await llm.achat(
+                    messages,
+                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
+                )
+                break
+            except Exception as e:
+                exc_info = sys.exc_info()
+                # Capture the exception details as a string
+                exception_string = "".join(traceback.format_exception(*exc_info))
+                logger.warning(
+                    f"count_achat retry {i+1}/{self.max_retry}: \n{exception_string}"
+                )
+                if i == self.max_retry - 1:
+                    raise e
+                await asyncio.sleep(self.retry_delay)
         usage = response.raw["usage"]
         assert isinstance(usage, Usage), f"Unknown usage type: {type(usage)}"
         return (

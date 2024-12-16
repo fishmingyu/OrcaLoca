@@ -13,7 +13,7 @@ args_dict = {
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
-    "idx_list": [0, 3],
+    # "idx_list": [0, 3],
     # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-26020)$",
@@ -22,9 +22,13 @@ args_dict = {
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
-    # "filter_instance": "^(sympy__sympy-23262)$",
+    "filter_instance": (
+        "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
+        "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
+        "scikit-learn__scikit-learn-13496)$"
+    ),
     # whole repo
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
@@ -109,11 +113,11 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    final_stage = "extract"
-    # final_stage = "search"
+    # final_stage = "extract"
+    final_stage = "search"
     # final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    # agent.set_redirect_log(True)
+    agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
