@@ -47,8 +47,13 @@ The API calls include:
 <TASKS>
 Everytime you will do the following things:
 
-Provide the observation based on given input. Think about where the bug might be in the code, and provide the potential bug locations.
-Check whether it contains any class, method or function you need to further search.
+1. Provide the observation based on given input:
+Everytime we will provide a new search result in tag <New Info>.
+It may contain the disambiguation info if the search action is related to multiple classes or methods.
+Also, previous search result will be provided in tag <Search Result>. You need to analyze the new search result based on the previous one, and provide the observation
+based on whole context.
+2. Think about where the bug might be in the code, and provide the potential bug locations.
+3. Check whether it contains any class, method or function you need to further search. Especially, if disambiguation info is provided, you need to search for the specific class or method.
 Plan the new_search_actions based on the current context. You can use the given API calls to search for the bug locations.
 You can put multiple actions in the new_search_actions list. Be sure to use arguments in the tool description.
 If you make sure the context is enough to answer the question, you can keep the new_search_actions list empty.
@@ -105,6 +110,7 @@ We will provide you with the problem statement, the code snippets that need to b
 <INPUT>
 You will receive the code snippets that need to be revised in the following JSON format:
 {bug_code_format}
+Also, we will provide you a hint observation in tag <Observation> based on the given input.
 </INPUT>
 
 <OUTPUT FORMAT>
@@ -121,7 +127,7 @@ DO NOT add any title or description outside the JSON structure.
 EDIT_REQUIREMENTS = r"""
 The revised code snippets should respect the requirements below:
 1. The revised code snippets should fix the issue mentioned in the problem statement.
-2. The code should be unit-test friendly. Specifically, the error messages should be deterministic.
+2. The code containing any error messages should be deterministic.
 """
 
 EXTRACT_FORMATS = {

@@ -347,6 +347,7 @@ class EditWorker(BaseAgentWorker):
         input_chat = self._edit_formatter.format(
             tools=tools,
             chat_history=task.extra_state["new_memory"].get_all(),
+            hint=self._edit_input.hint,
             bug_code_input=bug_code_input,
             reference_code=ref_code_input,
         )

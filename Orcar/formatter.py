@@ -426,6 +426,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
         self,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
+        hint: str,
         bug_code_input: str,
         reference_code: str,
     ) -> List[ChatMessage]:
@@ -437,6 +438,11 @@ class EditChatFormatter(BaseAgentChatFormatter):
         }
 
         fmt_sys_header = self.system_header.format(**format_args)
+
+        hint_observation = ChatMessage(
+            role=MessageRole.ASSISTANT,
+            content=f"Hint: {hint}",
+        )
 
         bug_code_msg = ChatMessage(
             role=MessageRole.USER,
@@ -466,6 +472,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
             *chat_history,
             bug_code_msg,
             reference_code_msg,
+            hint_observation,
             fmt_control_msg,
         ]
 

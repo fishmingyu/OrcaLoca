@@ -123,7 +123,12 @@ class SearchWorker(BaseAgentWorker):
         self._problem_statement = search_input.problem_statement
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
-        self.top_k_search = 12
+        self._config_dict = {
+            "top_k_search": 12,
+            "sliding_window_size": 10,
+            "top_k_methods": 3,
+            "score_threshold": 50,
+        }
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
@@ -458,12 +463,14 @@ class SearchWorker(BaseAgentWorker):
             for i, method in enumerate(class_methods):
                 results.append({"method_name": method, "score": scores[i]})
             sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
-            # prune scores less than 50
+            # prune scores less than self._config_dict["score_threshold"]
             sorted_results = [
-                result for result in sorted_results if result["score"] > 50
+                result
+                for result in sorted_results
+                if result["score"] > self._config_dict["score_threshold"]
             ]
             # get top 3 methods
-            top_k = 3
+            top_k = self._config_dict["top_k_methods"]
             if len(sorted_results) < top_k:
                 top_k = len(sorted_results)
             search_steps = []
@@ -496,11 +503,17 @@ class SearchWorker(BaseAgentWorker):
         )
         # add is_similar to the similarity_cache
         task.extra_state["similarity_cache"].append(is_similar)
-        # use sliding window to check the similarity, window size is 8
-        if len(task.extra_state["similarity_cache"]) > 8:
+        # use sliding window to check the similarity, window size is self._config_dict["sliding_window_size"]
+        if (
+            len(task.extra_state["similarity_cache"])
+            > self._config_dict["sliding_window_size"]
+        ):
             task.extra_state["similarity_cache"].pop(0)
-        # if all the observations in the window are similar and size is 8, we should early stop
-        if len(task.extra_state["similarity_cache"]) == 8:
+        # if all the observations in the window are similar and size is 10, we should early stop
+        if (
+            len(task.extra_state["similarity_cache"])
+            == self._config_dict["sliding_window_size"]
+        ):
             early_stop = all(task.extra_state["similarity_cache"])
         else:
             early_stop = False
@@ -556,7 +569,7 @@ class SearchWorker(BaseAgentWorker):
         self,
         current_res: SearchResult,
     ) -> AgentChatResponse:
-        response_str = current_res.get_content()
+        response_str = current_res.get_next_response()
         return AgentChatResponse(response=response_str)
 
     def _get_task_step_response(
@@ -731,7 +744,7 @@ class SearchWorker(BaseAgentWorker):
             search_cache.put(heuristic_search_result)
         # get the top k search results, put it to task.extra_state["search_cache"]
         task.extra_state["search_cache"] = []
-        for _ in range(min(self.top_k_search, search_cache.qsize())):
+        for _ in range(min(self._config_dict["top_k_search"], search_cache.qsize())):
             task.extra_state["search_cache"].append(search_cache.get().search_result)
 
         task.extra_state["next_step_input"] = agent_response.response
@@ -811,7 +824,7 @@ class SearchAgent(AgentRunner):
         llm: LLM,
         search_input: SearchInput = None,
         repo_path: str = "",
-        max_iterations: int = 20,
+        max_iterations: int = 10,
         search_formatter: Optional[SearchChatFormatter] = None,
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,

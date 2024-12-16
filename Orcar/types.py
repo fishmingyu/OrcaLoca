@@ -85,6 +85,13 @@ class SearchResult(SearchActionStep):
             Search Action Input: {self.search_action_input}\n
             {self.search_content}\n</Search Result>"""
 
+    def get_next_response(self) -> str:
+        """Get next response."""
+        return f"""<New Info>\n
+            Search Action: {self.search_action}\n
+            Search Action Input: {self.search_action_input}\n
+            {self.search_content}\n</New Info>"""
+
     def __eq__(self, other):  # not used
         pass
 
@@ -257,6 +264,7 @@ class EditInput(BaseModel):
     """
 
     problem_statement: str
+    hint: str
     bug_locations: List[BugLocations]
 
 

@@ -47,7 +47,8 @@ class Editor:
         insert_line: int | None = None,
         **kwargs,
     ):
-        _path = Path(path)
+        combined_path = os.path.join(self.repo_path, path)
+        _path = Path(combined_path)
         self.validate_path(command, _path)
         if command == "view":
             return self.view(_path, view_range)

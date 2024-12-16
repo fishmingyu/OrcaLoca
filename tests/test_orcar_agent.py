@@ -8,8 +8,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "SWE-bench_common",
-    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset": "SWE-bench_common",
+    # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
@@ -29,6 +29,8 @@ args_dict = {
     ),
     # whole repo
     # "filter_instance": ".*",
+    # internal error
+    "filter_instance": "^(django__django-15814)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
