@@ -11,7 +11,7 @@ from llama_index.core.callbacks import CallbackManager
 from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
-from .environment.benchmark import BenchmarkEnv, get_repo_dir
+from .environment.benchmark import LONG_TIMEOUT, BenchmarkEnv, get_repo_dir
 from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
 from .log_utils import get_logger
 from .output_parser import ExtractOutputParser
@@ -220,7 +220,8 @@ class ExtractWorker(BaseAgentWorker):
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
         log = self.env.run(
-            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path)
+            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
+            timeout=LONG_TIMEOUT,
         )
         logger.info(f"Reproducer log:\n{log}")
         return log
