@@ -8,12 +8,12 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "SWE-bench_common",
-    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset": "SWE-bench_common",
+    # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
-    "idx_list": [0, 3],
+    # "idx_list": [0, 3],
     # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-26020)$",
@@ -24,7 +24,9 @@ args_dict = {
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": "^(sympy__sympy-23262)$",
     # whole repo
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
+    # internal error
+    "filter_instance": "^(django__django-15814)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
@@ -109,11 +111,11 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    final_stage = "extract"
-    # final_stage = "search"
+    # final_stage = "extract"
+    final_stage = "search"
     # final_stage = "edit"
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    # agent.set_redirect_log(True)
+    agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))

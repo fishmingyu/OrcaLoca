@@ -128,7 +128,9 @@ def test_agent():
             search_output = json.load(f)
         bug_locations = search_output["bug_locations"]
         edit_input = EditInput(
-            problem_statement=problem_statement, bug_locations=bug_locations
+            problem_statement=problem_statement,
+            hint=search_output["conclusion"],
+            bug_locations=bug_locations,
         )
         edit_agent = EditAgent(llm=llm, edit_input=edit_input, repo_path=repo_path)
 
