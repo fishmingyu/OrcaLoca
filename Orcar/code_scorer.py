@@ -100,7 +100,12 @@ class CodeScorer:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         start_time = time.time()
-        results = loop.run_until_complete(self._score_batch_async(chat_inputs))
+        # add a buffer
+        results = []
+        for i in range(0, len(chat_inputs), 10):
+            results += loop.run_until_complete(
+                self._score_batch_async(chat_inputs[i : i + 10])
+            )
         logger.info(f"Total batch chat time: {time.time() - start_time:.2f}s")
 
         ret: List[int] = []

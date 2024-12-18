@@ -8,8 +8,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "SWE-bench_common",
-    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset": "SWE-bench_common",
+    # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
@@ -18,17 +18,17 @@ args_dict = {
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23314)$",
     # "filter_instance": "^(django__django-15814)$",
-    "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
     # Long Issue Test
     # "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
-    "filter_instance": (
-        "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
-        "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
-        "scikit-learn__scikit-learn-13496)$"
-    ),
+    # "filter_instance": (
+    #    "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
+    #    "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
+    #    "scikit-learn__scikit-learn-13496)$"
+    # ),
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
