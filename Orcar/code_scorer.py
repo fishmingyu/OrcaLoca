@@ -14,7 +14,7 @@ CODE_SCORER_SYSTEM_PROMPT = (
     "You are a python coding expert. "
     "Your job is to score how likely a piece of code will need to be modified "
     "to solve a github issue. "
-    "The issue description will be presentd in 'problem_statement'. "
+    "The issue description will be presented in 'problem_statement'. "
 )
 
 CODE_SCORER_ORDER_PROMPT = (
