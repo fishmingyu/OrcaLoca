@@ -77,16 +77,27 @@ def extract_final_response(input_text: str) -> Tuple[str, str]:
 
 
 def load_with_escape(input_text: str) -> dict:
-    # if input_text contains \s, replace it with __ESCAPED_S__
-    input_text = input_text.replace(r"\s", "__ESCAPED_S__")
+    # Define the regex to match backslashes followed by 's'
+    pattern = r"((?:\\)+)s"
+
+    def replace_match(match):
+        # Get the matched backslashes and count them
+        backslashes = match.group(1)
+        # Check if the total backslashes are odd
+        if len(backslashes) % 4 == 1:
+            # Increase the count by 1 and append 's'
+            return backslashes + r"\\" + r"s"
+        elif len(backslashes) % 4 == 3:
+            # Decrease the count by 1 and append 's'
+            return backslashes[:-1] + r"s"
+        # If even, return unchanged
+        return match.group(0)
+
+    # Apply the regex with the replacement function
+    input_text = re.sub(pattern, replace_match, input_text)
 
     # Parse JSON
     data = json.loads(input_text)
-
-    # Replace escaped characters only for observation_feedback
-    data["observation_feedback"] = data["observation_feedback"].replace(
-        "__ESCAPED_S__", r"\s"
-    )
 
     return data
 
