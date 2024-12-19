@@ -517,7 +517,7 @@ class SearchWorker(BaseAgentWorker):
             early_stop = all(task.extra_state["similarity_cache"])
         else:
             early_stop = False
-        logger.info(f"Is early stop: {early_stop}")
+        logger.info(f"Is early stop: {early_stop} similarity: {is_similar}")
         return early_stop
 
     def _judge_is_complete(self, task: Task) -> bool:
