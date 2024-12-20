@@ -591,7 +591,7 @@ class SearchManager:
             if class_name in self.inverted_index.index:
                 locs = self.inverted_index.search(class_name)
                 # len(locs) is always greater than 1
-                res = "Multiple matched classes found. \n"
+                res = f"Multiple matched classes found about class: {class_name}. \n"
                 for loc in locs:
                     res += f"Possible Location {locs.index(loc)+1}:\n"
                     res += f"File Path: {loc.file_path}\n"
@@ -703,7 +703,8 @@ class SearchManager:
             ):  # if the class method is not unique
                 locs = self.inverted_index.search(method_name)
                 # len(locs) is always greater than 1
-                res = "Multiple matched methods found. \n"
+                res = f"Multiple matched methods found about method: {method_name} in class: {class_name}. \n"
+                new_index = 0
                 for loc in locs:
                     # filter class_name matches
                     if loc.class_name is None:  # not a method
@@ -711,9 +712,10 @@ class SearchManager:
                     loc_class_name = loc.class_name
                     if loc_class_name != class_name:
                         continue
-                    res += f"Possible Location {locs.index(loc)+1}:\n"
+                    res += f"Possible Location {new_index+1}:\n"
                     res += f"File Path: {loc.file_path}\n"
                     res += f"Containing Class: {loc.class_name}\n"
+                    new_index += 1
                 # add <Disambiguation>res</Disambiguation>
                 ret_string = f"<Disambiguation>\n{res}</Disambiguation>"
                 new_row = {
@@ -774,12 +776,14 @@ class SearchManager:
                 query_name, file_path, self.inverted_index
             ):
                 locs = self.inverted_index.search(query_name)
-                res = "Multiple matched callables found. \n"
+                res = f"Multiple matched callables found about query {query_name} in {file_path}. \n"
+                new_index = 0
                 for loc in locs:
                     if loc.file_path != file_path:
                         continue
-                    res += f"Possible Location {locs.index(loc)+1}:\n"
+                    res += f"Possible Location {new_index+1}:\n"
                     res += f"File Path: {loc.file_path}\n"
+                    new_index += 1
                     if loc.class_name:
                         res += f"Containing Class: {loc.class_name}\n"
                     res += "\n"
@@ -850,10 +854,12 @@ class SearchManager:
             if query_name in self.inverted_index.index:
                 locs = self.inverted_index.search(query_name)
                 # len(locs) is always greater than 1
-                res = "Multiple matched callables found. \n"
+                res = f"Multiple matched callables found about query {query_name}. \n"
+                new_index = 0
                 for loc in locs:
-                    res += f"Possible Location {locs.index(loc)+1}:\n"
+                    res += f"Possible Location {new_index+1}:\n"
                     res += f"File Path: {loc.file_path}\n"
+                    new_index += 1
                     if loc.class_name:
                         res += f"Containing Class: {loc.class_name}\n"
                     res += "\n"

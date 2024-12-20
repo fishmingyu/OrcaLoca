@@ -30,16 +30,22 @@ def test_search_manager():
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
     # try to search function "to_python" in ModelChoiceField class
-    fuzzy_search_result = search_manager.fuzzy_search("ModelChoiceField")
-    print(fuzzy_search_result)
+    search_class_res = search_manager.search_class("ModelChoiceField")
+    print(search_class_res)
     dataframe = search_manager.get_frame_from_history(
-        action="fuzzy_search", input="ModelChoiceField"
+        action="search_class", input="ModelChoiceField"
     )
-    file_path = dataframe["file_path"].values[0]
+    file_path = dataframe["file_path"]
 
-    # try exact search
-    exact_search_result = search_manager.exact_search(
-        query="to_python", file_path=file_path, containing_class="ModelChoiceField"
+    # try search method in class
+    exact_search_result = search_manager.search_method_in_class(
+        class_name="ModelChoiceField", method_name="to_python", file_path=file_path
+    )
+    print(exact_search_result)
+
+    # try search method in class without specifying file path
+    exact_search_result = search_manager.search_method_in_class(
+        class_name="ModelChoiceField", method_name="to_python"
     )
     print(exact_search_result)
 
@@ -132,23 +138,53 @@ def test_fitsrec_source_code():
     print(search_manager.history["search_query"])
 
 
-def test_search_callable_in_file():
+def test_search_callable_1():
     repo_path = "~/.orcar/astropy__astropy/"
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
     callable_name = "_scale_back_ascii"
-    code_snippet = search_manager.exact_search(
-        query=callable_name,
+    code_snippet = search_manager.search_callable(
+        query_name=callable_name,
         file_path="astropy/io/fits/fitsrec.py",
-        containing_class="FITS_rec",
     )
 
     print(code_snippet)
 
     res = search_manager.get_query_from_history(
-        action="exact_search", input=callable_name
+        action="search_callable", input="astropy/io/fits/fitsrec.py::" + callable_name
     )
     print(res)
+
+
+def test_search_callable_2():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    callable_name = "to_python"
+    code_snippet = search_manager.search_callable(
+        query_name=callable_name,
+        file_path="django/forms/models.py",
+    )
+    print(code_snippet)
+
+    code_snippet = search_manager.search_callable(
+        query_name=callable_name,
+    )
+
+    print(code_snippet)
+
+    callable_name = "ModelChoiceField"
+    code_snippet = search_manager.search_callable(
+        query_name=callable_name,
+    )
+
+    print(code_snippet)
+
+    search_class = search_manager.search_class(
+        class_name="ASCIIUsernameValidator",
+        file_path="django/contrib/auth/validators.py",
+    )
+    print(search_class)
 
 
 def test_editor_get_bug_code():
@@ -195,22 +231,60 @@ def test_disambuiguate():
     repo_path = "~/.orcar/matplotlib__matplotlib/"
     expand_repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=expand_repo_path)
-    res = search_manager.fuzzy_search("AxesGrid")
+    res = search_manager.search_class("AxesGrid")
     print(res)
+
+    res = search_manager.search_class(
+        class_name="AxesGrid", file_path="lib/mpl_toolkits/axes_grid1/axes_grid.py"
+    )
+    print(res)
+
+    res = search_manager.search_class(
+        class_name="AxesGrid", file_path="lib/mpl_toolkits/axisartist/axes_grid.py"
+    )
+    print(res)
+
+
+def test_duplicate_search_history():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    # first search using the search_callable method
+    callable_name = "ModelChoiceField"
+    search_manager.search_callable(
+        query_name=callable_name,
+        file_path="django/forms/models.py",
+    )
+    history_res = search_manager.get_frame_from_history(
+        action="search_class", input="django/forms/models.py::" + callable_name
+    )
+    print(history_res)
+    history_res = search_manager.get_frame_from_history(
+        action="search_callable", input="django/forms/models.py::" + callable_name
+    )
+    print(history_res)
+    # second search using the search_class method
+    search_manager.search_class("ModelChoiceField")
+    history_res = search_manager.get_frame_from_history(
+        action="search_class", input="ModelChoiceField"
+    )
+    print(history_res)
 
 
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
     # test_search_manager()
-    test_exact_search()
+    # test_exact_search()
     # test_local_build_graph()
     # test_env_build_graph()
     # test_fitsrec()
     # test_fitsrec_source_code()
-    # test_search_callable_in_file()
+    # test_search_callable_1()
+    # test_search_callable_2()
     # print_search_priority()
     # test_editor_get_bug_code()
     # test_matplotlib_axesgrid()
     # test_inverted_index()
     # test_disambuiguate()
+    test_duplicate_search_history()
