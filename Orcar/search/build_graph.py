@@ -683,7 +683,7 @@ class AstVistor(ast.NodeVisitor):
         else:  # method
             self.inverted_index.add(
                 function_name,
-                IndexValue(self.current_file, self.current_class),
+                IndexValue(self.current_file, self.current_class.split("::")[-1]),
             )
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
