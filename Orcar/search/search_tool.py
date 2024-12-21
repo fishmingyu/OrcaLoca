@@ -6,7 +6,7 @@ from typing import List, Tuple
 import pandas as pd
 
 from .build_graph import Loc, LocInfo, RepoGraph
-from .inverted_index import InvertedIndex
+from .inverted_index import IndexValue, InvertedIndex
 
 
 def check_class_method_unique(
@@ -89,8 +89,9 @@ class SearchManager:
         return [
             self.search_file_skeleton,
             self.search_source_code,
-            self.fuzzy_search,
-            self.exact_search,
+            self.search_class,
+            self.search_method_in_class,
+            self.search_callable,
         ]
 
     def get_frame_from_history(self, action: str, input: str) -> pd.DataFrame | None:
@@ -267,6 +268,98 @@ class SearchManager:
             output_methods.append(node_name)
             output_code_snippets.append(content)
         return output_methods, output_code_snippets
+
+    def _get_disambiguous_methods(
+        self, query_name: str, class_name: str = None, file_path: str = None
+    ) -> Tuple[List[str], List[str]]:
+        """Get the disambiguous methods in the file.
+
+        Args:
+            query_name (str): The method name to search.
+            class_name (str): The containing class name. If the method is in a class, provide the class name.
+            file_path (str): The file path to search. If you could make sure the file path, please provide it to avoid ambiguity.
+            Leave it as None if you are not sure about the file path.
+
+        Returns:
+            Tuple[List[str], List[str]]: The list of method names and the list of method code snippets.
+        """
+        output_methods = []
+        output_code_snippets = []
+
+        def util_loc_output(iv: IndexValue) -> Tuple[str, str] | None:
+            containing_class = iv.class_name
+            iv_file_path = iv.file_path
+            if containing_class is not None:
+                # if the method is in a class, the node_name is file_path::class_name::method_name
+                node_name = f"{iv_file_path}::{containing_class}::{query_name}"
+            else:
+                # if the method is not in a class, the node_name is file_path::method_name
+                node_name = f"{iv_file_path}::{query_name}"
+            locinfo = self._get_exact_loc(node_name)
+            if locinfo is not None:
+                loc = locinfo.loc
+                joined_path = os.path.join(self.repo_path, loc.file_name)
+                content = self._get_code_snippet(
+                    joined_path, loc.start_line, loc.end_line
+                )
+                return loc.node_name, content
+            return None
+
+        if file_path is not None and class_name is not None:
+            # use direct search; usually this wouldn't happen in disambiguation
+            node_name = f"{file_path}::{class_name}::{query_name}"
+            locinfo = self._get_exact_loc(node_name)
+            if locinfo is not None:
+                loc = locinfo.loc
+                joined_path = os.path.join(self.repo_path, loc.file_name)
+                content = self._get_code_snippet(
+                    joined_path, loc.start_line, loc.end_line
+                )
+                output_methods.append(loc.node_name)
+                output_code_snippets.append(content)
+            return output_methods, output_code_snippets
+        elif file_path is not None and class_name is None:
+            # use inverted index, filter by file_path
+            key = query_name
+            if key not in self.inverted_index.index:
+                return output_methods, output_code_snippets
+            index_values = self.inverted_index.search(key)
+            for iv in index_values:
+                if iv.file_path == file_path:
+                    # if util_loc_output returns None, we skip this iv
+                    res = util_loc_output(iv)
+                    if res is not None:
+                        node_name, content = res
+                        output_methods.append(node_name)
+                        output_code_snippets.append(content)
+            return output_methods, output_code_snippets
+        elif file_path is None and class_name is not None:
+            # use inverted index, filter by class_name
+            key = query_name
+            if key not in self.inverted_index.index:
+                return output_methods, output_code_snippets
+            index_values = self.inverted_index.search(key)
+            for iv in index_values:
+                if iv.class_name == class_name:
+                    res = util_loc_output(iv)
+                    if res is not None:
+                        node_name, content = res
+                        output_methods.append(node_name)
+                        output_code_snippets.append(content)
+            return output_methods, output_code_snippets
+        else:
+            # use inverted index, no filter
+            key = query_name
+            if key not in self.inverted_index.index:
+                return output_methods, output_code_snippets
+            index_values = self.inverted_index.search(key)
+            for iv in index_values:
+                res = util_loc_output(iv)
+                if res is not None:
+                    node_name, content = res
+                    output_methods.append(node_name)
+                    output_code_snippets.append(content)
+            return output_methods, output_code_snippets
 
     def _fuzzy_search_class(self, class_name: str) -> str:
         """API for fuzzy search the class in the given repo.
@@ -588,6 +681,7 @@ class SearchManager:
         else:
             # first check the inverted_index, the inverted_index does not contain single value key
             # if the query is a single value key, we directly search in the knowledge graph
+            # usually class name wouldn't be used as a method name, so we don't need to check the type
             if class_name in self.inverted_index.index:
                 locs = self.inverted_index.search(class_name)
                 # len(locs) is always greater than 1
@@ -612,45 +706,41 @@ class SearchManager:
                 )
                 return ret_string
             # if the query is not in the inverted_index, we search in the knowledge graph
-            locinfo, snapshot = self._dfs_get_class(class_name)
-            if locinfo is None:
+            loc, snapshot = self._dfs_get_class(class_name)
+            if loc is None:
                 return f"Cannot find the class {class_name}"
-            start_line = locinfo.start_line
-            end_line = locinfo.end_line
+            start_line = loc.start_line
+            end_line = loc.end_line
             if end_line - start_line <= 100:
-                joined_path = os.path.join(self.repo_path, locinfo.file_name)
+                joined_path = os.path.join(self.repo_path, loc.file_name)
                 content = self._get_code_snippet(joined_path, start_line, end_line)
                 new_row = {
                     "search_action": "search_class",
                     "search_input": class_name,
-                    "search_query": locinfo.node_name,
+                    "search_query": loc.node_name,
                     "search_content": content,
                     "query_type": "class",
-                    "file_path": locinfo.file_name,
+                    "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
                 self.history = pd.concat(
                     [self.history, pd.DataFrame([new_row])], ignore_index=True
                 )
-                return (
-                    f"""File Path: {locinfo.file_name} \nClass Content: \n{content}"""
-                )
+                return f"""File Path: {loc.file_name} \nClass Content: \n{content}"""
             else:  # use class skeleton
                 new_row = {
                     "search_action": "search_class",
                     "search_input": class_name,
-                    "search_query": locinfo.node_name,
+                    "search_query": loc.node_name,
                     "search_content": snapshot,
                     "query_type": "class",
-                    "file_path": locinfo.file_name,
+                    "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
                 self.history = pd.concat(
                     [self.history, pd.DataFrame([new_row])], ignore_index=True
                 )
-                return (
-                    f"""File Path: {locinfo.file_name} \nClass Skeleton: \n{snapshot}"""
-                )
+                return f"""File Path: {loc.file_name} \nClass Skeleton: \n{snapshot}"""
 
     def search_method_in_class(
         self, class_name: str, method_name: str, file_path: str = None
@@ -732,6 +822,46 @@ class SearchManager:
                 )
                 return ret_string
             # if the query is not in the inverted_index, we search in the knowledge graph
+            # however here we should first detect whether the class is unique
+            # since the knowledge graph may lead to a wrong class
+            if class_name in self.inverted_index.index:
+                locs = self.inverted_index.search(class_name)
+                # note that there only exist one class that have corresponding method, since we have checked the uniqueness
+                file_path = None
+                for loc in locs:
+                    # iterate to find the file_path
+                    file_path = loc.file_path
+                    node_name = f"{file_path}::{class_name}::{method_name}"
+                    locinfo = self._get_exact_loc(node_name)
+                    if locinfo is not None:  # method is found
+                        break
+                if file_path is None:  # no method is found
+                    return f"Cannot find the method {method_name} in {class_name}"
+                else:
+                    node_name = f"{file_path}::{class_name}::{method_name}"
+                    locinfo = self._get_exact_loc(node_name)
+                    if locinfo is None:
+                        return f"Cannot find the method {method_name} in {class_name} in {file_path}"
+                    loc = locinfo.loc
+                    start_line = loc.start_line
+                    end_line = loc.end_line
+                    joined_path = os.path.join(self.repo_path, loc.file_name)
+                    content = self._get_code_snippet(joined_path, start_line, end_line)
+                    new_row = {
+                        "search_action": "search_method_in_class",
+                        "search_input": search_input,
+                        "search_query": loc.node_name,
+                        "search_content": content,
+                        "query_type": "method",
+                        "file_path": loc.file_name,
+                        "is_skeleton": False,
+                    }
+                    self.history = pd.concat(
+                        [self.history, pd.DataFrame([new_row])], ignore_index=True
+                    )
+                    return (
+                        f"""File Path: {loc.file_name} \nMethod Content: \n{content}"""
+                    )
             node_name = f"{class_name}::{method_name}"
             loc = self.kg.dfs_search_method_in_class(class_name, method_name)
             if loc is None:

@@ -271,6 +271,76 @@ def test_duplicate_search_history():
     print(history_res)
 
 
+def test_disambiguous_methods_1():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    callable_name = "to_python"
+    search_manager.search_callable(
+        query_name=callable_name,
+        file_path="django/forms/models.py",
+    )
+    history_res = search_manager.get_frame_from_history(
+        action="search_callable", input="django/forms/models.py::" + callable_name
+    )
+    is_disambiguous = history_res["query_type"] == "disambiguation"
+    print(f"Is disambiguous: {is_disambiguous}")
+    # use _get_disambiguous_methods
+    disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
+        query_name=callable_name, class_name=None, file_path="django/forms/models.py"
+    )
+    print(disambiguous_methods)
+    print(methods_code)
+
+
+def test_disambiguous_methods_2():
+    repo_path = "~/.orcar/matplotlib__matplotlib"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    callable_name = "AxesGrid"
+    search_manager.search_callable(
+        query_name=callable_name,
+    )
+    history_res = search_manager.get_frame_from_history(
+        action="search_callable", input=callable_name
+    )
+    is_disambiguous = history_res["query_type"] == "disambiguation"
+    print(f"Is disambiguous: {is_disambiguous}")
+    # use _get_disambiguous_methods
+    disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
+        query_name=callable_name
+    )
+    print(disambiguous_methods)
+    print(methods_code)
+
+
+def test_disambiguous_methods_3():
+    repo_path = "~/.orcar/matplotlib__matplotlib"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    class_name = "ImageGrid"
+    code_snippet = search_manager.search_method_in_class(
+        class_name=class_name,
+        method_name="_init_locators",
+    )
+    print(code_snippet)
+
+    code_snippet = search_manager.search_callable(
+        query_name="_init_locators",
+    )
+    print(code_snippet)
+    disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
+        query_name="_init_locators"
+    )
+    print(disambiguous_methods)
+
+    disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
+        query_name="_init_locators",
+        file_path="lib/mpl_toolkits/axes_grid1/axes_grid.py",
+    )
+    print(disambiguous_methods)
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -287,4 +357,7 @@ if __name__ == "__main__":
     # test_matplotlib_axesgrid()
     # test_inverted_index()
     # test_disambuiguate()
-    test_duplicate_search_history()
+    # test_duplicate_search_history()
+    # test_disambiguous_methods_1()
+    # test_disambiguous_methods_2()
+    test_disambiguous_methods_3()
