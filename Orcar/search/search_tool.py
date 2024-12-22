@@ -269,13 +269,35 @@ class SearchManager:
             output_code_snippets.append(content)
         return output_methods, output_code_snippets
 
+    def _get_disambiguous_classes(
+        self,
+        class_name: str,
+    ) -> List[str]:
+        """Get the disambiguous classes
+
+        Args:
+            class_name (str): The class name to search.
+
+        Returns:
+            List[str]: The list of corresponding file paths.
+        """
+        output_files = []
+
+        key = class_name
+        if key not in self.inverted_index.index:
+            return output_files
+        index_values = self.inverted_index.search(key)
+        for iv in index_values:
+            output_files.append(iv.file_path)
+        return output_files
+
     def _get_disambiguous_methods(
-        self, query_name: str, class_name: str = None, file_path: str = None
+        self, method_name: str, class_name: str = None, file_path: str = None
     ) -> Tuple[List[str], List[str]]:
         """Get the disambiguous methods in the file.
 
         Args:
-            query_name (str): The method name to search.
+            method_name (str): The method name to search.
             class_name (str): The containing class name. If the method is in a class, provide the class name.
             file_path (str): The file path to search. If you could make sure the file path, please provide it to avoid ambiguity.
             Leave it as None if you are not sure about the file path.
@@ -291,10 +313,10 @@ class SearchManager:
             iv_file_path = iv.file_path
             if containing_class is not None:
                 # if the method is in a class, the node_name is file_path::class_name::method_name
-                node_name = f"{iv_file_path}::{containing_class}::{query_name}"
+                node_name = f"{iv_file_path}::{containing_class}::{method_name}"
             else:
                 # if the method is not in a class, the node_name is file_path::method_name
-                node_name = f"{iv_file_path}::{query_name}"
+                node_name = f"{iv_file_path}::{method_name}"
             locinfo = self._get_exact_loc(node_name)
             if locinfo is not None:
                 loc = locinfo.loc
@@ -307,7 +329,7 @@ class SearchManager:
 
         if file_path is not None and class_name is not None:
             # use direct search; usually this wouldn't happen in disambiguation
-            node_name = f"{file_path}::{class_name}::{query_name}"
+            node_name = f"{file_path}::{class_name}::{method_name}"
             locinfo = self._get_exact_loc(node_name)
             if locinfo is not None:
                 loc = locinfo.loc
@@ -320,7 +342,7 @@ class SearchManager:
             return output_methods, output_code_snippets
         elif file_path is not None and class_name is None:
             # use inverted index, filter by file_path
-            key = query_name
+            key = method_name
             if key not in self.inverted_index.index:
                 return output_methods, output_code_snippets
             index_values = self.inverted_index.search(key)
@@ -335,7 +357,7 @@ class SearchManager:
             return output_methods, output_code_snippets
         elif file_path is None and class_name is not None:
             # use inverted index, filter by class_name
-            key = query_name
+            key = method_name
             if key not in self.inverted_index.index:
                 return output_methods, output_code_snippets
             index_values = self.inverted_index.search(key)
@@ -349,7 +371,7 @@ class SearchManager:
             return output_methods, output_code_snippets
         else:
             # use inverted index, no filter
-            key = query_name
+            key = method_name
             if key not in self.inverted_index.index:
                 return output_methods, output_code_snippets
             index_values = self.inverted_index.search(key)

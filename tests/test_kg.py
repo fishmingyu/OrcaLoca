@@ -287,7 +287,7 @@ def test_disambiguous_methods_1():
     print(f"Is disambiguous: {is_disambiguous}")
     # use _get_disambiguous_methods
     disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
-        query_name=callable_name, class_name=None, file_path="django/forms/models.py"
+        method_name=callable_name, class_name=None, file_path="django/forms/models.py"
     )
     print(disambiguous_methods)
     print(methods_code)
@@ -308,7 +308,7 @@ def test_disambiguous_methods_2():
     print(f"Is disambiguous: {is_disambiguous}")
     # use _get_disambiguous_methods
     disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
-        query_name=callable_name
+        method_name=callable_name
     )
     print(disambiguous_methods)
     print(methods_code)
@@ -330,12 +330,12 @@ def test_disambiguous_methods_3():
     )
     print(code_snippet)
     disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
-        query_name="_init_locators"
+        method_name="_init_locators"
     )
     print(disambiguous_methods)
 
     disambiguous_methods, methods_code = search_manager._get_disambiguous_methods(
-        query_name="_init_locators",
+        method_name="_init_locators",
         file_path="lib/mpl_toolkits/axes_grid1/axes_grid.py",
     )
     print(disambiguous_methods)
