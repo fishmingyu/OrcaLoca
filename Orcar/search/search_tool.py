@@ -121,6 +121,8 @@ class SearchManager:
 
     def get_node_existance(self, query: str) -> bool:
         # Check if the query exists in the knowledge graph
+        if query is None:
+            return False
         return self.kg.check_node_exists(query)
 
     def get_distance_between_queries(self, query1: str, query2: str) -> int:
@@ -290,6 +292,16 @@ class SearchManager:
         for iv in index_values:
             output_files.append(iv.file_path)
         return output_files
+
+    def _get_disambiguous_query_type(self, query: str) -> str | None:
+        """
+        Here we sample the first locinfo to get the query type, since we believe usually the query type is unique even if the query is not unique.
+        """
+        if query not in self.inverted_index.index:
+            return None
+        index_values = self.inverted_index.search(query)
+        for iv in index_values:
+            return iv.type
 
     def _get_disambiguous_methods(
         self, method_name: str, class_name: str = None, file_path: str = None

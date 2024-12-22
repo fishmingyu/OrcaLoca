@@ -5,9 +5,11 @@ from typing import List
 class IndexValue:
     def __init__(
         self,
+        type: str,
         file_path: str,
         class_name: str | None = None,
     ):
+        self.type = type
         self.file_path = file_path
         self.class_name = class_name
 

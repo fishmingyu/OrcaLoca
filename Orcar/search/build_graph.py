@@ -679,11 +679,17 @@ class AstVistor(ast.NodeVisitor):
         self.function_definitions[function_name] = node_name
         # Add the function to the inverted index
         if self.current_class is None:
-            self.inverted_index.add(function_name, IndexValue(self.current_file))
+            self.inverted_index.add(
+                function_name, IndexValue(type="function", file_path=self.current_file)
+            )
         else:  # method
             self.inverted_index.add(
                 function_name,
-                IndexValue(self.current_file, self.current_class.split("::")[-1]),
+                IndexValue(
+                    type="method",
+                    file_path=self.current_file,
+                    class_name=self.current_class.split("::")[-1],
+                ),
             )
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
@@ -722,7 +728,9 @@ class AstVistor(ast.NodeVisitor):
             end_line=node.end_lineno,
         )
         # Add the class to the inverted index
-        self.inverted_index.add(class_name, IndexValue(self.current_file))
+        self.inverted_index.add(
+            class_name, IndexValue(type="class", file_path=self.current_file)
+        )
         self.graph_builder.add_node(node_name, "class", class_name, docstring, node_loc)
 
         # Link class to the file node
@@ -750,7 +758,10 @@ class AstVistor(ast.NodeVisitor):
                         end_line=node.end_lineno,
                     )
                     # Add the global variable to the inverted index
-                    self.inverted_index.add(var_name, IndexValue(self.current_file))
+                    self.inverted_index.add(
+                        var_name,
+                        IndexValue(type="global_variable", file_path=self.current_file),
+                    )
                     self.graph_builder.add_node(
                         node_name, "global_variable", var_name, None, node_loc
                     )
