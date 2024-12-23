@@ -187,6 +187,9 @@ def _disambiguation_ranking(
         for i, dis in enumerate(disambiguated_methods):
             results.append({"disambiguated_method": dis, "score": scores[i]})
         sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+        print(sorted_results)
+        # prune scores less than self._config_dict["score_threshold"]
+        sorted_results = [result for result in sorted_results if result["score"] > 50]
         # get top 3 disambiguation
         top_k = 3
         if len(sorted_results) <= top_k:
@@ -387,7 +390,58 @@ def test_matplotlib_26020():
         print(res)
 
 
+def scikitlearn_disambiguation_scorer(llm: LLM, problem_statement: str):
+    repo_path = "~/.orcar/scikit-learn__scikit-learn"
+    repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=repo_path)
+
+    search_action = "search_callable"
+    search_action_input = {
+        "query_name": "_sparse_fit",
+    }
+    content = search_manager.search_callable(
+        search_action_input["query_name"],
+    )
+    print(content)
+    search_result = SearchResult(
+        search_action=search_action,
+        search_action_input=search_action_input,
+        search_content=content,
+    )
+    action_list = _disambiguation_ranking(
+        llm=llm,
+        problem_statement=problem_statement,
+        search_manager=search_manager,
+        search_result=search_result,
+    )
+    return action_list
+
+
+def test_scikitlearn_14894():
+    args_dict = {
+        "model": "claude-3-5-sonnet-20241022",
+        "image": "sweagent/swe-agent:latest",
+        "dataset": "princeton-nlp/SWE-bench_Lite",
+        "persistent": True,
+        "container_name": "test",
+        "split": "test",
+        "filter_instance": "^(scikit-learn__scikit-learn-14894)$",
+    }
+
+    args = argparse.Namespace(**args_dict)
+    cfg = Config("./key.cfg")
+    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    ds = load_filter_hf_dataset(args)
+    print(ds)
+    for inst in ds:
+        res = scikitlearn_disambiguation_scorer(
+            llm, problem_statement=inst["problem_statement"]
+        )
+        print(res)
+
+
 if __name__ == "__main__":
     # test_django_15814()
     # test_django_13933()
-    test_matplotlib_26020()
+    # test_matplotlib_26020()
+    test_scikitlearn_14894()

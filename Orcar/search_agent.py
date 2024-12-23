@@ -663,6 +663,12 @@ class SearchWorker(BaseAgentWorker):
             for i, dis in enumerate(disambiguated_methods):
                 results.append({"disambiguated_method": dis, "score": scores[i]})
             sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+            # prune scores less than self._config_dict["score_threshold"]
+            sorted_results = [
+                result
+                for result in sorted_results
+                if result["score"] > self._config_dict["score_threshold"]
+            ]
             # get top 3 disambiguation
             top_k = self._config_dict["top_k_methods"]
             if len(sorted_results) <= top_k:
