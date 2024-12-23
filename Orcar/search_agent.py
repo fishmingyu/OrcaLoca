@@ -274,7 +274,7 @@ class SearchWorker(BaseAgentWorker):
             class_name = bug["class_name"]
             method_name = bug["method_name"]
             # check method_name is a valid method name
-            if method_name != "":
+            if method_name != "" and class_name != "":
                 bug_query = f"{file_path}::{class_name}::{method_name}"
                 exact_loc = self._search_manager._get_exact_loc(bug_query)
                 if exact_loc is None:
