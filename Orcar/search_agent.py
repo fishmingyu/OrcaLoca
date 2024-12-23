@@ -271,7 +271,16 @@ class SearchWorker(BaseAgentWorker):
                 file_path = file_path[1:]
                 file_path = file_path[file_path.find("/") + 1 :]
                 bug["file_name"] = file_path
-        # logger.info(f"Bug location: {data}")
+            class_name = bug["class_name"]
+            method_name = bug["method_name"]
+            # check method_name is a valid method name
+            if method_name != "":
+                bug_query = f"{file_path}::{class_name}::{method_name}"
+                exact_loc = self._search_manager._get_exact_loc(bug_query)
+                if exact_loc is None:
+                    # revise method_name to "" since the method_name is not valid
+                    bug["method_name"] = ""
+
         # cat last observation and bug location
         search_output = {
             "conclusion": last_observation,
@@ -512,7 +521,6 @@ class SearchWorker(BaseAgentWorker):
         """Ranking the class methods."""
         # if the action is search_class, we should rank the class methods
         search_action = search_result.search_action
-        search_action_input = search_result.search_action_input
 
         is_class = self._check_search_result_is_class(search_result)
         if is_class:
@@ -562,11 +570,12 @@ class SearchWorker(BaseAgentWorker):
             search_steps = []
             for i in range(top_k):
                 method_name = sorted_results[i]["method_name"].split("::")[-1]
+                class_name = sorted_results[i]["method_name"].split("::")[-2]
                 search_steps.append(
                     SearchActionStep(
                         search_action="search_method_in_class",
                         search_action_input={
-                            "class_name": search_action_input["class_name"],
+                            "class_name": class_name,
                             "method_name": method_name,
                             "file_path": file_path,
                         },
