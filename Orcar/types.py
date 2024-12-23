@@ -35,27 +35,32 @@ class SearchActionStep(BaseReasoningStep):
     def get_search_input(self) -> str:
         """Get query."""
         """Different search_action
-            self.exact_search,
-            self.fuzzy_search,
+            self.search_class,
+            self.search_method_in_class,
+            self.search_callable,
             self.search_file_skeleton,
             self.search_source_code,
         """
         search_input = ""
-        if self.search_action == "exact_search":
-            # check if containing_class is in search_action_input (Dict)
-            if "containing_class" in self.search_action_input:
-                # avoid query==containing_class
-                if (
-                    self.search_action_input["query"]
-                    == self.search_action_input["containing_class"]
-                ):
-                    search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['query']}"
-                else:
-                    search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['containing_class']}::{self.search_action_input['query']}"
+        if self.search_action == "search_class":
+            class_name = self.search_action_input["class_name"]
+            if "file_path" in self.search_action_input:
+                search_input = f"{self.search_action_input['file_path']}::{class_name}"
             else:
-                search_input = f"{self.search_action_input['file_path']}::{self.search_action_input['query']}"
-        elif self.search_action == "fuzzy_search":
-            search_input = self.search_action_input["query"]
+                search_input = self.search_action_input["class_name"]
+        elif self.search_action == "search_method_in_class":
+            class_name = self.search_action_input["class_name"]
+            method_name = self.search_action_input["method_name"]
+            if "file_path" in self.search_action_input:
+                search_input = f"{self.search_action_input['file_path']}::{class_name}::{method_name}"
+            else:
+                search_input = f"{class_name}::{method_name}"
+        elif self.search_action == "search_callable":
+            query_name = self.search_action_input["query_name"]
+            if "file_path" in self.search_action_input:
+                search_input = f"{self.search_action_input['file_path']}::{query_name}"
+            else:
+                search_input = self.search_action_input["query_name"]
         elif self.search_action == "search_file_skeleton":
             search_input = self.search_action_input["file_name"]
         elif self.search_action == "search_source_code":
