@@ -271,7 +271,16 @@ class SearchWorker(BaseAgentWorker):
                 file_path = file_path[1:]
                 file_path = file_path[file_path.find("/") + 1 :]
                 bug["file_name"] = file_path
-        # logger.info(f"Bug location: {data}")
+            class_name = bug["class_name"]
+            method_name = bug["method_name"]
+            # check method_name is a valid method name
+            if method_name != "":
+                bug_query = f"{file_path}::{class_name}::{method_name}"
+                exact_loc = self._search_manager._get_exact_loc(bug_query)
+                if exact_loc is None:
+                    # revise method_name to "" since the method_name is not valid
+                    bug["method_name"] = ""
+
         # cat last observation and bug location
         search_output = {
             "conclusion": last_observation,
@@ -512,7 +521,6 @@ class SearchWorker(BaseAgentWorker):
         """Ranking the class methods."""
         # if the action is search_class, we should rank the class methods
         search_action = search_result.search_action
-        search_action_input = search_result.search_action_input
 
         is_class = self._check_search_result_is_class(search_result)
         if is_class:
@@ -562,11 +570,12 @@ class SearchWorker(BaseAgentWorker):
             search_steps = []
             for i in range(top_k):
                 method_name = sorted_results[i]["method_name"].split("::")[-1]
+                class_name = sorted_results[i]["method_name"].split("::")[-2]
                 search_steps.append(
                     SearchActionStep(
                         search_action="search_method_in_class",
                         search_action_input={
-                            "class_name": search_action_input["class_name"],
+                            "class_name": class_name,
                             "method_name": method_name,
                             "file_path": file_path,
                         },
@@ -777,18 +786,66 @@ class SearchWorker(BaseAgentWorker):
                     # we don't need to show the full content again
                     search_result.search_content = search_result.search_content[:100]
                     search_result.search_content += "..."
-                search_action = search_result.search_action
-                search_input = search_result.get_search_input()
-                search_query = self._search_manager.get_query_from_history(
-                    action=search_action, input=search_input
-                )
-                # maintain a searched_node_set to avoid duplicate search result in search_cache
-                task.extra_state["searched_node_set"].add(search_query)
                 task.extra_state["current_search"].append(
                     search_result
                 )  # we tolerate duplicate nodes, since it may have different content (e.g. different actions)
         # return the original search result
         return agent_response
+
+    def _process_heuristic_search_cache(
+        self, task: Task, potential_bugs: List[BugLocations]
+    ) -> None:
+        # cache heuristic search results
+        search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
+        # every step recalcuate the heuristic of the search result
+        for search_result in task.extra_state["current_search"]:
+            heuristic_search_result = self._search_result_heuristic(
+                search_result, potential_bugs
+            )
+            search_query = self._search_manager.get_query_from_history(
+                action=search_result.search_action,
+                input=search_result.get_search_input(),
+            )
+
+            # if search_query not in searched_node_set, add it to the search_cache (no duplicate)
+            if search_query not in task.extra_state["searched_node_set"]:
+                search_cache.put(heuristic_search_result)
+            # maintain a searched_node_set to avoid duplicate search result in search_cache
+            task.extra_state["searched_node_set"].add(search_query)
+        task.extra_state["searched_node_set"] = set()  # reset the searched_node_set
+        # get the top k search results, put it to task.extra_state["search_cache"]
+        task.extra_state["search_cache"] = []
+        for _ in range(min(self._config_dict["top_k_search"], search_cache.qsize())):
+            task.extra_state["search_cache"].append(search_cache.get().search_result)
+
+    def _action_decomposition(self, search_result: SearchResult, task: Task) -> None:
+        # we use type to determine whether the search result is a class or disambiguation
+        # if it is a disambiguation, we should rank the disambiguation
+        # if it is a class, we should rank the class methods
+        # class and disambiguation wouldn't appear at the same time
+        top_class_actions = self._class_methods_ranking(search_result, task)
+        disambiguation_actions = self._disambiguation_ranking(search_result, task)
+        # add top class methods to the left of the queue
+        if len(top_class_actions) > 0:
+            for class_method_action in top_class_actions:
+                if not self._check_action_valid(
+                    class_method_action, task.extra_state["action_history"]
+                ):
+                    continue
+                task.extra_state["search_queue"].appendleft(class_method_action)
+                task.extra_state["action_history"].append(class_method_action)
+            logger.info(f"Top class methods: {top_class_actions}")
+
+        # add disambiguation to the left of the queue
+        if len(disambiguation_actions) > 0:
+            for disambiguation_action in disambiguation_actions:
+                if not self._check_action_valid(
+                    disambiguation_action, task.extra_state["action_history"]
+                ):
+                    continue
+                task.extra_state["search_queue"].appendleft(disambiguation_action)
+                task.extra_state["action_history"].append(disambiguation_action)
+            logger.info(f"Disambiguation: {disambiguation_actions}")
 
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
@@ -949,16 +1006,7 @@ class SearchWorker(BaseAgentWorker):
         search_result = self._process_search(
             task, tools, search_step
         )  # this step does search (and forms the search result)
-        top_class_methods = self._class_methods_ranking(search_result, task)
-        # add top class methods to the left of the queue
-        for class_method_action in top_class_methods:
-            if not self._check_action_valid(
-                class_method_action, task.extra_state["action_history"]
-            ):
-                continue
-            task.extra_state["search_queue"].appendleft(class_method_action)
-            task.extra_state["action_history"].append(class_method_action)
-        logger.info(f"Top class methods: {top_class_methods}")
+        self._action_decomposition(search_result, task)
         # logger.info(f"Next Search Input: {search_result}")
 
         # get the agent response; decide the current_search.
@@ -966,20 +1014,10 @@ class SearchWorker(BaseAgentWorker):
             search_result, task, potential_bugs
         )
 
-        # cache heuristic search results
-        search_cache: PriorityQueue[HeuristicSearchResult] = PriorityQueue()
-        # every step recalcuate the heuristic of the search result
-        for search_result in task.extra_state["current_search"]:
-            heuristic_search_result = self._search_result_heuristic(
-                search_result, potential_bugs
-            )
-            search_cache.put(heuristic_search_result)
-        # get the top k search results, put it to task.extra_state["search_cache"]
-        task.extra_state["search_cache"] = []
-        for _ in range(min(self._config_dict["top_k_search"], search_cache.qsize())):
-            task.extra_state["search_cache"].append(search_cache.get().search_result)
+        self._process_heuristic_search_cache(task, potential_bugs)
 
         task.extra_state["next_step_input"] = agent_response.response
+
         # logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
         # logger.info(f"Searched: {search_result.get_content()}")
 
