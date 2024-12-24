@@ -16,7 +16,7 @@ args_dict = {
     # "idx_list": [0, 3],
     # "idx_range": [0, 1],
     # Short Issue Test
-    "filter_instance": "^(matplotlib__matplotlib-23299)$",
+    "filter_instance": "^(pylint-dev__pylint-7080)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
     # Long Issue Test
