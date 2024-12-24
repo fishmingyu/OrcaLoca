@@ -13,11 +13,12 @@ STEP_EXAMPLE = {
         },
     ],
     "new_search_actions": [
-        {"action": "fuzzy_search", "action_input": {"query": "str"}},
+        {"action": "search_class", "action_input": {"class_name": "str"}},
         {
-            "action": "exact_search",
-            "action_input": {"query": "str", "file_path": "path/to/file"},
+            "action": "search_method_in_class",
+            "action_input": {"class_name": "str", "method_name": "str"},
         },
+        {"action": "search_callable", "action_input": {"query_name": "str"}},
     ],
 }
 
@@ -97,7 +98,7 @@ BUG_CODE_INPUT = {
 
 EDIT_OUTPUT = {
     "feedback": "observation",
-    "action_input": {"command": "search_func", "path": "str"},
+    "action_input": {"command": "view", "path": "str"},
 }
 
 EDIT_SYSTEM_HEADER = r"""
