@@ -149,32 +149,26 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
                     elif not loc["method_name"]:
                         keyword += loc["class_name"]
                     else:
+                        model_keyword_set.add(keyword + loc["class_name"])
                         keyword += loc["class_name"] + "." + loc["method_name"]
                     model_keyword_set.add(keyword)
+                output_dict[inst_id]["file"] = dict()
                 if file_set.issubset(model_file_set):
                     file_match += 1
-                    # is_searcher_match = True
-                    # print('    File Matched!')
-                    output_dict[inst_id]["file"] = "Matched"
+                    output_dict[inst_id]["file"]["file_status"] = "Matched"
                 else:
-                    # print('    File mismatch:')
-                    # print('    Golden: \n    ',file_set)
-                    # print('    Model: \n    ',model_file_set)
-                    output_dict[inst_id]["file"] = dict()
-                    output_dict[inst_id]["file"]["golden"] = list(file_set)
-                    output_dict[inst_id]["file"]["model"] = list(model_file_set)
+                    output_dict[inst_id]["file"]["file_status"] = "Not Matched"
+                output_dict[inst_id]["file"]["golden"] = list(file_set)
+                output_dict[inst_id]["file"]["model"] = list(model_file_set)
 
+                output_dict[inst_id]["keyword"] = dict()
                 if keyword_set.issubset(model_keyword_set):
                     keyword_match += 1
-                    # print('    Keyword Matched!')
-                    output_dict[inst_id]["keyword"] = "Matched"
+                    output_dict[inst_id]["keyword"]["keyword_status"] = "Matched"
                 else:
-                    # print('    Keyword mismatch:')
-                    # print('    Golden: \n    ',keyword_set)
-                    # print('    Model: \n    ',model_keyword_set)
-                    output_dict[inst_id]["keyword"] = dict()
-                    output_dict[inst_id]["keyword"]["golden"] = list(keyword_set)
-                    output_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
+                    output_dict[inst_id]["keyword"]["keyword_status"] = "Not Matched"
+                output_dict[inst_id]["keyword"]["golden"] = list(keyword_set)
+                output_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
 
         # is_extractor_match = False
         json_dir = f"{output_dir}/{inst_id}/extractor_{inst_id}.json"

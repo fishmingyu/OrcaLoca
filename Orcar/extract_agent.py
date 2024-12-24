@@ -220,10 +220,13 @@ class ExtractWorker(BaseAgentWorker):
         output_path = f"/tmp/tracer_output_{inst['instance_id']}.json"
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
-        log = self.env.run(
-            gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
-            timeout=LONG_TIMEOUT,
-        )
+        try:
+            log = self.env.run(
+                gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
+                timeout=LONG_TIMEOUT,
+            )
+        except Exception as e:
+            log = str(e)
         logger.info(f"Reproducer log:\n{log}")
         return log
 
