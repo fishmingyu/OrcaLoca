@@ -682,6 +682,8 @@ class SearchWorker(BaseAgentWorker):
             top_k = self._config_dict["top_k_methods"]
             if len(sorted_results) <= top_k:
                 top_k = 1  # only one disambiguation
+            if len(sorted_results) == 0:
+                return []
             search_steps = []
             # please note, the disambiguated_method is the node name
             # if two "::" in the node name, it means it is a class's method
