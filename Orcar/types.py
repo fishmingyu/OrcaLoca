@@ -120,23 +120,23 @@ class HeuristicSearchResult(BaseModel):
 class BugLocations(BaseModel):
     """Bug locations reasoning step."""
 
-    file_name: str
+    file_path: str
     class_name: str
     method_name: str
 
     def bug_query(self) -> str | None:
         """Get bug query."""
         # class_name can be "", method_name can also be ""
-        if self.file_name == "":
+        if self.file_path == "":
             return None
         if self.class_name != "" and self.method_name != "":
-            return f"{self.file_name}::{self.class_name}::{self.method_name}"
+            return f"{self.file_path}::{self.class_name}::{self.method_name}"
         elif self.class_name == "" and self.method_name != "":
-            return f"{self.file_name}::{self.method_name}"
+            return f"{self.file_path}::{self.method_name}"
         elif self.class_name != "" and self.method_name == "":
-            return f"{self.file_name}::{self.class_name}"
+            return f"{self.file_path}::{self.class_name}"
         else:
-            return f"{self.file_name}"
+            return f"{self.file_path}"
 
 
 class ExtractSliceStep(BaseReasoningStep):

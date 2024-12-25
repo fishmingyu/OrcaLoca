@@ -120,12 +120,12 @@ class SearchOutputParser(BaseOutputParser):
             "observation": "str",
             "potential_bug_locations": [
                 {
-                    "file_name": "path/to/file",
+                    "file_path": "path/to/file",
                     "class_name": "class_name",
                     "method_name": "function_name",
                 },
                 {
-                    "file_name": "path/to/file",
+                    "file_path": "path/to/file",
                     "class_name": "class_name",
                     "method_name": "function_name",
                 },
@@ -159,7 +159,7 @@ class SearchOutputParser(BaseOutputParser):
 
             for bug_location in json_str["potential_bug_locations"]:
                 bug = BugLocations(
-                    file_name=bug_location["file_name"],
+                    file_path=bug_location["file_path"],
                     class_name=bug_location["class_name"],
                     method_name=bug_location["method_name"],
                 )
@@ -180,12 +180,12 @@ class SearchOutputParser(BaseOutputParser):
         """
         "bug_locations": [
                 {
-                    "file_name": "path/to/file",
+                    "file_path": "path/to/file",
                     "class_name": "class_name",
                     "method_name": "function_name",
                 },
                 {
-                    "file_name": "path/to/file",
+                    "file_path": "path/to/file",
                     "class_name": "class_name",
                     "method_name": "function_name",
                 },

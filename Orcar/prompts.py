@@ -2,12 +2,12 @@ STEP_EXAMPLE = {
     "observation_feedback": "observation",
     "potential_bug_locations": [
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "class_name": "class_name",
             "method_name": "function_name",
         },
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "class_name": "class_name",
             "method_name": "function_name",
         },
@@ -25,12 +25,12 @@ STEP_EXAMPLE = {
 BUG_OUTPUT = {
     "bug_locations": [
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "class_name": "class_name",
             "method_name": "function_name",
         },
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "class_name": "class_name",
             "method_name": "function_name",
         },
@@ -53,7 +53,7 @@ Everytime we will provide a new search result in tag <New Info>.
 It may contain the disambiguation info if the search action is related to multiple classes or methods.
 Also, previous search result will be provided in tag <Search Result>. You need to analyze the new search result based on the previous one, and provide the observation
 based on whole context.
-2. Think about where the bug might be in the code, and provide the potential bug locations.
+2. Think about where the bug might be in the code by the whole given context(including all Search Result), and provide the potential bug locations. Potential here means the most possible locations up to current context.
 3. Check whether it contains any class, method or function you need to further search. Especially, if disambiguation info is provided, you need to search for the specific class or method.
 Plan the new_search_actions based on the current context. You can use the given API calls to search for the bug locations.
 You can put multiple actions in the new_search_actions list. Be sure to use arguments in the tool description.
@@ -84,12 +84,12 @@ follow the instruction "Now let's come to a conclusion. ".
 BUG_CODE_INPUT = {
     "bug_info": [
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "func_name": "function_name",
             "range": "line numbers",
         },
         {
-            "file_name": "path/to/file",
+            "file_path": "path/to/file",
             "func_name": "function_name",
             "range": "line numbers",
         },
