@@ -119,7 +119,7 @@ class SearchManager:
 
         return query
 
-    def get_node_existance(self, query: str) -> bool:
+    def get_node_existence(self, query: str) -> bool:
         # Check if the query exists in the knowledge graph
         if query is None:
             return False
@@ -208,7 +208,7 @@ class SearchManager:
                     return func_body
         return f"Cannot find the context of {source_code} in {file_path}"
 
-    def _get_file_skeleton(self, file_name: str) -> Tuple[Loc, str] | None:
+    def _dfs_get_file_skeleton(self, file_name: str) -> Tuple[Loc, str] | None:
         """Get the skeleton of the file, including class and function definitions.
 
         Args:
@@ -218,6 +218,17 @@ class SearchManager:
             Tuple[Loc, str] | None: The location of the file and the file skeleton.
         """
         return self.kg.dfs_search_file_skeleton(file_name)
+
+    def _direct_get_file_skeleton(self, file_node_name: str) -> str | None:
+        """Get the skeleton of the file, including class and function definitions.
+
+        Args:
+            file_node_name (str): The file node name to get the skeleton.
+
+        Returns:
+            str | None: The file skeleton.
+        """
+        return self.kg.direct_get_file_skeleton_from_node(file_node_name)
 
     def _search_callable_kg(self, callable: str) -> LocInfo | None:
         """Search the callable in the knowledge graph.
@@ -447,36 +458,123 @@ class SearchManager:
     # Interface methods
     #################
 
-    def search_file_skeleton(self, file_name: str) -> str:
+    def search_file_contents(
+        self, file_name: str, directory_path: str | None = None
+    ) -> str:
         """API to search the file skeleton
             If you want to see the structure of the file, including class and function signatures.
-            Be sure to call search_class and search_func to get detailed information in the file.
+            Be sure to call search_class and search_method_in_class to get the detailed information.
 
         Args:
-            file_name (str): The file name to search. Usage: search_file_contents("example.py")
-            Do not include the path, only the file name.
+            file_name (str): The file name to search. Usage: search_file_contents("example.py"). Do not include the path, only the file name.
+            directory_path (str): The directory path to search. Usage: search_file_contents("example.py", "path/to/directory")
 
         Returns:
-           str: A string that contains the file path and the file skeleton.
+           str: If file contents exceed 200 lines, we will return the file skeleton, a string that contains the file path and the file skeleton.
+                Otherwise, we will return the file path and the file contents.
         """
-
-        loc, res = self._get_file_skeleton(file_name)
-        if loc is None:
-            return f"Cannot find the file skeleton of {file_name}"
-
-        new_row = {
-            "search_action": "search_file_skeleton",
-            "search_input": file_name,
-            "search_query": loc.node_name,
-            "search_content": res,
-            "query_type": "file",
-            "file_path": loc.file_name,
-            "is_skeleton": True,
-        }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
-        return f"""File Path: {loc.file_name} \nFile Skeleton: \n{res}"""
+        if directory_path is not None:
+            file_node = f"{directory_path}/{file_name}"
+            locinfo = self._get_exact_loc(file_node)
+            if locinfo is None:
+                return f"Cannot find the file {file_name} in {directory_path}"
+            loc = locinfo.loc
+            start_line = loc.start_line
+            end_line = loc.end_line
+            if end_line - start_line <= 200:
+                content = self._get_code_snippet(
+                    os.path.join(self.repo_path, loc.file_name), start_line, end_line
+                )
+                new_row = {
+                    "search_action": "search_file_contents",
+                    "search_input": file_name,
+                    "search_query": loc.node_name,
+                    "search_content": content,
+                    "query_type": "file",
+                    "file_path": loc.file_name,
+                    "is_skeleton": False,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""File Path: {loc.file_name} \nFile Content: \n{content}"""
+            else:
+                snapshot = self._direct_get_file_skeleton(loc.node_name)
+                new_row = {
+                    "search_action": "search_file_contents",
+                    "search_input": file_name,
+                    "search_query": loc.node_name,
+                    "search_content": snapshot,
+                    "query_type": "file",
+                    "file_path": loc.file_name,
+                    "is_skeleton": True,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""File Path: {loc.file_name} \nFile Skeleton: \n{snapshot}"""
+        else:
+            # first check inverted_index, the inverted_index does not contain single value key
+            # if the query is a single value key, we directly search in the knowledge graph
+            if file_name in self.inverted_index.index:
+                locs = self.inverted_index.search(file_name)
+                # len(locs) is always greater than 1
+                res = f"Multiple matches found for file {file_name}. \n"
+                for loc in locs:
+                    res += f"Possible Location {locs.index(loc)+1}:\n"
+                    res += f"File Path: {loc.file_path}\n"
+                    res += "\n"
+                # add <Disambiguation>res</Disambiguation>
+                ret_string = f"<Disambiguation>\n{res}</Disambiguation>"
+                new_row = {
+                    "search_action": "search_file_contents",
+                    "search_input": file_name,
+                    "search_query": file_name,
+                    "search_content": res,
+                    "query_type": "disambiguation",
+                    "file_path": "",
+                    "is_skeleton": False,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return ret_string
+            loc, res = self._dfs_get_file_skeleton(file_name)
+            if loc is None:
+                return f"Cannot find the file {file_name}"
+            start_line = loc.start_line
+            end_line = loc.end_line
+            if end_line - start_line <= 200:
+                content = self._get_code_snippet(
+                    os.path.join(self.repo_path, loc.file_name), start_line, end_line
+                )
+                new_row = {
+                    "search_action": "search_file_contents",
+                    "search_input": file_name,
+                    "search_query": loc.node_name,
+                    "search_content": content,
+                    "query_type": "file",
+                    "file_path": loc.file_name,
+                    "is_skeleton": False,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""File Path: {loc.file_name} \nFile Content: \n{content}"""
+            else:
+                new_row = {
+                    "search_action": "search_file_contents",
+                    "search_input": file_name,
+                    "search_query": loc.node_name,
+                    "search_content": res,
+                    "query_type": "file",
+                    "file_path": loc.file_name,
+                    "is_skeleton": True,
+                }
+                self.history = pd.concat(
+                    [self.history, pd.DataFrame([new_row])], ignore_index=True
+                )
+                return f"""File Path: {loc.file_name} \nFile Skeleton: \n{res}"""
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
         """API to search the source code in the file. If you want to search the code snippet in the file.
