@@ -389,6 +389,44 @@ def test_file_contents_2():
     assert history_res["query_type"] == "disambiguation"
 
 
+def test_analyze_bug_locs_with_file():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    bug_locs = search_manager._get_bug_location(
+        "Command", "django/core/management/commands/sqlmigrate.py"
+    )
+    print(bug_locs)
+    bug_locs = search_manager._get_bug_location("to_python", "django/forms/models.py")
+    print(bug_locs)
+    bug_locs = search_manager._get_bug_location(
+        "ModelChoiceField", "django/forms/models.py"
+    )
+    print(bug_locs)
+    bug_locs = search_manager._get_bug_location(
+        "serializer_factory", "django/db/migrations/serializer.py"
+    )
+    print(bug_locs)
+
+
+def test_analyze_bug_locs():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    bug_locs = search_manager._get_bug_location(
+        "to_python",
+    )
+    print(bug_locs)
+    bug_locs = search_manager._get_bug_location(
+        "ModelChoiceField",
+    )
+    print(bug_locs)
+    bug_locs = search_manager._get_bug_location(
+        "serializer_factory",
+    )
+    print(bug_locs)
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -410,4 +448,6 @@ if __name__ == "__main__":
     # test_disambiguous_methods_2()
     # test_disambiguous_methods_3()
     # test_file_contents_1()
-    test_file_contents_2()
+    # test_file_contents_2()
+    test_analyze_bug_locs_with_file()
+    # test_analyze_bug_locs()
