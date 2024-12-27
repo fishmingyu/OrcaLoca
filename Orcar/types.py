@@ -38,7 +38,7 @@ class SearchActionStep(BaseReasoningStep):
             self.search_class,
             self.search_method_in_class,
             self.search_callable,
-            self.search_file_skeleton,
+            self.search_file_contents,
             self.search_source_code,
         """
         search_input = ""
@@ -61,8 +61,14 @@ class SearchActionStep(BaseReasoningStep):
                 search_input = f"{self.search_action_input['file_path']}::{query_name}"
             else:
                 search_input = self.search_action_input["query_name"]
-        elif self.search_action == "search_file_skeleton":
-            search_input = self.search_action_input["file_name"]
+        elif self.search_action == "search_file_contents":
+            file_name = self.search_action_input["file_name"]
+            if "directory_path" in self.search_action_input:
+                search_input = (
+                    f"{self.search_action_input['directory_path']}/{file_name}"
+                )
+            else:
+                search_input = self.search_action_input["file_name"]
         elif self.search_action == "search_source_code":
             search_input = self.search_action_input["source_code"]
         return search_input

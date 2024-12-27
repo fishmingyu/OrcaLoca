@@ -87,7 +87,7 @@ class SearchManager:
     def get_search_functions(self) -> list:
         """Return a list of search functions."""
         return [
-            self.search_file_skeleton,
+            self.search_file_contents,
             self.search_source_code,
             self.search_class,
             self.search_method_in_class,
@@ -304,6 +304,28 @@ class SearchManager:
             output_files.append(iv.file_path)
         return output_files
 
+    def _get_disambiguous_files(
+        self,
+        file_name: str,
+    ) -> List[str]:
+        """Get the disambiguous files
+
+        Args:
+            file_name (str): The file name to search.
+
+        Returns:
+            List[str]: The list of corresponding file paths.
+        """
+        output_files = []
+
+        key = file_name
+        if key not in self.inverted_index.index:
+            return output_files
+        index_values = self.inverted_index.search(key)
+        for iv in index_values:
+            output_files.append(iv.file_path)
+        return output_files
+
     def _get_disambiguous_query_type(self, query: str) -> str | None:
         """
         Here we sample the first locinfo to get the query type, since we believe usually the query type is unique even if the query is not unique.
@@ -487,7 +509,7 @@ class SearchManager:
                 )
                 new_row = {
                     "search_action": "search_file_contents",
-                    "search_input": file_name,
+                    "search_input": file_node,
                     "search_query": loc.node_name,
                     "search_content": content,
                     "query_type": "file",
@@ -502,7 +524,7 @@ class SearchManager:
                 snapshot = self._direct_get_file_skeleton(loc.node_name)
                 new_row = {
                     "search_action": "search_file_contents",
-                    "search_input": file_name,
+                    "search_input": file_node,
                     "search_query": loc.node_name,
                     "search_content": snapshot,
                     "query_type": "file",
