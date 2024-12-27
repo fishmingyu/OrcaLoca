@@ -282,6 +282,24 @@ class SearchManager:
             output_code_snippets.append(content)
         return output_methods, output_code_snippets
 
+    def _get_file_functions(self, file_node_name: str) -> Tuple[List[str], List[str]]:
+        """Return
+        1. The list of function names in the file.
+        2. The list of function code snippets in the file.
+        """
+
+        output_functions = []
+        output_code_snippets = []
+        list_loc = self.kg.get_file_functions(file_node_name)
+        for loc in list_loc:
+            file_name = loc.file_name
+            node_name = loc.node_name
+            joined_path = os.path.join(self.repo_path, file_name)
+            content = self._get_code_snippet(joined_path, loc.start_line, loc.end_line)
+            output_functions.append(node_name)
+            output_code_snippets.append(content)
+        return output_functions, output_code_snippets
+
     def _get_disambiguous_classes(
         self,
         class_name: str,

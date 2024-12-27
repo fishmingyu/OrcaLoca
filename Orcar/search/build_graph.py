@@ -324,6 +324,15 @@ class RepoGraph:
                 methods.append(self.graph.nodes[method]["loc"])
         return methods
 
+    def get_file_functions(self, file_node_name: str) -> List[Loc] | None:
+        if not self.check_node_exists(file_node_name):
+            return None
+        functions = []
+        for function in self.graph.neighbors(file_node_name):
+            if self.graph.nodes[function]["type"] == "function":
+                functions.append(self.graph.nodes[function]["loc"])
+        return functions
+
     def direct_get_file_skeleton_from_node(self, file_node_name: str) -> str | None:
         """Get the snapshot of a file from the node name of the file."""
         # check if the node exists in the graph
