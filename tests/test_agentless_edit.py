@@ -125,6 +125,7 @@ def gather_search_result():
         found_edit_locs: Dict[str, List[str]] = dict()
 
         search_manager = SearchManager(repo_path=repo_path)
+        exp_length = 0
         for bug in bug_locations:
             if bug.method_name == "":
                 loc_info = search_manager._get_exact_loc(
@@ -144,6 +145,7 @@ def gather_search_result():
             if bug.file_name not in found_edit_locs:
                 found_edit_locs[bug.file_name] = []
 
+            """
             if bug.method_name == "":
                 bug_str = f"class: {bug.class_name}"
             elif bug.class_name == "":
@@ -153,20 +155,23 @@ def gather_search_result():
                     bug_str = f"function: {bug.method_name}"
             else:
                 bug_str = f"function: {bug.class_name}.{bug.method_name}"
+            """
 
-            found_edit_locs[bug.file_name].append(bug_str)
+            # found_edit_locs[bug.file_name].append(bug_str)
+            # exp_length += 1
 
-            # start_line = loc_info.loc.start_line
-            # end_line = loc_info.loc.end_line
-            # range_str = f"{start_line}-{end_line}"
-            # found_edit_locs[bug.file_name].append(f"line: {range_str}")
+            start_line = int(loc_info.loc.start_line)
+            end_line = int(loc_info.loc.end_line)
+            for i in range(start_line, end_line + 1):
+                found_edit_locs[bug.file_name].append(f"line: {i}")
+            exp_length += end_line - start_line + 1
 
         sum_output_lines = 0
         for _, v in found_edit_locs.items():
             sum_output_lines += len(v)
-        if sum_output_lines != len(bug_locations):
+        if sum_output_lines != exp_length:
             logger.warning(
-                f"Output lines mismatch: Got {sum_output_lines} != Exp {2 * len(bug_locations)}"
+                f"Output lines mismatch: Got {sum_output_lines} != Exp {exp_length}"
             )
 
         found_files = sorted(list(set(list(found_edit_locs.keys()))))  # unique
