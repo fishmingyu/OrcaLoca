@@ -124,8 +124,8 @@ class SearchWorker(BaseAgentWorker):
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._config_dict = {
-            "top_k_search": 15,
-            "sliding_window_size": 10,
+            "top_k_search": 12,
+            "sliding_window_size": 12,
             "top_k_methods": 3,
             "score_threshold": 50,
         }
