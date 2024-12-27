@@ -1,7 +1,7 @@
 import ast
 import os
 import re
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 
@@ -145,6 +145,156 @@ class SearchManager:
         with open(file_path, "r") as f:
             lines = f.readlines()
             return "".join(lines[start - 1 : end])
+
+    def _get_bug_location(
+        self, query: str, file_path: str = None
+    ) -> Dict[str, str] | None:
+        """Get the bug location
+
+        Args:
+            query (str): The query to search.
+            file_path (str): The file path to search.
+
+        Returns:
+            Dict[str, str]: The bug location.
+        """
+        if file_path is not None:
+            # check callable in the file using inverted index
+            if check_callable_unique_in_file(query, file_path, self.inverted_index):
+                locinfo = self._get_query_in_file(file_path, query)
+                if locinfo is not None:
+                    loc = locinfo.loc
+                    node_name = loc.node_name
+                    type = locinfo.type
+                    if type == "method":
+                        class_name = node_name.split("::")[1]
+                        method_name = node_name.split("::")[2]
+                        file_path = loc.file_name
+                        bug_loc = {
+                            "file_path": file_path,
+                            "class_name": class_name,
+                            "method_name": method_name,
+                        }
+                    elif type == "class":
+                        file_path = loc.file_name
+                        bug_loc = {
+                            "file_path": file_path,
+                            "class_name": query,
+                            "method_name": "",
+                        }
+                    else:
+                        bug_loc = {
+                            "file_path": loc.file_name,
+                            "class_name": "",
+                            "method_name": query,
+                        }
+                    bug_loc_json = {"bug_locations": [bug_loc]}
+                    return bug_loc_json
+                return None
+            else:  # if the callable is not unique in the file, we need to disambiguate
+                # return all the possible locations
+                ivs = self.inverted_index.search(query)
+                bug_locs = []
+                for iv in ivs:
+                    if iv.file_path == file_path:  # filter by file_path
+                        # if iv.class_name is not None, it is a method
+                        if iv.class_name is not None:
+                            class_name = iv.class_name
+                            method_name = query
+                            bug_loc = {
+                                "file_path": iv.file_path,
+                                "class_name": class_name,
+                                "method_name": method_name,
+                            }
+                        else:
+                            node_name = iv.file_path + "::" + query
+                            locinfo = self._get_exact_loc(node_name)
+                            if locinfo is None:
+                                continue
+                            type = locinfo.type
+                            if type == "class":
+                                bug_loc = {
+                                    "file_path": iv.file_path,
+                                    "class_name": query,
+                                    "method_name": "",
+                                }
+                            else:
+                                bug_loc = {
+                                    "file_path": iv.file_path,
+                                    "class_name": "",
+                                    "method_name": query,
+                                }
+                        bug_locs.append(bug_loc)
+                bug_loc_json = {"bug_locations": bug_locs}
+                return bug_loc_json
+        else:
+            # check callable in the inverted index
+            if query in self.inverted_index.index:
+                locs = self.inverted_index.search(query)
+                # return all the possible locations
+                bug_locs = []
+                for loc in locs:
+                    if loc.class_name is not None:  # it is a method
+                        class_name = loc.class_name
+                        method_name = query
+                        bug_loc = {
+                            "file_path": loc.file_path,
+                            "class_name": class_name,
+                            "method_name": method_name,
+                        }
+                    else:
+                        node_name = loc.file_path + "::" + query
+                        locinfo = self._get_exact_loc(node_name)
+                        if locinfo is None:
+                            continue
+                        type = locinfo.type
+                        if type == "class":
+                            bug_loc = {
+                                "file_path": loc.file_path,
+                                "class_name": query,
+                                "method_name": "",
+                            }
+                        else:
+                            bug_loc = {
+                                "file_path": loc.file_path,
+                                "class_name": "",
+                                "method_name": query,
+                            }
+                    bug_locs.append(bug_loc)
+                bug_loc_json = {"bug_locations": bug_locs}
+                return bug_loc_json
+            else:  # not in the inverted index, directly search in the knowledge graph
+                locinfo = self._search_callable_kg(query)
+                if locinfo is None:
+                    return None
+                loc = locinfo.loc
+                node_name = loc.node_name
+                type = locinfo.type
+                if type == "method":
+                    class_name = node_name.split("::")[1]
+                    method_name = node_name.split("::")[2]
+                    file_path = loc.file_name
+                    bug_loc = {
+                        "file_path": file_path,
+                        "class_name": class_name,
+                        "method_name": method_name,
+                    }
+                elif type == "class":
+                    class_name = node_name.split("::")[1]
+                    file_path = loc.file_name
+                    bug_loc = {
+                        "file_path": file_path,
+                        "class_name": class_name,
+                        "method_name": "",
+                    }
+                else:
+                    bug_loc = {
+                        "file_path": loc.file_name,
+                        "class_name": "",
+                        "method_name": query,
+                    }
+                bug_loc_json = {"bug_locations": [bug_loc]}
+                return bug_loc_json
 
     def _get_exact_loc(self, query: str) -> LocInfo | None:
         """Get the exact location of the query in the knowledge graph.
