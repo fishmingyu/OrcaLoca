@@ -24,6 +24,7 @@ from Orcar.log_utils import (
     switch_log_to_file,
     switch_log_to_stdout,
 )
+from Orcar.search import SearchManager
 from Orcar.search_agent import SearchAgent
 from Orcar.types import EditInput, ExtractOutput, SearchInput, SearchOutput
 
@@ -93,6 +94,10 @@ class OrcarAgent:
             json.dumps(dict(self.inst))
         )
         extract_output = ExtractOutput.model_validate_json(response.response)
+        self.logger.info("Raw Extract output:")
+        self.logger.info(extract_output)
+        extract_output = self.filter_extract_output(extract_output)
+        self.logger.info("Filtered extract output:")
         self.logger.info(extract_output)
 
         if self.output_to_file:
@@ -102,6 +107,28 @@ class OrcarAgent:
             ) as handle:
                 json.dump(extract_json_obj, handle, indent=4)
 
+        return extract_output
+
+    def filter_extract_output(self, extract_output: ExtractOutput) -> ExtractOutput:
+        """Filter the extract output."""
+        self.logger.info("Filtering extract output with search manager...")
+        search_manager = SearchManager(self.repo_path)
+        suspicious_code = extract_output.suspicious_code
+        ret = []
+        for i, c in enumerate(suspicious_code):
+            keyword = c.keyword
+            file_path = c.file_path if c.file_path else None
+            ret_c = search_manager.search_callable(keyword, file_path)
+            if not ret_c.startswith("Cannot find the definition of"):
+                ret.append(c)
+                self.logger.info(
+                    f"({i+1:02d}/{len(suspicious_code):02d}) Search Manager found CodeInfo {c}: \n{ret_c}"
+                )
+            else:
+                self.logger.info(
+                    f"({i+1:02d}/{len(suspicious_code):02d}) Search Manager could not find CodeInfo {c}: \n{ret_c}"
+                )
+        extract_output.suspicious_code = ret
         return extract_output
 
     def run_search_agent(self, extract_output: ExtractOutput) -> SearchOutput:
