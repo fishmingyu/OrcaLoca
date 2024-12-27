@@ -133,7 +133,9 @@ def test_fitsrec_source_code():
     line_num = search_manager.search_source_code(
         "astropy/io/fits/fitsrec.py", source_code
     )
+    exist = search_manager.get_node_existence("astropy/io/fits/fitsrec.py")
     print(line_num)
+    print(exist)
 
     print(search_manager.history["search_query"])
 
@@ -341,6 +343,52 @@ def test_disambiguous_methods_3():
     print(disambiguous_methods)
 
 
+def test_file_contents_1():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    file_contents = search_manager.search_file_contents(
+        "models.py", directory_path="django/forms"
+    )
+    print(file_contents)
+
+    file_contents = search_manager.search_file_contents(
+        "validators.py", directory_path="django/contrib/auth"
+    )
+    print(file_contents)
+
+
+def test_file_contents_2():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+
+    file_contents = search_manager.search_file_contents("sqlmigrate.py")
+    print(file_contents)
+
+    history_res = search_manager.get_frame_from_history(
+        action="search_file_contents", input="sqlmigrate.py"
+    )
+    assert history_res["query_type"] == "file"
+
+    file_contents = search_manager.search_file_contents("boundfield.py")
+    print(file_contents)
+
+    history_res = search_manager.get_frame_from_history(
+        action="search_file_contents", input="boundfield.py"
+    )
+    assert history_res["is_skeleton"]
+
+    disambiguation = search_manager.search_file_contents("query.py")
+    print(disambiguation)
+
+    history_res = search_manager.get_frame_from_history(
+        action="search_file_contents", input="query.py"
+    )
+
+    assert history_res["query_type"] == "disambiguation"
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -360,4 +408,6 @@ if __name__ == "__main__":
     # test_duplicate_search_history()
     # test_disambiguous_methods_1()
     # test_disambiguous_methods_2()
-    test_disambiguous_methods_3()
+    # test_disambiguous_methods_3()
+    # test_file_contents_1()
+    test_file_contents_2()

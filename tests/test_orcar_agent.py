@@ -30,7 +30,7 @@ args_dict = {
     # whole repo
     # "filter_instance": ".*",
     # internal error
-    # "filter_instance": "^(django__django-11099)$",
+    "filter_instance": "^(django__django-17087)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action

@@ -38,7 +38,7 @@ class SearchActionStep(BaseReasoningStep):
             self.search_class,
             self.search_method_in_class,
             self.search_callable,
-            self.search_file_skeleton,
+            self.search_file_contents,
             self.search_source_code,
         """
         search_input = ""
@@ -61,8 +61,14 @@ class SearchActionStep(BaseReasoningStep):
                 search_input = f"{self.search_action_input['file_path']}::{query_name}"
             else:
                 search_input = self.search_action_input["query_name"]
-        elif self.search_action == "search_file_skeleton":
-            search_input = self.search_action_input["file_name"]
+        elif self.search_action == "search_file_contents":
+            file_name = self.search_action_input["file_name"]
+            if "directory_path" in self.search_action_input:
+                search_input = (
+                    f"{self.search_action_input['directory_path']}/{file_name}"
+                )
+            else:
+                search_input = self.search_action_input["file_name"]
         elif self.search_action == "search_source_code":
             search_input = self.search_action_input["source_code"]
         return search_input
@@ -120,23 +126,23 @@ class HeuristicSearchResult(BaseModel):
 class BugLocations(BaseModel):
     """Bug locations reasoning step."""
 
-    file_name: str
+    file_path: str
     class_name: str
     method_name: str
 
     def bug_query(self) -> str | None:
         """Get bug query."""
         # class_name can be "", method_name can also be ""
-        if self.file_name == "":
+        if self.file_path == "":
             return None
         if self.class_name != "" and self.method_name != "":
-            return f"{self.file_name}::{self.class_name}::{self.method_name}"
+            return f"{self.file_path}::{self.class_name}::{self.method_name}"
         elif self.class_name == "" and self.method_name != "":
-            return f"{self.file_name}::{self.method_name}"
+            return f"{self.file_path}::{self.method_name}"
         elif self.class_name != "" and self.method_name == "":
-            return f"{self.file_name}::{self.class_name}"
+            return f"{self.file_path}::{self.class_name}"
         else:
-            return f"{self.file_name}"
+            return f"{self.file_path}"
 
 
 class ExtractSliceStep(BaseReasoningStep):

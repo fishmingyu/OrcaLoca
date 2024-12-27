@@ -324,6 +324,50 @@ class RepoGraph:
                 methods.append(self.graph.nodes[method]["loc"])
         return methods
 
+    def get_file_functions(self, file_node_name: str) -> List[Loc] | None:
+        if not self.check_node_exists(file_node_name):
+            return None
+        functions = []
+        for function in self.graph.neighbors(file_node_name):
+            if self.graph.nodes[function]["type"] == "function":
+                functions.append(self.graph.nodes[function]["loc"])
+        return functions
+
+    def direct_get_file_skeleton_from_node(self, file_node_name: str) -> str | None:
+        """Get the snapshot of a file from the node name of the file."""
+        # check if the node exists in the graph
+        if not self.check_node_exists(file_node_name):
+            return None
+        # Get the file node
+        file_node_data = self.graph.nodes[file_node_name]
+        # Check if the node is a file
+        if file_node_data["type"] != "file":
+            return None
+
+        # Get all the contents in the file
+        contents = {}
+        for child_node in self.graph.neighbors(file_node_name):
+            child_name = child_node.split("::")[-1]
+            child_data = self.graph.nodes[child_node]
+            snapshot = (
+                child_data["type"],
+                child_data["signature"],
+                child_data["docstring"],
+            )
+            contents[child_name] = snapshot
+
+        # setup the snapshot
+        snapshot = ""
+
+        for child_name, child_snapshot in contents.items():
+            node_type, signature, docstring = child_snapshot
+            snapshot += f"\n{node_type.capitalize()}: {child_name}\n"
+            if signature:
+                snapshot += f"Signature: {signature}\n"
+            if docstring:
+                snapshot += f"Docstring: {docstring}\n"
+        return snapshot
+
     # dfs search for contents in a file
     def dfs_search_file_skeleton(self, file_name) -> Tuple[Loc, str] | None:
         root = self.root_node
@@ -476,12 +520,22 @@ class RepoGraph:
                     ):
                         continue
 
+                    # check end_line by reading the file
+                    with open(file_path, "r") as file:
+                        end_line = len(file.readlines())
+
                     # Add a node for the file and link it to the directory
+                    # 1-based indexing for line numbers
                     loc = Loc(
                         file_name=file_node_name,
                         node_name=file_node_name,
-                        start_line=0,
-                        end_line=0,
+                        start_line=1,
+                        end_line=end_line,
+                    )
+                    # get the file_name (last part of the file_node_name)
+                    file_name = file_node_name.split("/")[-1]
+                    self.inverted_index.add(
+                        file_name, IndexValue(type="file", file_path=file_node_name)
                     )
                     self.add_node(file_node_name, "file", loc=loc)
                     self.add_edge(dir_node_name, file_node_name, "contains")

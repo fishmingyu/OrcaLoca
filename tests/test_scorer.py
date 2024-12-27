@@ -12,8 +12,8 @@ from Orcar.search import SearchManager
 from Orcar.types import SearchActionStep, SearchResult
 
 
-def _check_search_result_is_class(
-    search_manager: SearchManager, search_result: SearchResult
+def _check_search_result_type(
+    search_manager: SearchManager, search_result: SearchResult, type: str
 ) -> bool:
     """Check if the search result is searching for a class."""
     action = search_result.search_action
@@ -24,24 +24,7 @@ def _check_search_result_is_class(
     if frame is not None:
         # logger.info(f"Frame: {frame}")
         query_type = frame["query_type"]
-        if query_type == "class":
-            return True
-    return False
-
-
-def _check_search_result_is_disambiguation(
-    search_manager: SearchManager, search_result: SearchResult
-) -> bool:
-    """Check if the search result is a disambiguation."""
-    action = search_result.search_action
-    search_input = search_result.get_search_input()
-    # use get_frame_from_history to get the frame of the search result
-    frame = search_manager.get_frame_from_history(action, search_input)
-    # check frame is not None
-    if frame is not None:
-        # logger.info(f"Frame: {frame}")
-        query_type = frame["query_type"]
-        if query_type == "disambiguation":
+        if query_type == type:
             return True
     return False
 
@@ -57,7 +40,7 @@ def _class_methods_ranking(
     search_action = search_result.search_action
     search_action_input = search_result.search_action_input
 
-    is_class = _check_search_result_is_class(search_manager, search_result)
+    is_class = _check_search_result_type(search_manager, search_result, "class")
     if is_class:
         frame = search_manager.get_frame_from_history(
             search_action, search_result.get_search_input()
@@ -105,6 +88,61 @@ def _class_methods_ranking(
     return []
 
 
+def _file_functions_ranking(
+    llm: LLM,
+    problem_statement: str,
+    search_manager: SearchManager,
+    search_result: SearchResult,
+) -> List[SearchActionStep]:
+    """Ranking the file functions."""
+    # if the action is search_file_contents, we should rank the file functions
+    search_action = search_result.search_action
+    is_file = _check_search_result_type(search_manager, search_result, "file")
+    if is_file:
+        frame = search_manager.get_frame_from_history(
+            search_action, search_result.get_search_input()
+        )
+        file_node_name = frame["search_query"]
+        # search_query is the exact node name
+        functions, functions_code = search_manager._get_file_functions(file_node_name)
+        if len(functions) == 0:
+            return []
+        # package the list of functions into a list of ChatMessage
+        chat_messages: List[List[ChatMessage]] = []
+        for function in functions_code:
+            chat_messages.append([ChatMessage(role=MessageRole.USER, content=function)])
+        code_scorer = CodeScorer(llm=llm, problem_statement=problem_statement)
+        # score the list of functions
+        scores = code_scorer.score_batch(chat_messages)
+        # combine the scores with the function names
+        results = []
+        for i, function in enumerate(functions):
+            results.append({"function_name": function, "score": scores[i]})
+        sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+        # prune scores less than self._config_dict["score_threshold"]
+        sorted_results = [result for result in sorted_results if result["score"] > 50]
+        # get top 3 functions
+        top_k = 3
+        if len(sorted_results) < top_k:
+            top_k = len(sorted_results)
+        print(sorted_results)
+        search_steps = []
+        for i in range(top_k):
+            function_name = sorted_results[i]["function_name"].split("::")[-1]
+            file_path = sorted_results[i]["function_name"].split("::")[0]
+            search_steps.append(
+                SearchActionStep(
+                    search_action="search_callable",
+                    search_action_input={
+                        "query_name": function_name,
+                        "file_path": file_path,
+                    },
+                )
+            )
+        return search_steps
+    return []
+
+
 def _disambiguation_ranking(
     llm: LLM,
     problem_statement: str,
@@ -122,8 +160,8 @@ def _disambiguation_ranking(
             return True
         return False
 
-    is_disambiguation = _check_search_result_is_disambiguation(
-        search_manager, search_result
+    is_disambiguation = _check_search_result_type(
+        search_manager, search_result, "disambiguation"
     )
     if is_disambiguation:
         # if is_class, we don't score
@@ -440,8 +478,61 @@ def test_scikitlearn_14894():
         print(res)
 
 
+def django_file_functions_scorer(llm: LLM, problem_statement: str):
+    repo_path = "~/.orcar/django__django"
+    repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=repo_path)
+
+    search_action = "search_file_contents"
+    search_action_input = {
+        "file_name": "models.py",
+        "directory_path": "django/forms",
+    }
+    content = search_manager.search_file_contents(
+        search_action_input["file_name"],
+        search_action_input["directory_path"],
+    )
+    print(content)
+    search_result = SearchResult(
+        search_action=search_action,
+        search_action_input=search_action_input,
+        search_content=content,
+    )
+    action_list = _file_functions_ranking(
+        llm=llm,
+        problem_statement=problem_statement,
+        search_manager=search_manager,
+        search_result=search_result,
+    )
+    return action_list
+
+
+def test_django_13315():
+    args_dict = {
+        "model": "claude-3-5-sonnet-20241022",
+        "image": "sweagent/swe-agent:latest",
+        "dataset": "princeton-nlp/SWE-bench_Lite",
+        "persistent": True,
+        "container_name": "test",
+        "split": "test",
+        "filter_instance": "^(django__django-13315)$",
+    }
+
+    args = argparse.Namespace(**args_dict)
+    cfg = Config("./key.cfg")
+    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    ds = load_filter_hf_dataset(args)
+    print(ds)
+    for inst in ds:
+        res = django_file_functions_scorer(
+            llm, problem_statement=inst["problem_statement"]
+        )
+        print(res)
+
+
 if __name__ == "__main__":
     # test_django_15814()
     # test_django_13933()
     # test_matplotlib_26020()
-    test_scikitlearn_14894()
+    # test_scikitlearn_14894()
+    test_django_13315()

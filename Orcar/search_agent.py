@@ -3,6 +3,7 @@ A search agent. Process raw response into json format.
 """
 
 import json
+import os
 import uuid
 from collections import deque
 from queue import PriorityQueue
@@ -123,7 +124,7 @@ class SearchWorker(BaseAgentWorker):
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._config_dict = {
-            "top_k_search": 12,
+            "top_k_search": 15,
             "sliding_window_size": 10,
             "top_k_methods": 3,
             "score_threshold": 50,
@@ -260,17 +261,17 @@ class SearchWorker(BaseAgentWorker):
         """Calibrate bug location."""
         data = self._output_parser.parse_bug_report(output_str)
         for bug in data["bug_locations"]:
-            file_path = bug["file_name"]
-            # check each "file_name" in bug_location whether is a valid file path
+            file_path = bug["file_path"]
+            # check each "file_path" in bug_location whether is a valid file path
             # for example the correct file should be like "astropy/io/fits/fitsrec.py",
             # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
             # if the file is wrong, we should remove the first "/" and the first word before the first "/"
             # if the file is correct, we should keep it
-            file_path = bug["file_name"]
+            file_path = bug["file_path"]
             if file_path[0] == "/":
                 file_path = file_path[1:]
                 file_path = file_path[file_path.find("/") + 1 :]
-                bug["file_name"] = file_path
+                bug["file_path"] = file_path
             class_name = bug["class_name"]
             method_name = bug["method_name"]
             # check method_name is a valid method name
@@ -354,35 +355,32 @@ class SearchWorker(BaseAgentWorker):
                 return True
         return False
 
-    def _check_search_result_is_class(self, search_result: SearchResult) -> bool:
-        """Check if the search result is searching for a class."""
+    def _check_search_result_type(self, search_result: SearchResult, type: str) -> bool:
+        """Check if the search result is a certain type."""
         action = search_result.search_action
         search_input = search_result.get_search_input()
         # use get_frame_from_history to get the frame of the search result
         frame = self._search_manager.get_frame_from_history(action, search_input)
         # check frame is not None
         if frame is not None:
-            # logger.info(f"Frame: {frame}")
             query_type = frame["query_type"]
-            if query_type == "class":
+            if query_type == type:
                 return True
         return False
 
-    def _check_search_result_is_disambiguation(
-        self, search_result: SearchResult
-    ) -> bool:
-        """Check if the search result is a disambiguation."""
+    # enlarge search space
+    def _get_search_result_file_path(self, search_result: SearchResult) -> str | None:
+        """Get the file path of the search result."""
         action = search_result.search_action
         search_input = search_result.get_search_input()
-        # use get_frame_from_history to get the frame of the search result
         frame = self._search_manager.get_frame_from_history(action, search_input)
-        # check frame is not None
         if frame is not None:
-            # logger.info(f"Frame: {frame}")
-            query_type = frame["query_type"]
-            if query_type == "disambiguation":
-                return True
-        return False
+            file_path = frame["file_path"]
+            # try to use search_manager to check the node existence
+            exist = self._search_manager.get_node_existence(file_path)
+            if exist:
+                return file_path
+        return None
 
     def _concat_search_results(self, search_results: List[SearchResult]) -> str:
         """Join and Concatenate search results."""
@@ -401,16 +399,20 @@ class SearchWorker(BaseAgentWorker):
         search_query = self._search_manager.get_query_from_history(
             action=search_action, input=search_input
         )
-        is_disambiguation = self._check_search_result_is_disambiguation(search_result)
+        is_disambiguation = self._check_search_result_type(
+            search_result, "disambiguation"
+        )
+        is_skeleton = self._check_search_result_skeleton(search_result)
         if (
-            is_disambiguation
+            is_disambiguation or is_skeleton
         ):  # not valid if is disambiguation, don't need to check the node existance
+            # not valid if is skeleton, don't need to check the node existance
+            # Reason: disambiguation and skeleton are limited information, and we have already
+            # use the action decomposition to get the detailed information
             valid_search = False
         else:
-            node_existence = self._search_manager.get_node_existance(
-                search_query
-            )  # if search_query is None, then vaild_search is False
-            valid_search = node_existence
+            # valid depends on the node existence
+            valid_search = self._search_manager.get_node_existence(search_query)
 
         if valid_search is False:
             return HeuristicSearchResult(
@@ -423,7 +425,7 @@ class SearchWorker(BaseAgentWorker):
             bug_query = bug.bug_query()
             vaild_bug = (
                 bug_query is not None
-            ) and self._search_manager.get_node_existance(bug_query)
+            ) and self._search_manager.get_node_existence(bug_query)
             if vaild_bug:
                 heuristic = self._search_manager.get_distance_between_queries(
                     search_query, bug_query
@@ -522,7 +524,7 @@ class SearchWorker(BaseAgentWorker):
         # if the action is search_class, we should rank the class methods
         search_action = search_result.search_action
 
-        is_class = self._check_search_result_is_class(search_result)
+        is_class = self._check_search_result_type(search_result, "class")
         if is_class:
             frame = self._search_manager.get_frame_from_history(
                 search_action, search_result.get_search_input()
@@ -584,6 +586,72 @@ class SearchWorker(BaseAgentWorker):
             return search_steps
         return []
 
+    def _file_functions_ranking(
+        self,
+        search_result: SearchResult,
+        task: Task,
+    ) -> List[SearchActionStep]:
+        """Ranking the file functions."""
+        # if the action is search_file_contents, we should rank the file functions
+        search_action = search_result.search_action
+        is_file = self._check_search_result_type(search_result, "file")
+        if is_file:
+            frame = self._search_manager.get_frame_from_history(
+                search_action, search_result.get_search_input()
+            )
+            file_node_name = frame["search_query"]
+            # search_query is the exact node name
+            functions, functions_code = self._search_manager._get_file_functions(
+                file_node_name
+            )
+            if len(functions) == 0:
+                return []
+            # package the list of functions into a list of ChatMessage
+            chat_messages: List[List[ChatMessage]] = []
+            for function in functions_code:
+                chat_messages.append(
+                    [ChatMessage(role=MessageRole.USER, content=function)]
+                )
+            logger.info(f"File functions number: {len(functions)}")
+            code_scorer = CodeScorer(
+                llm=self._llm, problem_statement=self._problem_statement
+            )
+            # score the list of functions
+            scores = code_scorer.score_batch(chat_messages)
+            task.extra_state["token_cnts"].append(
+                ("Functions Score", code_scorer.get_sum_cnt())
+            )
+            # combine the scores with the function names
+            results = []
+            for i, function in enumerate(functions):
+                results.append({"function_name": function, "score": scores[i]})
+            sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+            # prune scores less than self._config_dict["score_threshold"]
+            sorted_results = [
+                result
+                for result in sorted_results
+                if result["score"] > self._config_dict["score_threshold"]
+            ]
+            # get top 3 functions
+            top_k = self._config_dict["top_k_methods"]
+            if len(sorted_results) < top_k:
+                top_k = len(sorted_results)
+            search_steps = []
+            for i in range(top_k):
+                function_name = sorted_results[i]["function_name"].split("::")[-1]
+                file_path = sorted_results[i]["function_name"].split("::")[0]
+                search_steps.append(
+                    SearchActionStep(
+                        search_action="search_callable",
+                        search_action_input={
+                            "query_name": function_name,
+                            "file_path": file_path,
+                        },
+                    )
+                )
+            return search_steps
+        return []
+
     def _disambiguation_ranking(
         self,
         search_result: SearchResult,
@@ -594,11 +662,19 @@ class SearchWorker(BaseAgentWorker):
         search_action = search_result.search_action
         search_action_input = search_result.search_action_input
 
-        is_disambiguation = self._check_search_result_is_disambiguation(search_result)
+        is_disambiguation = self._check_search_result_type(
+            search_result, "disambiguation"
+        )
 
         def check_action_is_class(search_action: str) -> bool:
             """Check if the action is search_class."""
             if search_action == "search_class":
+                return True
+            return False
+
+        def check_action_is_file(search_action: str) -> bool:
+            """Check if the action is search_file_contents."""
+            if search_action == "search_file_contents":
                 return True
             return False
 
@@ -618,6 +694,28 @@ class SearchWorker(BaseAgentWorker):
                             search_action_input={
                                 "class_name": class_name,
                                 "file_path": file_path,
+                            },
+                        )
+                    )
+                return search_steps
+            # if is_file, we don't score
+            is_file = check_action_is_file(search_action)
+            if is_file:
+                file_name = search_action_input["file_name"]
+                # we don't have directory_path since we got the disambiguation
+                file_paths = self._search_manager._get_disambiguous_files(file_name)
+                if len(file_paths) == 0:
+                    return []
+                search_steps = []
+                for file_path in file_paths:
+                    # use relative path to get the directory_path
+                    directory_path = os.path.dirname(file_path)
+                    search_steps.append(
+                        SearchActionStep(
+                            search_action="search_file_contents",
+                            search_action_input={
+                                "file_name": file_name,
+                                "directory_path": directory_path,
                             },
                         )
                     )
@@ -771,7 +869,6 @@ class SearchWorker(BaseAgentWorker):
         """Process search result."""
         # calculate the heuristic of the search result
         agent_response = self._get_response(search_result)
-        is_skeleton = self._check_search_result_skeleton(search_result)
 
         if search_result is not None:
             heuristic_search_result = self._search_result_heuristic(
@@ -781,13 +878,6 @@ class SearchWorker(BaseAgentWorker):
                 heuristic_search_result.heuristic >= 0
             ):  # if the heuristic is greater than 0, we should add it to the current search
                 # add search steps to task state
-                # if the search result is a skeleton
-                if is_skeleton:
-                    # truncate the search result to first 100 characters
-                    # since the full content has been seen by LLM before
-                    # we don't need to show the full content again
-                    search_result.search_content = search_result.search_content[:100]
-                    search_result.search_content += "..."
                 task.extra_state["current_search"].append(
                     search_result
                 )  # we tolerate duplicate nodes, since it may have different content (e.g. different actions)
@@ -821,33 +911,52 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["search_cache"].append(search_cache.get().search_result)
 
     def _action_decomposition(self, search_result: SearchResult, task: Task) -> None:
-        # we use type to determine whether the search result is a class or disambiguation
+        # we use type to determine whether the search result is a class, disambiguation or file
         # if it is a disambiguation, we should rank the disambiguation
         # if it is a class, we should rank the class methods
-        # class and disambiguation wouldn't appear at the same time
+        # if it is a file, we should rank the file functions
+        # class, disambiguation and file wouldn't appear at the same time
         top_class_actions = self._class_methods_ranking(search_result, task)
+        top_function_actions = self._file_functions_ranking(search_result, task)
         disambiguation_actions = self._disambiguation_ranking(search_result, task)
+
+        # append actions to the left of the queue
+        def add_actions_to_queue(actions: List[SearchActionStep], log_str: str) -> None:
+            if len(actions) > 0:
+                for action in actions:
+                    if not self._check_action_valid(
+                        action, task.extra_state["action_history"]
+                    ):
+                        continue
+                    task.extra_state["search_queue"].appendleft(action)
+                    task.extra_state["action_history"].append(action)
+                logger.info(f"{log_str}: {actions}")
+
         # add top class methods to the left of the queue
-        if len(top_class_actions) > 0:
-            for class_method_action in top_class_actions:
-                if not self._check_action_valid(
-                    class_method_action, task.extra_state["action_history"]
-                ):
-                    continue
-                task.extra_state["search_queue"].appendleft(class_method_action)
-                task.extra_state["action_history"].append(class_method_action)
-            logger.info(f"Top class methods: {top_class_actions}")
+        add_actions_to_queue(top_class_actions, "Top class methods")
+
+        # add top file functions to the left of the queue
+        add_actions_to_queue(top_function_actions, "Top file functions")
 
         # add disambiguation to the left of the queue
-        if len(disambiguation_actions) > 0:
-            for disambiguation_action in disambiguation_actions:
-                if not self._check_action_valid(
-                    disambiguation_action, task.extra_state["action_history"]
-                ):
-                    continue
-                task.extra_state["search_queue"].appendleft(disambiguation_action)
-                task.extra_state["action_history"].append(disambiguation_action)
-            logger.info(f"Disambiguation: {disambiguation_actions}")
+        add_actions_to_queue(disambiguation_actions, "Disambiguation")
+
+        # put the file content search to the left of the queue
+        file_node = self._get_search_result_file_path(search_result)
+        if file_node is not None:
+            file_search_action = SearchActionStep(
+                search_action="search_file_contents",
+                search_action_input={
+                    "file_name": os.path.basename(file_node),
+                    "directory_path": os.path.dirname(file_node),
+                },
+            )
+            if self._check_action_valid(
+                file_search_action, task.extra_state["action_history"]
+            ):
+                task.extra_state["search_queue"].appendleft(file_search_action)
+                task.extra_state["action_history"].append(file_search_action)
+                logger.info(f"File search: {file_node}")
 
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
         """previous user instruction in chat message will affect the future result, so we need to delete them"""
