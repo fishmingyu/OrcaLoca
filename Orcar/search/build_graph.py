@@ -331,6 +331,11 @@ class RepoGraph:
         for function in self.graph.neighbors(file_node_name):
             if self.graph.nodes[function]["type"] == "function":
                 functions.append(self.graph.nodes[function]["loc"])
+            if self.graph.nodes[function]["type"] == "class":
+                # if a class end_line - start_line <= 100, we treat it as a function
+                class_loc = self.graph.nodes[function]["loc"]
+                if class_loc.end_line - class_loc.start_line <= 100:
+                    functions.append(class_loc)
         return functions
 
     def direct_get_file_skeleton_from_node(self, file_node_name: str) -> str | None:
