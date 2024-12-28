@@ -32,6 +32,9 @@ class SearchActionStep(BaseReasoningStep):
             self.search_action_input == other.search_action_input
         )
 
+    def __hash__(self):
+        return hash((self.search_action, frozenset(self.search_action_input.items())))
+
     def get_search_input(self) -> str:
         """Get query."""
         """Different search_action
@@ -72,6 +75,58 @@ class SearchActionStep(BaseReasoningStep):
         elif self.search_action == "search_source_code":
             search_input = self.search_action_input["source_code"]
         return search_input
+
+
+class SearchActionHistory:
+    def __init__(self):
+        # Initialize an empty dictionary
+        self.action_history: Dict[SearchActionStep, int] = {}
+
+    def add_action(self, action: SearchActionStep):
+        """
+        Add a SearchActionStep to the history.
+
+        If the action matches a key in the dictionary, increment the value.
+        If a key matches the new query, increment the value.
+        Otherwise, add the action as a new key with an initial value of 1.
+        """
+        for existing_action in self.action_history.keys():
+            # Case 1: Check if the key matches the new query
+            if existing_action == action:
+                self.action_history[existing_action] += 1
+                return
+
+        # Case 2: Add the new query as a key
+        self.action_history[action] = 1
+
+    def get_action_count(self, action: SearchActionStep) -> int:
+        """Get the count of a specific action."""
+        return self.action_history.get(
+            action, 0
+        )  # return 0 if the action is not in the history
+
+    def keys(self) -> List[SearchActionStep]:
+        """Get the keys of the action history."""
+        return list(self.action_history.keys())
+
+    def check_action(self, action: SearchActionStep) -> bool:
+        """Check if the action is in the history."""
+        return action in self.action_history
+
+    def get_history(self):
+        """Get the current action history."""
+        return self.action_history
+
+    def __repr__(self) -> str:
+        """Developer-friendly string representation of the action history."""
+        return (
+            "SearchActionHistory(\n"
+            + "\n".join(
+                f"  {action.get_content()}: {count}"
+                for action, count in self.action_history.items()
+            )
+            + "\n)"
+        )
 
 
 class EditActionStep(BaseReasoningStep):
