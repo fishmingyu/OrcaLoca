@@ -11,16 +11,16 @@ args_dict = {
     "dataset": "SWE-bench_common",
     # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
-    "container_name": "test_1",
+    "container_name": "test",
     "split": "test",
     # "idx_list": [0, 3],
     # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23476)$",
-    # "filter_instance": "^(astropy__astropy-12907)$",
+    # "filter_instance": "^(astropy__astropy-14182)$",
     # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
     # Long Issue Test
-    # "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(sphinx-doc__sphinx-8721|sphinx-doc__sphinx-8595)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
@@ -30,7 +30,8 @@ args_dict = {
     # whole repo
     # "filter_instance": ".*",
     # internal error
-    "filter_instance": "^(django__django-17087)$",
+    # "filter_instance": "^(django__django-13315)$",
+    # "filter_instance": "^(django__django-14580|django__django-17087)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
@@ -121,6 +122,7 @@ def test_agent():
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
     agent.set_redirect_log(True)
     for i, inst in enumerate(ds):
+        # if inst['instance_id'].startswith("sympy__sympy-"):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
 
