@@ -28,7 +28,7 @@ def get_bert_embedding(text, model, tokenizer, device="cuda"):
 
 
 def check_observation_similarity(
-    text1, text2, threshold=0.95, model_name="bert-base-uncased"
+    text1, text2, threshold=0.97, model_name="bert-base-uncased"
 ):
     """
     Check similarity between two paragraphs using BERT embeddings.

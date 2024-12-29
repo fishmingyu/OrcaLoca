@@ -5,7 +5,6 @@ A search agent. Process raw response into json format.
 import json
 import os
 import uuid
-from collections import deque
 from queue import PriorityQueue
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
@@ -45,6 +44,7 @@ from .types import (
     SearchActionHistory,
     SearchActionStep,
     SearchInput,
+    SearchQueue,
     SearchResult,
 )
 from .utils import check_observation_similarity
@@ -128,10 +128,12 @@ class SearchWorker(BaseAgentWorker):
         self._max_iterations = max_iterations
         self._config_dict = {
             "top_k_search": 12,
-            "sliding_window_size": 15,
+            "sliding_window_size": 12,
             "top_k_methods": 3,
+            "top_k_disambiguation": 3,
             "top_k_functions": 2,
-            "score_threshold": 50,
+            "score_threshold": 75,
+            "similarity_threshold": 0.97,
         }
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
@@ -206,7 +208,7 @@ class SearchWorker(BaseAgentWorker):
         is_done = False
         next_step_input: str = ""
         last_observation: str = ""
-        search_queue: deque = deque()
+        search_queue: SearchQueue = SearchQueue()
         action_history: SearchActionHistory = SearchActionHistory()
         current_search: List[SearchResult] = []
         searched_node_set: set = set()
@@ -568,7 +570,7 @@ class SearchWorker(BaseAgentWorker):
                 for result in sorted_results
                 if result["score"] > self._config_dict["score_threshold"]
             ]
-            # get top 3 methods
+            # get top 2 methods
             top_k = self._config_dict["top_k_methods"]
             if len(sorted_results) < top_k:
                 top_k = len(sorted_results)
@@ -780,7 +782,7 @@ class SearchWorker(BaseAgentWorker):
                 if result["score"] > self._config_dict["score_threshold"]
             ]
             # get top 3 disambiguation
-            top_k = self._config_dict["top_k_methods"]
+            top_k = self._config_dict["top_k_disambiguation"]
             if len(sorted_results) <= top_k:
                 top_k = 1  # only one disambiguation
             if len(sorted_results) == 0:
@@ -832,7 +834,9 @@ class SearchWorker(BaseAgentWorker):
         second_last_observation = observation_history[-2].content
         # check similarity
         _, is_similar = check_observation_similarity(
-            last_observation, second_last_observation
+            last_observation,
+            second_last_observation,
+            self._config_dict["similarity_threshold"],
         )
         # add is_similar to the similarity_cache
         task.extra_state["similarity_cache"].append(is_similar)
@@ -936,14 +940,14 @@ class SearchWorker(BaseAgentWorker):
                             task.extra_state["search_queue"].appendleft(action)
                         else:
                             task.extra_state["search_queue"].append(action)
-                            task.extra_state["action_history"].add_action(action)
+                        task.extra_state["action_history"].add_action(action)
                 logger_action_history.info(f"{log_str}: {actions}")
 
         # add top class methods to the left of the queue
         add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
 
         # add top file functions to the left of the queue
-        add_actions_to_queue(top_function_actions, "Top file functions")
+        add_actions_to_queue(top_function_actions, "Top file functions", priority=True)
 
         # add disambiguation to the left of the queue
         add_actions_to_queue(disambiguation_actions, "Disambiguation", priority=True)
@@ -1123,8 +1127,14 @@ class SearchWorker(BaseAgentWorker):
                 None,
                 is_done=False,
             )
+        # resort the search_queue based on the action history
+        task.extra_state["search_queue"].resort(task.extra_state["action_history"])
+        logger_queue.debug(
+            f"Resorted search queue: \n {task.extra_state['search_queue']}"
+        )
+
         # pop the head of the queue
-        head_search_step = task.extra_state["search_queue"].popleft()
+        head_search_step = task.extra_state["search_queue"].pop()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(
             task, tools, search_step
