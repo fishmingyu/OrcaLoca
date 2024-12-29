@@ -2,8 +2,8 @@
 *.png
 *egg-info/
 dist/
-log/
-output/
+log*/
+output*/
 build/
 __pycache__/
 .mypy_cache/
