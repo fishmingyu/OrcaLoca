@@ -33,7 +33,7 @@ from .prompts import (
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
 )
-from .types import BaseReasoningStep, SearchActionStep, SearchResult
+from .types import BaseReasoningStep, SearchQueue, SearchResult
 
 logger = get_logger(__name__)
 
@@ -329,8 +329,8 @@ class SearchChatFormatter(BaseAgentChatFormatter):
         step_type: str,
         tools: Sequence[BaseTool],
         chat_history: List[ChatMessage],
-        current_search: Optional[List[SearchResult]] = None,
-        current_queue: Optional[List[SearchActionStep]] = None,
+        current_search: List[SearchResult] = None,
+        current_queue: SearchQueue = None,
     ) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         assert step_type in [
@@ -367,7 +367,7 @@ class SearchChatFormatter(BaseAgentChatFormatter):
             Search Queue Status:
             - Queue Length: {len(current_queue)}\n
         """
-        for queue_step in current_queue:
+        for _, _, queue_step in current_queue:
             # Search Queue status
             status_string += f"""
                 - {queue_step.get_content()}\n

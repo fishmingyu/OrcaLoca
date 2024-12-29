@@ -5,7 +5,6 @@ A search agent. Process raw response into json format.
 import json
 import os
 import uuid
-from collections import deque
 from queue import PriorityQueue
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
@@ -42,14 +41,18 @@ from .search import SearchManager
 from .types import (
     BugLocations,
     HeuristicSearchResult,
+    SearchActionHistory,
     SearchActionStep,
     SearchInput,
+    SearchQueue,
     SearchResult,
 )
 from .utils import check_observation_similarity
 
 logger = get_logger(__name__)
 dispatcher = get_dispatcher(__name__)
+logger_action_history = get_logger("action_history")
+logger_queue = get_logger("search_queue")
 
 
 def parse_search_input_step(input: SearchInput, task: Task) -> None:
@@ -77,7 +80,7 @@ def parse_search_input_step(input: SearchInput, task: Task) -> None:
                     },
                 )
             task.extra_state["search_queue"].append(search_step)
-            task.extra_state["action_history"].append(search_step)
+            task.extra_state["action_history"].add_action(search_step)
 
 
 def add_user_step_to_memory(
@@ -127,7 +130,10 @@ class SearchWorker(BaseAgentWorker):
             "top_k_search": 12,
             "sliding_window_size": 12,
             "top_k_methods": 3,
-            "score_threshold": 50,
+            "top_k_disambiguation": 3,
+            "top_k_functions": 2,
+            "score_threshold": 75,
+            "similarity_threshold": 0.97,
         }
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
@@ -202,8 +208,8 @@ class SearchWorker(BaseAgentWorker):
         is_done = False
         next_step_input: str = ""
         last_observation: str = ""
-        search_queue: deque = deque()
-        action_history: List[SearchActionStep] = []
+        search_queue: SearchQueue = SearchQueue()
+        action_history: SearchActionHistory = SearchActionHistory()
         current_search: List[SearchResult] = []
         searched_node_set: set = set()
         search_cache: List[SearchResult] = []
@@ -445,19 +451,18 @@ class SearchWorker(BaseAgentWorker):
         )
 
     def _check_action_valid(
-        self, action: SearchActionStep, action_history: List[SearchActionStep]
+        self, action: SearchActionStep, action_history: SearchActionHistory
     ) -> bool:
         """Check if the action is valid."""
         # first check if the action is in the history
-        for history_action in action_history:
-            if history_action == action:
-                return False  # non-valid action
+        if action_history.check_action(action):
+            return False  # non-valid
 
         # special case for search_class; if search_callable with the same query is in the history, skip
         if action.search_action == "search_class":
             # case 1: search_class argument file_path is None
             if "file_path" not in action.search_action_input:
-                for history_action in action_history:
+                for history_action in action_history.keys():
                     if history_action.search_action == "search_callable":
                         if (
                             history_action.search_action_input["query_name"]
@@ -469,7 +474,7 @@ class SearchWorker(BaseAgentWorker):
                             return False
             # case 2: search_class argument file_path is not None
             else:
-                for history_action in action_history:
+                for history_action in action_history.keys():
                     # if "file_path" not in history_action.search_action_input, skip
                     if "file_path" not in history_action.search_action_input:
                         continue
@@ -487,7 +492,7 @@ class SearchWorker(BaseAgentWorker):
         if action.search_action == "search_callable":
             # case 1: search_callable argument file_path is None
             if "file_path" not in action.search_action_input:
-                for history_action in action_history:
+                for history_action in action_history.keys():
                     if history_action.search_action == "search_class":
                         if (
                             history_action.search_action_input["class_name"]
@@ -499,7 +504,7 @@ class SearchWorker(BaseAgentWorker):
                             return False
             # case 2: search_callable argument file_path is not None
             else:
-                for history_action in action_history:
+                for history_action in action_history.keys():
                     # if "file_path" not in history_action.search_action_input, skip
                     if "file_path" not in history_action.search_action_input:
                         continue
@@ -565,7 +570,7 @@ class SearchWorker(BaseAgentWorker):
                 for result in sorted_results
                 if result["score"] > self._config_dict["score_threshold"]
             ]
-            # get top 3 methods
+            # get top 2 methods
             top_k = self._config_dict["top_k_methods"]
             if len(sorted_results) < top_k:
                 top_k = len(sorted_results)
@@ -632,8 +637,8 @@ class SearchWorker(BaseAgentWorker):
                 for result in sorted_results
                 if result["score"] > self._config_dict["score_threshold"]
             ]
-            # get top 3 functions
-            top_k = self._config_dict["top_k_methods"]
+            # get top 2 functions
+            top_k = self._config_dict["top_k_functions"]
             if len(sorted_results) < top_k:
                 top_k = len(sorted_results)
             search_steps = []
@@ -777,7 +782,7 @@ class SearchWorker(BaseAgentWorker):
                 if result["score"] > self._config_dict["score_threshold"]
             ]
             # get top 3 disambiguation
-            top_k = self._config_dict["top_k_methods"]
+            top_k = self._config_dict["top_k_disambiguation"]
             if len(sorted_results) <= top_k:
                 top_k = 1  # only one disambiguation
             if len(sorted_results) == 0:
@@ -829,7 +834,9 @@ class SearchWorker(BaseAgentWorker):
         second_last_observation = observation_history[-2].content
         # check similarity
         _, is_similar = check_observation_similarity(
-            last_observation, second_last_observation
+            last_observation,
+            second_last_observation,
+            self._config_dict["similarity_threshold"],
         )
         # add is_similar to the similarity_cache
         task.extra_state["similarity_cache"].append(is_similar)
@@ -921,25 +928,29 @@ class SearchWorker(BaseAgentWorker):
         disambiguation_actions = self._disambiguation_ranking(search_result, task)
 
         # append actions to the left of the queue
-        def add_actions_to_queue(actions: List[SearchActionStep], log_str: str) -> None:
+        def add_actions_to_queue(
+            actions: List[SearchActionStep], log_str: str, priority: bool = False
+        ) -> None:
             if len(actions) > 0:
                 for action in actions:
-                    if not self._check_action_valid(
+                    if self._check_action_valid(
                         action, task.extra_state["action_history"]
                     ):
-                        continue
-                    task.extra_state["search_queue"].appendleft(action)
-                    task.extra_state["action_history"].append(action)
-                logger.info(f"{log_str}: {actions}")
+                        if priority:
+                            task.extra_state["search_queue"].appendleft(action)
+                        else:
+                            task.extra_state["search_queue"].append(action)
+                        task.extra_state["action_history"].add_action(action)
+                logger_action_history.info(f"{log_str}: {actions}")
 
         # add top class methods to the left of the queue
-        add_actions_to_queue(top_class_actions, "Top class methods")
+        add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
 
         # add top file functions to the left of the queue
-        add_actions_to_queue(top_function_actions, "Top file functions")
+        add_actions_to_queue(top_function_actions, "Top file functions", priority=True)
 
         # add disambiguation to the left of the queue
-        add_actions_to_queue(disambiguation_actions, "Disambiguation")
+        add_actions_to_queue(disambiguation_actions, "Disambiguation", priority=True)
 
         # put the file content search to the left of the queue
         file_node = self._get_search_result_file_path(search_result)
@@ -955,7 +966,7 @@ class SearchWorker(BaseAgentWorker):
                 file_search_action, task.extra_state["action_history"]
             ):
                 task.extra_state["search_queue"].appendleft(file_search_action)
-                task.extra_state["action_history"].append(file_search_action)
+                task.extra_state["action_history"].add_action(file_search_action)
                 logger.info(f"File search: {file_node}")
 
     def _del_previous_inst_input(self, memory: ChatMemoryBuffer) -> None:
@@ -1042,8 +1053,8 @@ class SearchWorker(BaseAgentWorker):
             current_search=task.extra_state["search_cache"],
             current_queue=task.extra_state["search_queue"],
         )
-        logger.info(f"Search cache: {task.extra_state['search_cache']}")
         logger.debug(f"Search content: {task.extra_state['instruct_memory'].get_all()}")
+        logger.info(f"Search cache: {task.extra_state['search_cache']}")
         # if task.extra_state["is_done"]:
         #     logger.info(input_chat)
         self._del_previous_inst_input(task.extra_state["instruct_memory"])
@@ -1082,15 +1093,20 @@ class SearchWorker(BaseAgentWorker):
         observation, potential_bugs, search_steps = self._extract_exploring_step(
             chat_response
         )
-        # push back search steps to the queue
+        # push back search steps to the queue (LLM's recommendation)s
         for search_step in search_steps:
-            # if search_step in history, skip
-            if not self._check_action_valid(
+            # only add the search step to the queue if it is valid
+            if self._check_action_valid(
                 search_step, task.extra_state["action_history"]
             ):
-                continue
-            task.extra_state["search_queue"].append(search_step)
-            task.extra_state["action_history"].append(search_step)
+                task.extra_state["search_queue"].append(search_step)
+            task.extra_state["action_history"].add_action(
+                search_step
+            )  # here we would count the action if it appears multiple times (only for LLM's recommendation)
+        # log action_history
+        logger_action_history.debug(
+            f"Action history: \n {task.extra_state['action_history']}"
+        )
         # print current queue size
         logger.info(
             f"Current search queue size: {len(task.extra_state['search_queue'])}"
@@ -1111,8 +1127,14 @@ class SearchWorker(BaseAgentWorker):
                 None,
                 is_done=False,
             )
+        # resort the search_queue based on the action history
+        task.extra_state["search_queue"].resort(task.extra_state["action_history"])
+        logger_queue.debug(
+            f"Resorted search queue: \n {task.extra_state['search_queue']}"
+        )
+
         # pop the head of the queue
-        head_search_step = task.extra_state["search_queue"].popleft()
+        head_search_step = task.extra_state["search_queue"].pop()
         search_step = cast(SearchActionStep, head_search_step)
         search_result = self._process_search(
             task, tools, search_step

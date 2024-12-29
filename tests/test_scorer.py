@@ -478,7 +478,7 @@ def test_scikitlearn_14894():
         print(res)
 
 
-def django_file_functions_scorer(llm: LLM, problem_statement: str):
+def django_13315_file_functions_scorer(llm: LLM, problem_statement: str):
     repo_path = "~/.orcar/django__django"
     repo_path = os.path.expanduser(repo_path)
     search_manager = SearchManager(repo_path=repo_path)
@@ -487,6 +487,35 @@ def django_file_functions_scorer(llm: LLM, problem_statement: str):
     search_action_input = {
         "file_name": "models.py",
         "directory_path": "django/forms",
+    }
+    content = search_manager.search_file_contents(
+        search_action_input["file_name"],
+        search_action_input["directory_path"],
+    )
+    print(content)
+    search_result = SearchResult(
+        search_action=search_action,
+        search_action_input=search_action_input,
+        search_content=content,
+    )
+    action_list = _file_functions_ranking(
+        llm=llm,
+        problem_statement=problem_statement,
+        search_manager=search_manager,
+        search_result=search_result,
+    )
+    return action_list
+
+
+def django_17087_file_functions_scorer(llm: LLM, problem_statement: str):
+    repo_path = "~/.orcar/django__django"
+    repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=repo_path)
+
+    search_action = "search_file_contents"
+    search_action_input = {
+        "file_name": "serializer.py",
+        "directory_path": "django/db/migrations",
     }
     content = search_manager.search_file_contents(
         search_action_input["file_name"],
@@ -524,7 +553,30 @@ def test_django_13315():
     ds = load_filter_hf_dataset(args)
     print(ds)
     for inst in ds:
-        res = django_file_functions_scorer(
+        res = django_13315_file_functions_scorer(
+            llm, problem_statement=inst["problem_statement"]
+        )
+        print(res)
+
+
+def test_django_17087():
+    args_dict = {
+        "model": "claude-3-5-sonnet-20241022",
+        "image": "sweagent/swe-agent:latest",
+        "dataset": "princeton-nlp/SWE-bench_Lite",
+        "persistent": True,
+        "container_name": "test",
+        "split": "test",
+        "filter_instance": "^(django__django-17087)$",
+    }
+
+    args = argparse.Namespace(**args_dict)
+    cfg = Config("./key.cfg")
+    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    ds = load_filter_hf_dataset(args)
+    print(ds)
+    for inst in ds:
+        res = django_17087_file_functions_scorer(
             llm, problem_statement=inst["problem_statement"]
         )
         print(res)
@@ -535,4 +587,5 @@ if __name__ == "__main__":
     # test_django_13933()
     # test_matplotlib_26020()
     # test_scikitlearn_14894()
-    test_django_13315()
+    # test_django_13315()
+    test_django_17087()

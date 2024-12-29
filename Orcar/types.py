@@ -1,7 +1,8 @@
 """Base types for ReAct agent."""
 
+import heapq
 from abc import abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from llama_index.core.bridge.pydantic import BaseModel
 
@@ -31,6 +32,9 @@ class SearchActionStep(BaseReasoningStep):
         return (self.search_action == other.search_action) and (
             self.search_action_input == other.search_action_input
         )
+
+    def __hash__(self):
+        return hash((self.search_action, frozenset(self.search_action_input.items())))
 
     def get_search_input(self) -> str:
         """Get query."""
@@ -72,6 +76,132 @@ class SearchActionStep(BaseReasoningStep):
         elif self.search_action == "search_source_code":
             search_input = self.search_action_input["source_code"]
         return search_input
+
+
+class SearchActionHistory:
+    def __init__(self):
+        # Initialize an empty dictionary
+        self.action_history: Dict[SearchActionStep, int] = {}
+
+    def add_action(self, action: SearchActionStep):
+        """
+        Add a SearchActionStep to the history.
+
+        If the action matches a key in the dictionary, increment the value.
+        If a key matches the new query, increment the value.
+        Otherwise, add the action as a new key with an initial value of 1.
+        """
+        for existing_action in self.action_history.keys():
+            # Case 1: Check if the key matches the new query
+            if existing_action == action:
+                self.action_history[existing_action] += 1
+                return
+
+        # Case 2: Add the new query as a key
+        self.action_history[action] = 1
+
+    def get_action_count(self, action: SearchActionStep) -> int:
+        """Get the count of a specific action."""
+        return self.action_history.get(
+            action, 0
+        )  # return 0 if the action is not in the history
+
+    def keys(self) -> List[SearchActionStep]:
+        """Get the keys of the action history."""
+        return list(self.action_history.keys())
+
+    def check_action(self, action: SearchActionStep) -> bool:
+        """Check if the action is in the history."""
+        return action in self.action_history
+
+    def get_history(self):
+        """Get the current action history."""
+        return self.action_history
+
+    def __repr__(self) -> str:
+        """Developer-friendly string representation of the action history."""
+        return (
+            "SearchActionHistory(\n"
+            + "\n".join(
+                f"  {action.get_content()}: {count}"
+                for action, count in self.action_history.items()
+            )
+            + "\n)"
+        )
+
+
+# use negative value to ensure that the action with the highest count is popped first
+class SearchQueue:
+    def __init__(self):
+        """Initialize the SearchQueue with a reference to SearchActionHistory."""
+        self.queue: List[Tuple[int, int, SearchActionStep]] = (
+            []
+        )  # (value, order, action)
+        self.counter = 0  # To ensure stable sorting for actions with the same value
+
+    def append(self, action: SearchActionStep):
+        """
+        Add a new SearchActionStep to the queue with value = 1.
+        """
+        heapq.heappush(self.queue, (-1, self.counter, action))  # (max heap)
+        self.counter += 1
+
+    def appendleft(self, action: SearchActionStep):
+        """
+        Add a new SearchActionStep to the queue with value = 2. (higher priority)
+        """
+        heapq.heappush(self.queue, (-2, self.counter, action))
+        self.counter += 1
+
+    def resort(self, action_history: SearchActionHistory):
+        """
+        Recheck the count in SearchActionHistory and update the priority queue.
+        If the count for a SearchActionStep in SearchActionHistory surpasses the
+        value for that step in the queue, update the value to the count.
+        """
+        # Create a new list for updated queue
+        updated_queue = []
+        while self.queue:
+            neg_value, order, action = heapq.heappop(self.queue)
+            current_count = action_history.get_action_count(action)
+
+            # If the count surpasses the current value, update it
+            if current_count > -neg_value:
+                neg_value = -current_count
+
+            updated_queue.append((neg_value, order, action))
+
+        # Rebuild the heap
+        self.queue = updated_queue
+        heapq.heapify(self.queue)
+
+    def pop(self) -> SearchActionStep:
+        """
+        Remove and return the SearchActionStep with the biggest value. (minimum neg_value)
+        """
+        if not self.queue:
+            raise IndexError("pop from an empty priority queue")
+        _, _, action = heapq.heappop(self.queue)
+        return action
+
+    def __repr__(self) -> str:
+        """Return a developer-friendly representation of the queue."""
+        return (
+            "SearchQueue(\n"
+            + "\n".join(
+                f"  Value: {-neg_value}, Action: {action.get_content()}"
+                for neg_value, _, action in sorted(self.queue)
+            )
+            + "\n)"
+        )
+
+    def __len__(self) -> int:
+        """Return the length of the queue."""
+        return len(self.queue)
+
+    def __iter__(self):
+        """Return an iterator for the queue."""
+        return iter(sorted(self.queue))
 
 
 class EditActionStep(BaseReasoningStep):
