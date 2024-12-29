@@ -267,8 +267,7 @@ class ExtractWorker(BaseAgentWorker):
                 "source_code_parse"
             ] = slice_step.source_code_slice
             task.extra_state["parse_type"]["source_code_parse"] = "code"
-
-        next_step_names.append("summarize")
+        # next_step_names.append("summarize")
 
         return self.gen_next_steps(step, next_step_names)
 

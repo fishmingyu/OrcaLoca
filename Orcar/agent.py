@@ -48,7 +48,13 @@ class OrcarAgent:
         agent.run(dict(inst))
     """
 
-    def __init__(self, args: argparse.Namespace, llm: LLM, final_stage: str) -> None:
+    def __init__(
+        self,
+        args: argparse.Namespace,
+        llm: LLM,
+        final_stage: str,
+        current_retry: int = 0,
+    ) -> None:
         """
         llm: Should be initiated outside and passed to agent construction
         final_stage: Which stage will agent end at, currently support ["extract", "search"]
@@ -70,10 +76,15 @@ class OrcarAgent:
         self.redirect_log: bool = False
         self.output_to_file: bool = True
         self.final_stage = Stage[final_stage.upper()]
+        self.output_insts = []
+        self.base_log_dir = "./log"
+        self.current_retry = current_retry
+        if self.current_retry > 0:
+            self.base_log_dir += f"_{self.current_retry}"
 
     def __del__(self) -> None:
         """Pause the container."""
-        if self.ctr_bash.ctr_subprocess.stdin is not None:
+        if hasattr(self, "ctr_bash") and self.ctr_bash.ctr_subprocess.stdin is not None:
             self.ctr_bash.ctr_subprocess.stdin.close()
         if self.persistent:
             pause_persistent_container(self.ctr_bash)
@@ -96,9 +107,9 @@ class OrcarAgent:
         extract_output = ExtractOutput.model_validate_json(response.response)
         self.logger.info("Raw Extract output:")
         self.logger.info(extract_output)
-        extract_output = self.filter_extract_output(extract_output)
-        self.logger.info("Filtered extract output:")
-        self.logger.info(extract_output)
+        # extract_output = self.filter_extract_output(extract_output)
+        # self.logger.info("Filtered extract output:")
+        # self.logger.info(extract_output)
 
         if self.output_to_file:
             extract_json_obj = json.loads(extract_output.model_dump_json())
@@ -106,6 +117,8 @@ class OrcarAgent:
                 f"{self.output_dir}/extractor_{self.inst_id}.json", "w"
             ) as handle:
                 json.dump(extract_json_obj, handle, indent=4)
+            if self.final_stage == Stage.EXTRACT:
+                self.output_insts.append(self.inst_id)
 
         return extract_output
 
@@ -159,6 +172,8 @@ class OrcarAgent:
             search_json_obj = json.loads(search_output.model_dump_json())
             with open(f"{self.output_dir}/searcher_{self.inst_id}.json", "w") as handle:
                 json.dump(search_json_obj, handle, indent=4)
+            if self.final_stage == Stage.SEARCH:
+                self.output_insts.append(self.inst_id)
 
         return search_output
 
@@ -189,6 +204,8 @@ class OrcarAgent:
         if self.output_to_file:
             with open(f"{self.output_dir}/editor_{self.inst_id}.patch", "w") as handle:
                 handle.write(edit_output)
+            if self.final_stage == Stage.EDIT:
+                self.output_insts.append(self.inst_id)
 
         return edit_output
 
@@ -196,7 +213,7 @@ class OrcarAgent:
         """Config the output redirection to run agents."""
         self.inst = instance
         self.inst_id = self.inst["instance_id"]
-        self.log_dir = f"./log/{self.inst_id}"
+        self.log_dir = f"{self.base_log_dir}/{self.inst_id}"
         self.output_dir = f"./output/{self.inst_id}"
         self.repo_name = get_repo_dir(self.inst["repo"])
         self.repo_path = os.path.join(self.base_path, self.repo_name)
