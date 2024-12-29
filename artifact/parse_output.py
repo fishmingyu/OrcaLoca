@@ -79,7 +79,12 @@ class ParsedPatch(BaseModel):
         )
 
 
-def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) -> None:
+def parse_output(
+    args: argparse.Namespace,
+    ds_golden: pd.DataFrame,
+    output_dir: str,
+    artifact_dir: str,
+) -> None:
     file_match = 0
     keyword_match = 0
     notgen_cnt = 0
@@ -137,11 +142,11 @@ def parse_output(ds_golden: pd.DataFrame, output_dir: str, artifact_dir: str) ->
                 output_dict[inst_id]["status"] = "Json invalid"
             else:
                 for loc in model_searcher_output["bug_locations"]:
-                    file_name = loc["file_name"]
+                    file_name = loc[args.file_key]
                     if file_name and file_name[0] == "/":
                         file_name = file_name[1:]
                     model_file_set.add(file_name)
-                    keyword = loc["file_name"] + ":"
+                    keyword = loc[args.file_key] + ":"
                     if not (bool(loc["class_name"]) or bool(loc["method_name"])):
                         continue
                     elif not loc["class_name"]:
@@ -220,11 +225,17 @@ def main():
         default="./output",
         help=f"The directory of the output dir(agent's output)",
     )
+    parser.add_argument(
+        "-f",
+        "--file_key",
+        default="file_path",
+        help=f"The key to extract file path from the json",
+    )
     args = parser.parse_args()
     output_dir: str = args.output_dir
     artifact_dir: str = args.artifact_dir
     ds_golden = download_golden_data(artifact_dir=artifact_dir)
-    parse_output(ds_golden, output_dir=output_dir, artifact_dir=artifact_dir)
+    parse_output(args, ds_golden, output_dir=output_dir, artifact_dir=artifact_dir)
 
 
 if __name__ == "__main__":
