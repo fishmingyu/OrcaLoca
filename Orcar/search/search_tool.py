@@ -148,7 +148,7 @@ class SearchManager:
 
     def _get_bug_location(
         self, query: str, file_path: str = None
-    ) -> Dict[str, str] | None:
+    ) -> Dict[str, List[Dict[str, str]]]:
         """Get the bug location
 
         Args:
@@ -190,7 +190,7 @@ class SearchManager:
                         }
                     bug_loc_json = {"bug_locations": [bug_loc]}
                     return bug_loc_json
-                return None
+                return {"bug_locations": []}
             else:  # if the callable is not unique in the file, we need to disambiguate
                 # return all the possible locations
                 ivs = self.inverted_index.search(query)
@@ -266,7 +266,7 @@ class SearchManager:
             else:  # not in the inverted index, directly search in the knowledge graph
                 locinfo = self._search_callable_kg(query)
                 if locinfo is None:
-                    return None
+                    return {"bug_locations": []}
                 loc = locinfo.loc
                 node_name = loc.node_name
                 type = locinfo.type
