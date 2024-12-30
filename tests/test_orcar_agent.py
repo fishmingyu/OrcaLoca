@@ -9,7 +9,7 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    "dataset": "SWE-bench_common",
+    "dataset": "SWE-bench_Lite_Diff_common",
     # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test",
@@ -19,7 +19,7 @@ args_dict = {
     # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23476)$",
-    "filter_instance": "^(sphinx-doc__sphinx-11445|sphinx-doc__sphinx-8595|sympy__sympy-12419)$",
+    # "filter_instance": "^(sphinx-doc__sphinx-11445|sphinx-doc__sphinx-8595|sympy__sympy-12419)$",
     # "filter_instance": "^(sympy__sympy-12419)$",
     # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-14182)$",
     # Long Issue Test
@@ -31,7 +31,7 @@ args_dict = {
     #     "scikit-learn__scikit-learn-13496)$"
     # ),
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
 }
 
 
@@ -65,8 +65,8 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    final_stage = "extract"
-    # final_stage = "search"
+    # final_stage = "extract"
+    final_stage = "search"
     # final_stage = "edit"
     redirect_log = True
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
