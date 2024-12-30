@@ -4,6 +4,7 @@ import os
 from typing import Dict, List
 
 import gdown
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
@@ -79,19 +80,19 @@ class ParsedPatch(BaseModel):
         )
 
 
-def parse_output(
-    args: argparse.Namespace,
-    ds_golden: pd.DataFrame,
-    output_dir: str,
-    artifact_dir: str,
-) -> None:
+def parse_output(ds_golden: pd.DataFrame, args) -> None:
+    output_dir: str = args.output_dir
+    artifact_dir: str = args.artifact_dir
+    file_path_key: str = args.file_path_key
     file_match = 0
     keyword_match = 0
     notgen_cnt = 0
-    extractor_file_match = 0
-    extractor_notgen_cnt = 0
+    # extractor_file_match = 0
+    # extractor_notgen_cnt = 0
     output_dict = dict()
     issues = os.listdir(output_dir)
+    file_snr_list = []
+    keyword_snr_list = []
     for inst_id in sorted(issues):
         inst = ds_golden[ds_golden["instance_id"] == inst_id].iloc[0]
         output_dict[inst_id] = dict()
@@ -100,10 +101,10 @@ def parse_output(
         file_set = set()
         keyword_set = set()
         for diff_loc in parsed_patch.diff_locs:
-            file_name = diff_loc.file
-            file_set.add(file_name)
+            file_path = diff_loc.file
+            file_set.add(file_path)
             diff_nodes = diff_loc.diff_nodes
-            keyword_name = file_name + ":"
+            keyword_name = file_path + ":"
             if len(diff_nodes) == 0:
                 continue
             keyword_name += diff_nodes[0].node_name
@@ -142,11 +143,11 @@ def parse_output(
                 output_dict[inst_id]["status"] = "Json invalid"
             else:
                 for loc in model_searcher_output["bug_locations"]:
-                    file_name = loc[args.file_key]
-                    if file_name and file_name[0] == "/":
-                        file_name = file_name[1:]
-                    model_file_set.add(file_name)
-                    keyword = loc[args.file_key] + ":"
+                    file_path = loc[file_path_key]
+                    if file_path and file_path[0] == "/":
+                        file_path = file_path[1:]
+                    model_file_set.add(file_path)
+                    keyword = loc[file_path_key] + ":"
                     if not (bool(loc["class_name"]) or bool(loc["method_name"])):
                         continue
                     elif not loc["class_name"]:
@@ -163,48 +164,45 @@ def parse_output(
                     output_dict[inst_id]["file"]["file_status"] = "Matched"
                 else:
                     output_dict[inst_id]["file"]["file_status"] = "Not Matched"
+                file_snr_list.append(
+                    len(file_set.intersection(model_file_set)) / len(model_file_set)
+                    if len(model_file_set)
+                    else 1
+                )
+
                 output_dict[inst_id]["file"]["golden"] = list(file_set)
                 output_dict[inst_id]["file"]["model"] = list(model_file_set)
 
                 output_dict[inst_id]["keyword"] = dict()
                 if keyword_set.issubset(model_keyword_set):
                     keyword_match += 1
+
                     output_dict[inst_id]["keyword"]["keyword_status"] = "Matched"
                 else:
                     output_dict[inst_id]["keyword"]["keyword_status"] = "Not Matched"
                 output_dict[inst_id]["keyword"]["golden"] = list(keyword_set)
                 output_dict[inst_id]["keyword"]["model"] = list(model_keyword_set)
-
-        # is_extractor_match = False
-        json_dir = f"{output_dir}/{inst_id}/extractor_{inst_id}.json"
-        extractor_file_set = set()
-        if not os.path.isfile(json_dir):
-            extractor_notgen_cnt += 1
-            # print('Not gen:', inst_id)
-        else:
-            with open(json_dir, "r") as handle:
-                model_extractor_output = json.load(handle)
-            for code in model_extractor_output["suspicious_code"]:
-                file_name = code["file_path"]
-                if file_name and file_name[0] == "/":
-                    file_name = file_name[1:]
-                extractor_file_set.add(file_name)
-            if file_set.issubset(extractor_file_set):
-                extractor_file_match += 1
-                # is_extractor_match = True
-        # if is_extractor_match and not is_searcher_match:
-        # print(f'Extractor match but searcher missed: {inst_id}')
+                keyword_snr_list.append(
+                    len(keyword_set.intersection(model_keyword_set))
+                    / len(model_keyword_set)
+                    if len(model_keyword_set)
+                    else 1
+                )
 
     total_cnt = len(issues)
     print(f"File match: {file_match}/{total_cnt}, {file_match / total_cnt * 100:.2f}%")
     print(
+        f"Mean File SNR: {np.mean(file_snr_list):.2f}, Std File SNR: {np.std(file_snr_list):.2f}"
+    )
+    print(
         f"Keyword Match: {keyword_match}/{total_cnt}, {keyword_match / total_cnt * 100:.2f}%"
+    )
+    print(
+        f"Mean Keyword SNR: {np.mean(keyword_snr_list):.2f}, Std Keyword SNR: {np.std(keyword_snr_list):.2f}"
     )
     print(
         f"Json not gen: {notgen_cnt}/{total_cnt}, {notgen_cnt / total_cnt * 100:.2f}%"
     )
-    # print(f"Extractor File match: {extractor_file_match / total_cnt:.2f}")
-    # print(f"Extractor Json not gen: {extractor_notgen_cnt / total_cnt:.2f}")
     output_path = f"{artifact_dir}/assets/orcar_parsed_output.json"
     with open(output_path, "w") as handle:
         json.dump(output_dict, handle, indent=4)
@@ -227,15 +225,13 @@ def main():
     )
     parser.add_argument(
         "-f",
-        "--file_key",
+        "--file_path_key",
         default="file_path",
-        help=f"The key to extract file path from the json",
+        help=f"The directory of the output dir(agent's output)",
     )
     args = parser.parse_args()
-    output_dir: str = args.output_dir
-    artifact_dir: str = args.artifact_dir
-    ds_golden = download_golden_data(artifact_dir=artifact_dir)
-    parse_output(args, ds_golden, output_dir=output_dir, artifact_dir=artifact_dir)
+    ds_golden = download_golden_data(artifact_dir=args.artifact_dir)
+    parse_output(ds_golden, args)
 
 
 if __name__ == "__main__":

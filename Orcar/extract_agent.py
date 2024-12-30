@@ -69,6 +69,9 @@ class ExtractWorker(BaseAgentWorker):
     ) -> None:
         self._llm = llm
         self.env = env
+        logger.info(
+            f"Current extractor container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+        )
         self.callback_manager = callback_manager or llm.callback_manager
         self._chat_formatter = ExtractChatFormatter()
         self._output_parser = ExtractOutputParser()
@@ -221,12 +224,29 @@ class ExtractWorker(BaseAgentWorker):
         self.env.copy_to_env(issue_reproducer, reproducer_path)
         logger.info("Running reproducer...")
         try:
+            conda_env = self.env.run("echo $CONDA_DEFAULT_ENV")
+            logger.info(f"Conda env: {conda_env}")
             log = self.env.run(
                 gen_tracer_cmd(input_path=reproducer_path, output_path=output_path),
                 timeout=LONG_TIMEOUT,
             )
         except Exception as e:
             log = str(e)
+            logger.warning(f"Reproducer failed: {log}")
+            self.env.reset_ctr_bash()
+            self.env.setup(inst)
+            for cmd in [
+                f"cd /{repo_dir}",
+                f"conda activate {repo_dir + '__' + inst['version']}",
+            ]:
+                self.env.run_with_handle(
+                    cmd=cmd, err_msg=f"Inst {inst['instance_id']} failed at {cmd=}"
+                )
+            conda_env = self.env.run("echo $CONDA_DEFAULT_ENV")
+            logger.info(f"Conda env: {conda_env}")
+            logger.info(
+                f"New extractor container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+            )
         logger.info(f"Reproducer log:\n{log}")
         return log
 
@@ -267,8 +287,7 @@ class ExtractWorker(BaseAgentWorker):
                 "source_code_parse"
             ] = slice_step.source_code_slice
             task.extra_state["parse_type"]["source_code_parse"] = "code"
-
-        next_step_names.append("summarize")
+        # next_step_names.append("summarize")
 
         return self.gen_next_steps(step, next_step_names)
 
