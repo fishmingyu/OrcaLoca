@@ -31,8 +31,13 @@ args_dict = {
     #     "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
     #     "scikit-learn__scikit-learn-13496)$"
     # ),
-    # Early Stop Test
-    # "filter_instance": "^(sympy__sympy-17630|django__django-14608|pydata__xarray-4094|sympy__sympy-16792|pytest-dev__pytest-7490|sympy__sympy-18698|django__django-13925|sympy__sympy-21379|django__django-11999|sympy__sympy-17655|django__django-14017|sympy__sympy-15345|sympy__sympy-23262|sympy__sympy-24066|sympy__sympy-17139|astropy__astropy-14182|scikit-learn__scikit-learn-25747|django__django-15814|django__django-15252|sympy__sympy-13031|django__django-13033|sympy__sympy-12419|django__django-13933|django__django-12308|pylint-dev__pylint-7080|sympy__sympy-22714|astropy__astropy-12907|django__django-13028)$",
+    # whole repo
+    # "filter_instance": ".*",
+    # internal error
+    # "filter_instance": "^(django__django-13315)$",
+    # "filter_instance": "^(django__django-17087)$",
+    # Multi Issue Test
+    # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     "filter_instance": ".*",
 }
 
