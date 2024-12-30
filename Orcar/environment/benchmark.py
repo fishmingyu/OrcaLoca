@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import subprocess
 import time
 from typing import Any, Dict, Tuple
@@ -12,6 +13,8 @@ from Orcar.log_utils import get_logger
 from .utils import (
     ContainerBash,
     copy_file_to_container,
+    get_bash_pid_in_docker,
+    get_container,
     get_exit_code,
     run_command_in_container,
 )
@@ -91,6 +94,22 @@ class BenchmarkEnv:
         self.clone_repo(inst)
         self.cache_repo_to_host(inst)
         self.create_conda_env(inst)
+
+    def reset_ctr_bash(self) -> None:
+        logger.info("Restting container bash...")
+        self.ctr_bash.ctr_subprocess.send_signal(signal.SIGINT)
+        time.sleep(1)
+        if hasattr(self, "ctr_bash") and self.ctr_bash.ctr_subprocess.stdin is not None:
+            self.ctr_bash.ctr_subprocess.stdin.close()
+        self.ctr_bash.ctr_subprocess = get_container(
+            ctr_name=self.args.container_name,
+            image_name=self.args.image,
+            persistent=self.args.persistent,
+        )[0]
+        self.ctr_bash.ctr_pid = get_bash_pid_in_docker(self.ctr_bash.ctr_subprocess)
+        logger.info(
+            f"New container subprocess: {self.ctr_bash.ctr_subprocess.pid}, ctr pid: {self.ctr_bash.ctr_pid}"
+        )
 
     @property
     def cache_dir(self):

@@ -19,8 +19,9 @@ args_dict = {
     # "idx_range": [0, 1],
     # Short Issue Test
     # "filter_instance": "^(matplotlib__matplotlib-23476)$",
-    # "filter_instance": "^(astropy__astropy-12907)$",
-    "filter_instance": "^(astropy__astropy-12907|astropy__astropy-14182)$",
+    "filter_instance": "^(sphinx-doc__sphinx-11445|sphinx-doc__sphinx-8595|sympy__sympy-12419)$",
+    # "filter_instance": "^(sympy__sympy-12419)$",
+    # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-14182)$",
     # Long Issue Test
     # "filter_instance": "^(sphinx-doc__sphinx-8721|sphinx-doc__sphinx-8595)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
@@ -64,11 +65,12 @@ def test_agent():
     llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
     ds = load_filter_hf_dataset(args)
 
-    # final_stage = "extract"
-    final_stage = "search"
+    final_stage = "extract"
+    # final_stage = "search"
     # final_stage = "edit"
+    redirect_log = True
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
-    agent.set_redirect_log(True)
+    agent.set_redirect_log(redirect_log)
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
@@ -89,7 +91,7 @@ def test_agent():
         agent = OrcarAgent(
             args=args, llm=llm, final_stage=final_stage, current_retry=current_retry + 1
         )
-        agent.set_redirect_log(True)
+        agent.set_redirect_log(redirect_log)
         for i, inst in enumerate(ds):
             print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
             agent.run(dict(inst))

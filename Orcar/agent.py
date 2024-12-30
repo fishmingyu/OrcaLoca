@@ -60,6 +60,7 @@ class OrcarAgent:
         final_stage: Which stage will agent end at, currently support ["extract", "search"]
         """
         super().__init__()
+        self.logger = get_logger(__name__)
         ctr_name = args.container_name
         docker_ctr_subprocess = get_container(
             ctr_name=ctr_name, image_name=args.image, persistent=args.persistent
@@ -72,7 +73,6 @@ class OrcarAgent:
         self.env = BenchmarkEnv(args, self.ctr_bash)
         self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=False)
         self.base_path = self.env.cache_dir
-        self.logger = get_logger(__name__)
         self.redirect_log: bool = False
         self.output_to_file: bool = True
         self.final_stage = Stage[final_stage.upper()]
@@ -119,6 +119,9 @@ class OrcarAgent:
                 json.dump(extract_json_obj, handle, indent=4)
             if self.final_stage == Stage.EXTRACT:
                 self.output_insts.append(self.inst_id)
+        self.logger.info(
+            f"Current container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+        )
 
         return extract_output
 
@@ -244,6 +247,9 @@ class OrcarAgent:
     def run_agents(self) -> str:
         """Setup env and run agents."""
         try:
+            self.logger.info(
+                f"Current container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+            )
             self.env.setup(self.inst)
         except Exception:
             exc_info = sys.exc_info()
