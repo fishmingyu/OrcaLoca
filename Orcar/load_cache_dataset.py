@@ -64,6 +64,28 @@ def load_filter_hf_dataset_explicit(
                 input_columns=["instance_id"],
                 function=lambda x: x in ds_lite["instance_id"],
             )
+        elif dataset == "SWE-bench_Lite_Diff_common":
+            ds_lite: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Lite", split=split
+            )
+            ds_verified: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Verified", split=split
+            )
+            ds = ds_lite.filter(
+                input_columns=["instance_id"],
+                function=lambda x: x not in ds_verified["instance_id"],
+            )
+        elif dataset == "SWE-bench_Verified_Diff_common":
+            ds_lite: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Lite", split=split
+            )
+            ds_verified: datasets.arrow_dataset.Dataset = datasets.load_dataset(
+                "princeton-nlp/SWE-bench_Verified", split=split
+            )
+            ds = ds_verified.filter(
+                input_columns=["instance_id"],
+                function=lambda x: x not in ds_lite["instance_id"],
+            )
         else:
             ds = datasets.load_dataset(dataset, split=split)
         ds.to_json(dataset_path)
