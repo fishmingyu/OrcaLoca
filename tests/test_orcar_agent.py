@@ -20,7 +20,7 @@ args_dict = {
     # "filter_instance": "^(astropy__astropy-14182)$",
     # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-7746)$",
     # Long Issue Test
-    "filter_instance": "^(sphinx-doc__sphinx-8721|sphinx-doc__sphinx-8595)$",
+    # "filter_instance": "^(django__django-11815)$",
     # "filter_instance": "^(astropy__astropy-6938|astropy__astropy-12907)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
@@ -31,7 +31,7 @@ args_dict = {
     # "filter_instance": ".*",
     # internal error
     # "filter_instance": "^(django__django-13315)$",
-    # "filter_instance": "^(django__django-14580|django__django-17087)$",
+    "filter_instance": "^(django__django-17087)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # Wrong action
