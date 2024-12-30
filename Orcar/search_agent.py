@@ -128,7 +128,7 @@ class SearchWorker(BaseAgentWorker):
         self._max_iterations = max_iterations
         self._config_dict = {
             "top_k_search": 12,
-            "sliding_window_size": 12,
+            "sliding_window_size": 15,
             "top_k_methods": 3,
             "top_k_disambiguation": 3,
             "top_k_functions": 2,
@@ -408,11 +408,13 @@ class SearchWorker(BaseAgentWorker):
         is_disambiguation = self._check_search_result_type(
             search_result, "disambiguation"
         )
+        is_file = self._check_search_result_type(search_result, "file")
         is_skeleton = self._check_search_result_skeleton(search_result)
         if (
-            is_disambiguation or is_skeleton
+            is_disambiguation or is_skeleton or is_file
         ):  # not valid if is disambiguation, don't need to check the node existance
             # not valid if is skeleton, don't need to check the node existance
+            # not valid if is file(file info << method info), don't need to check the node existance
             # Reason: disambiguation and skeleton are limited information, and we have already
             # use the action decomposition to get the detailed information
             valid_search = False
