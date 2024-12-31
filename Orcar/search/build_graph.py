@@ -40,6 +40,7 @@ exclude_patterns = [
     "sphinx/templates/latex",  # Workaround for issue in 'sphinx-doc__sphinx'
     "tests/test_runner_apps/tagged/",
     "django/conf/app_template/",  # Workaround for issue in 'django__django'
+    "sympy/polys/numberfields/resolvent_lookup.py",  # Workaround for issue in 'sympy__sympy'
 ]
 
 
