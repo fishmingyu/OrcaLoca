@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import docker
 from Orcar import OrcarAgent
@@ -9,8 +10,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    "dataset": "SWE-bench_Lite_Diff_common",
-    # "dataset": "princeton-nlp/SWE-bench_Lite",
+    # "dataset": "SWE-bench_Lite_Diff_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test",
     "split": "test",
@@ -21,7 +22,8 @@ args_dict = {
     # "filter_instance": "^(matplotlib__matplotlib-23476)$",
     # "filter_instance": "^(sphinx-doc__sphinx-11445|sphinx-doc__sphinx-8595|sympy__sympy-12419)$",
     # "filter_instance": "^(sympy__sympy-12419)$",
-    # "filter_instance": "^(astropy__astropy-12907|astropy__astropy-14182)$",
+    # "filter_instance": "^(astropy__astropy-14365|django__django-11001|pylint-dev__pylint-7993)$",
+    "filter_instance": "^(django__django-12983|pylint-dev__pylint-7228)$",
     # Long Issue Test
     # "filter_instance": "^(django__django-11815)$",
     # "filter_instance": "^(sphinx-doc__sphinx-8721|sphinx-doc__sphinx-8595)$",
@@ -38,7 +40,7 @@ args_dict = {
     # "filter_instance": "^(django__django-17087)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
 }
 
 
@@ -78,10 +80,24 @@ def test_agent():
     redirect_log = True
     agent = OrcarAgent(args=args, llm=llm, final_stage=final_stage)
     agent.set_redirect_log(redirect_log)
+    output_insts = agent.output_insts.copy()
     for i, inst in enumerate(ds):
+        try:
+            agent.env.run_with_handle("ls", err_msg="ls failed")
+        except Exception as e:
+            print(f"Got env exception for instance {inst['instance_id']}: {e}")
+            output_insts.extend(agent.output_insts.copy())
+            del agent
+            time.sleep(5)
+            stop_container_by_name(args.container_name)
+            print(f"Restarting Container...")
+            agent = OrcarAgent(
+                args=args, llm=llm, final_stage=final_stage, current_retry=0
+            )
+            agent.set_redirect_log(redirect_log)
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         agent.run(dict(inst))
-    output_insts = frozenset(agent.output_insts.copy())
+    output_insts.extend(agent.output_insts.copy())
 
     for current_retry in range(args.max_retry):
         ds = ds.filter(
@@ -94,15 +110,34 @@ def test_agent():
         for inst in ds:
             print(inst["instance_id"])
         del agent
+        time.sleep(5)
         stop_container_by_name(args.container_name)
+        print(f"Restarting Container...")
         agent = OrcarAgent(
             args=args, llm=llm, final_stage=final_stage, current_retry=current_retry + 1
         )
         agent.set_redirect_log(redirect_log)
+        output_insts = agent.output_insts.copy()
         for i, inst in enumerate(ds):
+            try:
+                agent.env.run_with_handle("ls", err_msg="ls failed")
+            except Exception as e:
+                print(f"Got env exception for instance {inst['instance_id']}: {e}")
+                output_insts.extend(agent.output_insts.copy())
+                del agent
+                time.sleep(5)
+                stop_container_by_name(args.container_name)
+                print(f"Restarting Container...")
+                agent = OrcarAgent(
+                    args=args,
+                    llm=llm,
+                    final_stage=final_stage,
+                    current_retry=current_retry + 1,
+                )
+                agent.set_redirect_log(redirect_log)
             print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
             agent.run(dict(inst))
-        output_insts = frozenset(agent.output_insts.copy())
+        output_insts.extend(agent.output_insts.copy())
 
 
 if __name__ == "__main__":
