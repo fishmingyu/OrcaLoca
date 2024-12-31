@@ -427,6 +427,20 @@ def test_analyze_bug_locs():
     print(bug_locs)
 
 
+def test_build_graph_sympy():
+    repo_path = "~/.orcar/sympy__sympy"
+    expand_repo_path = os.path.expanduser(repo_path)
+    graph_builder = RepoGraph(
+        repo_path=expand_repo_path, save_log=True, log_path="log", build_kg=True
+    )
+    # try to search function "add" in the graph
+    node = graph_builder.dfs_search_callable_def("resolvent_coeff_lambdas")
+    if node:
+        print(f"Snapshot of callable resolvent_coeff_lambdas: \n {node}")
+    else:
+        print("Callable snapshot not found")
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -449,5 +463,6 @@ if __name__ == "__main__":
     # test_disambiguous_methods_3()
     # test_file_contents_1()
     # test_file_contents_2()
-    test_analyze_bug_locs_with_file()
+    # test_analyze_bug_locs_with_file()
     # test_analyze_bug_locs()
+    test_build_graph_sympy()
