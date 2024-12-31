@@ -186,7 +186,7 @@ class ExtractWorker(BaseAgentWorker):
                 *cut_since_last_sensitive(path.parts, sensitive_list)
             )
 
-            find_output = self.env.run(f"find * -name {path.parts[-1]}")
+            find_output = self.env.run(f"find * -type f -name {path.parts[-1]}")
             candidates = find_output.split("\n")
             output_paths = list(
                 filter(lambda x: x.endswith(str(relative_path_suffix)), candidates)

@@ -77,21 +77,27 @@ def extract_final_response(input_text: str) -> Tuple[str, str]:
 
 
 def load_with_escape(input_text: str) -> dict:
-    # Define the regex to match backslashes followed by 's'
-    pattern = r"((?:\\)+)s"
+    # Define the regex to match backslashes followed by non-quote characters
+    pattern = r"(\\+)[^\'\"]"
 
     def replace_match(match):
         # Get the matched backslashes and count them
         backslashes = match.group(1)
+        logger.info(
+            f"Find a match with {len(backslashes)} backslashes: {match.group(0)}, {match.group(1)}"
+        )
         # Check if the total backslashes are odd
         if len(backslashes) % 4 == 1:
-            # Increase the count by 1 and append 's'
-            return backslashes + r"\\" + r"s"
+            # Increase the count by 1 and append last character
+            ret = backslashes + "\\" + match.group(0)[-1]
         elif len(backslashes) % 4 == 3:
-            # Decrease the count by 1 and append 's'
-            return backslashes[:-1] + r"s"
+            # Decrease the count by 1 and append last character
+            ret = backslashes[:-1] + match.group(0)[-1]
         # If even, return unchanged
-        return match.group(0)
+        else:
+            ret = match.group(0)
+        logger.info(f"Replace with {ret}")
+        return ret
 
     # Apply the regex with the replacement function
     input_text = re.sub(pattern, replace_match, input_text)
