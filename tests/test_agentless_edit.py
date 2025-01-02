@@ -12,6 +12,7 @@ from Orcar.environment.utils import (
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.log_utils import get_logger, set_log_dir, switch_log_to_file
 from Orcar.search import SearchManager
+from Orcar.types import BugLocations
 
 logger = get_logger(__name__)
 
@@ -19,8 +20,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    "dataset": "SWE-bench_common",
-    # "dataset": "princeton-nlp/SWE-bench_Lite",
+    # "dataset": "SWE-bench_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test_0",
     "split": "test",
@@ -118,11 +119,12 @@ def gather_search_result():
             search_output = json.load(f)
         bug_locations_raw: List[Dict[str, Any]] = search_output["bug_locations"]
         logger.info(f"Search bug_locations: {bug_locations_raw}")
-        bug_locations = []
+        bug_locations: List[BugLocations] = []
         for x in bug_locations_raw:
             if "file_path" not in x and args.file_path_key in x:
                 x["file_path"] = x[args.file_path_key]
                 x.pop(args.file_path_key)
+            bug_locations.append(BugLocations.model_validate(x))
         ret = {}
         ret["instance_id"] = inst["instance_id"]
 
