@@ -133,7 +133,7 @@ def gather_search_result() -> Dict[str, Any]:
         # open the file ./output/instance_id/search_instance_id.json
         # and extract the bug locations
         search_output_path = (
-            f"../output/{inst['instance_id']}/searcher_{inst['instance_id']}.json"
+            f"./output/{inst['instance_id']}/searcher_{inst['instance_id']}.json"
         )
         if not os.path.exists(search_output_path):
             logger.warning(f"Cannot find search output: {search_output_path}")
