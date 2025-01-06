@@ -441,6 +441,31 @@ def test_build_graph_sympy():
         print("Callable snapshot not found")
 
 
+def test_retrieve_dependency():
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    dep_locs = search_manager._get_dependency(
+        "django/contrib/admin/utils.py::display_for_value"
+    )
+    print(dep_locs)
+
+
+def test_retrieve_dependency_2():
+    repo_path = "~/.orcar/pytest-dev__pytest"
+    expand_repo_path = os.path.expanduser(repo_path)
+    search_manager = SearchManager(repo_path=expand_repo_path)
+    # {
+    #         "file_path": "src/_pytest/pytesters.py",
+    #         "class_name": "Pytester",
+    #         "method_name": "spawn"
+    #     }
+    dep_locs = search_manager._get_dependency(
+        "src/_pytest/pytester.py::Pytester::spawn"
+    )
+    print(dep_locs)
+
+
 if __name__ == "__main__":
     # Example usage
     # test_build_graph()
@@ -465,4 +490,6 @@ if __name__ == "__main__":
     # test_file_contents_2()
     # test_analyze_bug_locs_with_file()
     # test_analyze_bug_locs()
-    test_build_graph_sympy()
+    # test_build_graph_sympy()
+    # test_retrieve_dependency()
+    test_retrieve_dependency_2()
