@@ -9,5 +9,6 @@ __pycache__/
 .mypy_cache/
 key.cfg
 artifact/assets
+artifact/artifact
 # unignore a file
 !requirements.txt

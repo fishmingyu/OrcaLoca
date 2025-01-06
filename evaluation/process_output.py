@@ -167,6 +167,9 @@ def gather_search_result() -> Dict[str, Any]:
                 class_name=x["class_name"],
                 method_name=x["method_name"],
             )
+            # filter out test files
+            if bug_loc.file_path.startswith("tests/"):
+                continue
             joined_file_path = os.path.join(repo_path, x["file_path"])
             line_range = get_line_range(joined_file_path, bug_loc)
             if line_range is None:
