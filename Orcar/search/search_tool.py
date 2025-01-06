@@ -307,6 +307,17 @@ class SearchManager:
         """
         return self.kg.get_query(query)
 
+    def _get_dependency(self, query: str) -> List[Loc] | None:
+        """Get the dependency of the query in the knowledge graph.
+
+        Args:
+            query (str): The query to search.
+
+        Returns:
+            List[Loc] | None: The list of dependencies.
+        """
+        return self.kg.get_dependency(query)
+
     def _get_query_in_file(self, file_path: str, query: str) -> LocInfo | None:
         """Get the query definition in the file. Search the query in KG.
 

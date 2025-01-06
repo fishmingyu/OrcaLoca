@@ -1,8 +1,10 @@
 import ast
+import builtins
+import difflib
 import json
 import os
 from collections import namedtuple
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -14,6 +16,23 @@ from .inverted_index import IndexValue, InvertedIndex
 
 Loc = namedtuple("Loc", ["file_name", "node_name", "start_line", "end_line"])
 Snapshot = namedtuple("snapshot", ["docstring", "signature"])
+# Get all built-ins
+builtins_list = dir(builtins)
+
+# Filter out specific categories
+builtins_functions = [
+    name for name in builtins_list if callable(getattr(builtins, name))
+]
+builtins_constants = [
+    name for name in builtins_list if not callable(getattr(builtins, name))
+]
+builtins_exceptions = [
+    name
+    for name in builtins_list
+    if isinstance(getattr(builtins, name), type)
+    and issubclass(getattr(builtins, name), BaseException)
+]
+all_builtins = builtins_functions + builtins_constants + builtins_exceptions
 
 
 class LocInfo:
@@ -33,6 +52,8 @@ class LocInfo:
 exclude_patterns = [
     "doc",  # Discovered this issue in 'pytest-dev__pytest'
     "requests/packages",  # Workaround for issue in 'psf__requests'
+    "tests",
+    "testing",  # Workaround for issue in 'pytest-dev__pytest'
     "tests/regrtest_data",
     "tests/input",
     "tests/functional",  # Workaround for issue in 'pylint-dev__pylint'
@@ -74,7 +95,7 @@ class RepoGraph:
 
         self.save_log = save_log
         self.log_path = log_path  # Name of the output log directory
-        self.function_definitions = (
+        self.function_definitions: Dict[str, List[str]] = (
             {}
         )  # Map to store function definitions by their qualified name
         if build_kg:
@@ -192,6 +213,32 @@ class RepoGraph:
                     type=self.graph.nodes[node]["type"],
                 )
         return None
+
+    # exact get dependency for a query
+    def get_dependency(self, query) -> List[Loc] | None:
+        # check node first
+        if not self.check_node_exists(query):
+            return None
+        # query is in node name format
+        dependencies = []
+        for node in self.graph.neighbors(query):
+            # first check the edge type is references
+            if self.graph.edges[query, node]["edge_type"] == "references":
+                print(f"node: {query} --> {node}")
+                dependencies.append(self.graph.nodes[node]["loc"])
+        # if query is a method, we need to check the class
+        # method is the child of the class
+        # return the father node of the method
+        father_nodes = self.graph.predecessors(query)
+        for father_node in father_nodes:
+            # # check edge type between father_node and query
+            # if self.graph.edges[father_node, query]["edge_type"] == "contains":
+            #     print(f"Dependency: {father_node} contains {query}")
+            # elif self.graph.edges[father_node, query]["edge_type"] == "references":
+            #     print(f"Dependency: {father_node} --> {query}")
+            if self.graph.nodes[father_node]["type"] == "class":
+                dependencies.append(self.graph.nodes[father_node]["loc"])
+        return dependencies
 
     # high level search for the callable function or class definition in the graph
     def dfs_search_callable_def(self, query) -> LocInfo | None:
@@ -715,7 +762,7 @@ class AstVistor(ast.NodeVisitor):
         self,
         graph_builder: RepoGraph,
         file_node_name: str,
-        function_definitions: dict,
+        function_definitions: Dict[str, List[str]],
         inverted_index: InvertedIndex,
     ):
         self.graph_builder = graph_builder
@@ -736,7 +783,7 @@ class AstVistor(ast.NodeVisitor):
             if self.current_class is None
             else f"{self.current_class}::{function_name}"
         )
-        self.function_definitions[function_name] = node_name
+
         # Add the function to the inverted index
         if self.current_class is None:
             self.inverted_index.add(
@@ -751,6 +798,10 @@ class AstVistor(ast.NodeVisitor):
                     class_name=self.current_class.split("::")[-1],
                 ),
             )
+        if function_name not in self.function_definitions:
+            self.function_definitions[function_name] = [node_name]
+        else:
+            self.function_definitions[function_name].append(node_name)
         node_type = "function" if self.current_class is None else "method"
         node_loc = Loc(
             file_name=self.current_file,
@@ -868,6 +919,10 @@ class ReferenceBuilder:
         )
         visitor.visit(tree)
 
+        # check_file_path = "src/_pytest/pytester.py"
+        # if file_path == check_file_path:
+        #     print(visitor.imports)
+
 
 class FunctionReferenceVisitor(ast.NodeVisitor):
     def __init__(self, graph, function_definitions, file_path):
@@ -876,6 +931,22 @@ class FunctionReferenceVisitor(ast.NodeVisitor):
         self.current_file = file_path
         self.current_class = None
         self.current_function = None
+        self.imports = {}
+
+    def visit_Import(self, node):
+        """Track imported modules and their aliases."""
+        for alias in node.names:
+            imported_name = alias.name  # Full module name
+            as_name = alias.asname or imported_name
+            self.imports[as_name] = imported_name
+
+    def visit_ImportFrom(self, node):
+        """Track specific imports from a module."""
+        module = node.module or ""
+        for alias in node.names:
+            imported_name = f"{module}.{alias.name}"
+            as_name = alias.asname or alias.name
+            self.imports[as_name] = imported_name
 
     def visit_FunctionDef(self, node):
         function_name = node.name
@@ -891,17 +962,46 @@ class FunctionReferenceVisitor(ast.NodeVisitor):
 
     def visit_ClassDef(self, node):
         class_name = node.name
+        previous_class = self.current_class  # Save the previous class
         self.current_class = class_name
         self.generic_visit(node)
-        self.current_class = None  # Reset after visiting the class
+        self.current_class = previous_class
 
     def visit_Call(self, node):
         """Capture function calls and add them as edges in the graph."""
         if isinstance(node.func, ast.Name):
             function_name = node.func.id
-            if function_name in self.function_definitions:
-                caller = self.current_function
-                callee = self.function_definitions[function_name]
-                if caller and callee:
-                    self.graph.add_edge(caller, callee, edge_type="references")
+            # first check function_name in the imports
+            if function_name not in all_builtins:
+                if function_name in self.imports:
+                    import_module = self.imports[function_name]
+                    # the import_module usually in a format like A.B.xxx, where xxx is a class or function
+                    # we need to convert A.B to A/B (path format) then followed by ::xxx
+                    parts = import_module.split(".")
+                    callable_name = parts[-1]
+                    module_name = "/".join(parts[:-1])
+                    compare_str = f"{module_name}::{callable_name}"
+                    if function_name in self.function_definitions:
+                        callee_list = self.function_definitions[function_name]
+                        # find the most similar function in the callee_list to the compare_str
+                        callee = difflib.get_close_matches(
+                            compare_str, callee_list, n=1, cutoff=0.0
+                        )
+                        if callee:
+                            callee = callee[0]
+                            caller = self.current_function
+                            if caller and callee:
+                                self.graph.add_edge(
+                                    caller, callee, edge_type="references"
+                                )
+                elif function_name in self.function_definitions:
+                    caller = self.current_function
+                    callee_list = self.function_definitions[function_name]
+                    callee = difflib.get_close_matches(
+                        self.current_file, callee_list, n=1, cutoff=0.0
+                    )
+                    if callee:
+                        callee = callee[0]
+                        if caller and callee:
+                            self.graph.add_edge(caller, callee, edge_type="references")
         self.generic_visit(node)
