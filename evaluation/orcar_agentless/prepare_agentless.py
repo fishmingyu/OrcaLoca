@@ -4,6 +4,8 @@ import json
 import os
 from typing import Any, Dict, List
 
+from Orcar.load_cache_dataset import load_filter_hf_dataset
+
 
 def parse_line_range(line_range: str) -> List[int]:
     line_range = ast.literal_eval(line_range)
@@ -83,9 +85,23 @@ def main():
     parser.add_argument(
         "-a", "--agentless_path", type=str, default="../../third_party/Agentless"
     )
+    default_dataset = "princeton-nlp/SWE-bench_Lite"
+    parser.add_argument(
+        "-d",
+        "--dataset",
+        default=default_dataset,
+        help=f"The target dataset (default: {default_dataset})",
+    )
+    parser.add_argument("-f", "--filter_instance", type=str, default="^(.*)$")
+    parser.add_argument("-s", "--split", type=str, default="test")
     args = parser.parse_args()
+    ds = load_filter_hf_dataset(args)
+    insts = ds["instance_id"]
     data = parse_input(args.evaluation_path)
-    write_output(data, args.agentless_path)
+    print(f"Got number of instances: {len(data)}")
+    data_filtered = [x for x in data if x["instance_id"] in insts]
+    print(f"Filtered number of instances: {len(data_filtered)}")
+    write_output(data_filtered, args.agentless_path)
 
 
 if __name__ == "__main__":
