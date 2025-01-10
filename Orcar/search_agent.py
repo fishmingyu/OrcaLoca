@@ -127,6 +127,12 @@ class SearchWorker(BaseAgentWorker):
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._config_dict = {
+            "context_control": False,
+            "score_decomposition": {
+                "class": True,
+                "file": False,
+                "disambiguation": True,
+            },
             "top_k_search": 12,
             "sliding_window_size": 15,
             "top_k_methods": 3,
@@ -295,9 +301,25 @@ class SearchWorker(BaseAgentWorker):
         }
         return json.dumps(search_output)
 
-    def _process_search(
+    def _process_search_queue(
         self,
         task: Task,
+        tools: Sequence[BaseTool],
+    ) -> SearchResult:
+        # while not duplicate, keep popping
+        while len(task.extra_state["search_queue"]) > 0:
+            head_search_step = task.extra_state["search_queue"].pop()
+            search_step = cast(SearchActionStep, head_search_step)
+            search_result = self._process_search_action(tools, search_step)
+            # check if the search result is duplicate
+            is_duplicate = self._check_search_result_duplicate(search_result)
+            # if duplicate, continue to pop
+            if not is_duplicate:  # until we get a non-duplicate search result
+                return search_result
+            logger_action_history.info(f"Duplicate search result: {search_result}")
+
+    def _process_search_action(
+        self,
         tools: Sequence[BaseTool],
         search_step: SearchActionStep,
     ) -> SearchResult:
@@ -359,6 +381,19 @@ class SearchWorker(BaseAgentWorker):
             is_skeleton = frame["is_skeleton"]
             if is_skeleton:
                 return True
+        return False
+
+    def _check_search_result_duplicate(self, search_result: SearchResult) -> bool:
+        """Check if search query of the search result is duplicate."""
+        action = search_result.search_action
+        search_input = search_result.get_search_input()
+        # use get_query_from_history to get the query of the search result
+        query = self._search_manager.get_query_from_history(action, search_input)
+        # check query is not None
+        if query is not None:
+            # use search_manager.check_and_add_query to check if the query is duplicate
+            is_duplicate = self._search_manager.check_and_add_query(query)
+            return is_duplicate
         return False
 
     def _check_search_result_type(self, search_result: SearchResult, type: str) -> bool:
@@ -876,8 +911,10 @@ class SearchWorker(BaseAgentWorker):
         potential_bugs: List[BugLocations],
     ) -> AgentChatResponse:
         """Process search result."""
-        # calculate the heuristic of the search result
-        agent_response = self._get_response(search_result)
+        # the response could contain action not found, so we should keep it
+        agent_response = self._get_response(
+            search_result
+        )  # directly return the search result
 
         if search_result is not None:
             heuristic_search_result = self._search_result_heuristic(
@@ -919,15 +956,14 @@ class SearchWorker(BaseAgentWorker):
         for _ in range(min(self._config_dict["top_k_search"], search_cache.qsize())):
             task.extra_state["search_cache"].append(search_cache.get().search_result)
 
-    def _action_decomposition(self, search_result: SearchResult, task: Task) -> None:
+    def _action_decomposition(
+        self, search_result: SearchResult, task: Task, config: dict
+    ) -> None:  # config is {"class": True, "disambiguation": True, "file": True}
         # we use type to determine whether the search result is a class, disambiguation or file
         # if it is a disambiguation, we should rank the disambiguation
         # if it is a class, we should rank the class methods
         # if it is a file, we should rank the file functions
         # class, disambiguation and file wouldn't appear at the same time
-        top_class_actions = self._class_methods_ranking(search_result, task)
-        top_function_actions = self._file_functions_ranking(search_result, task)
-        disambiguation_actions = self._disambiguation_ranking(search_result, task)
 
         # append actions to the left of the queue
         def add_actions_to_queue(
@@ -945,14 +981,24 @@ class SearchWorker(BaseAgentWorker):
                         task.extra_state["action_history"].add_action(action)
                 logger_action_history.info(f"{log_str}: {actions}")
 
-        # add top class methods to the left of the queue
-        add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
+        if config["class"]:
+            top_class_actions = self._class_methods_ranking(search_result, task)
+            # add top class methods to the left of the queue
+            add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
 
-        # add top file functions to the left of the queue
-        add_actions_to_queue(top_function_actions, "Top file functions", priority=True)
+        if config["file"]:
+            top_function_actions = self._file_functions_ranking(search_result, task)
+            # add top file functions to the left of the queue
+            add_actions_to_queue(
+                top_function_actions, "Top file functions", priority=True
+            )
 
-        # add disambiguation to the left of the queue
-        add_actions_to_queue(disambiguation_actions, "Disambiguation", priority=True)
+        if config["disambiguation"]:
+            disambiguation_actions = self._disambiguation_ranking(search_result, task)
+            # add disambiguation to the left of the queue
+            add_actions_to_queue(
+                disambiguation_actions, "Disambiguation", priority=True
+            )
 
         # put the file content search to the left of the queue
         file_node = self._get_search_result_file_path(search_result)
@@ -1134,22 +1180,24 @@ class SearchWorker(BaseAgentWorker):
         logger_queue.debug(
             f"Resorted search queue: \n {task.extra_state['search_queue']}"
         )
+        # process the search queue
+        search_result = self._process_search_queue(
+            task, tools
+        )  # this step processed search (and forms the search result)
 
-        # pop the head of the queue
-        head_search_step = task.extra_state["search_queue"].pop()
-        search_step = cast(SearchActionStep, head_search_step)
-        search_result = self._process_search(
-            task, tools, search_step
-        )  # this step does search (and forms the search result)
-        self._action_decomposition(search_result, task)
+        self._action_decomposition(
+            search_result, task, self._config_dict["score_decomposition"]
+        )
         # logger.info(f"Next Search Input: {search_result}")
 
         # get the agent response; decide the current_search.
         agent_response = self._process_search_result(
             search_result, task, potential_bugs
         )
-
-        self._process_heuristic_search_cache(task, potential_bugs)
+        if self._config_dict["context_control"]:  # use heuristic search cache
+            self._process_heuristic_search_cache(task, potential_bugs)
+        else:  # directly put the search result to the search_cache
+            task.extra_state["search_cache"].append(search_result)
 
         task.extra_state["next_step_input"] = agent_response.response
 
