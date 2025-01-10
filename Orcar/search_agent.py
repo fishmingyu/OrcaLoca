@@ -127,10 +127,10 @@ class SearchWorker(BaseAgentWorker):
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._config_dict = {
-            "context_control": False,
+            "context_control": True,
             "score_decomposition": {
                 "class": True,
-                "file": False,
+                "file": True,
                 "disambiguation": True,
             },
             "top_k_search": 12,
