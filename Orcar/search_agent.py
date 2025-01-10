@@ -295,9 +295,25 @@ class SearchWorker(BaseAgentWorker):
         }
         return json.dumps(search_output)
 
-    def _process_search(
+    def _process_search_queue(
         self,
         task: Task,
+        tools: Sequence[BaseTool],
+    ) -> SearchResult:
+        # while not duplicate, keep popping
+        while len(task.extra_state["search_queue"]) > 0:
+            head_search_step = task.extra_state["search_queue"].pop()
+            search_step = cast(SearchActionStep, head_search_step)
+            search_result = self._process_search_action(tools, search_step)
+            # check if the search result is duplicate
+            is_duplicate = self._check_search_result_duplicate(search_result)
+            # if duplicate, continue to pop
+            if not is_duplicate:  # until we get a non-duplicate search result
+                return search_result
+            logger_action_history.info(f"Duplicate search result: {search_result}")
+
+    def _process_search_action(
+        self,
         tools: Sequence[BaseTool],
         search_step: SearchActionStep,
     ) -> SearchResult:
@@ -359,6 +375,19 @@ class SearchWorker(BaseAgentWorker):
             is_skeleton = frame["is_skeleton"]
             if is_skeleton:
                 return True
+        return False
+
+    def _check_search_result_duplicate(self, search_result: SearchResult) -> bool:
+        """Check if search query of the search result is duplicate."""
+        action = search_result.search_action
+        search_input = search_result.get_search_input()
+        # use get_query_from_history to get the query of the search result
+        query = self._search_manager.get_query_from_history(action, search_input)
+        # check query is not None
+        if query is not None:
+            # use search_manager.check_and_add_query to check if the query is duplicate
+            is_duplicate = self._search_manager.check_and_add_query(query)
+            return is_duplicate
         return False
 
     def _check_search_result_type(self, search_result: SearchResult, type: str) -> bool:
@@ -876,8 +905,10 @@ class SearchWorker(BaseAgentWorker):
         potential_bugs: List[BugLocations],
     ) -> AgentChatResponse:
         """Process search result."""
-        # calculate the heuristic of the search result
-        agent_response = self._get_response(search_result)
+        # the response could contain action not found, so we should keep it
+        agent_response = self._get_response(
+            search_result
+        )  # directly return the search result
 
         if search_result is not None:
             heuristic_search_result = self._search_result_heuristic(
@@ -1134,13 +1165,11 @@ class SearchWorker(BaseAgentWorker):
         logger_queue.debug(
             f"Resorted search queue: \n {task.extra_state['search_queue']}"
         )
+        # process the search queue
+        search_result = self._process_search_queue(
+            task, tools
+        )  # this step processed search (and forms the search result)
 
-        # pop the head of the queue
-        head_search_step = task.extra_state["search_queue"].pop()
-        search_step = cast(SearchActionStep, head_search_step)
-        search_result = self._process_search(
-            task, tools, search_step
-        )  # this step does search (and forms the search result)
         self._action_decomposition(search_result, task)
         # logger.info(f"Next Search Input: {search_result}")
 

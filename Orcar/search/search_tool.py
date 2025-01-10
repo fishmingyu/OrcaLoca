@@ -76,8 +76,32 @@ class SearchManager:
                 "is_skeleton",
             ]
         )
+        self.history_query_set = set()
         self.repo_path = repo_path
         self._setup_graph()
+
+    def add_result_to_history(
+        self,
+        new_row: Dict[str, str],
+    ) -> None:
+        """Add the new row to the history."""
+        self.history = pd.concat(
+            [self.history, pd.DataFrame([new_row])], ignore_index=True
+        )
+
+    def check_and_add_query(self, query: str) -> bool:
+        """Compare the query with the query set.
+        If the query is in the history query set, return True.
+        Otherwise, check the node existence in the knowledge graph.
+        If the node exists, add the query to the query set.
+        Default return False.
+        """
+        if query in self.history_query_set:
+            return True
+        existence = self.get_node_existence(query)
+        if existence:
+            self.history_query_set.add(query)
+        return False
 
     def _setup_graph(self):
         graph_builder = RepoGraph(repo_path=self.repo_path)
@@ -635,9 +659,8 @@ class SearchManager:
                 "file_path": loc.file_name,
                 "is_skeleton": False,
             }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
+            # use add_result_to_history
+            self.add_result_to_history(new_row)
             return f"""File Path: {loc.file_name} \nQuery Type: class \nClass Content: \n{content}"""
 
         new_row = {
@@ -649,9 +672,7 @@ class SearchManager:
             "file_path": loc.file_name,
             "is_skeleton": True,
         }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
+        self.add_result_to_history(new_row)
 
         return f"""File Path: {loc.file_name} \nQuery Type: class \nClass Skeleton: \n{snapshot}"""
 
@@ -695,9 +716,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nFile Content: \n{content}"""
             else:
                 snapshot = self._direct_get_file_skeleton(loc.node_name)
@@ -710,9 +730,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nFile Skeleton: \n{snapshot}"""
         else:
             # first check inverted_index, the inverted_index does not contain single value key
@@ -736,9 +755,8 @@ class SearchManager:
                     "file_path": "",
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return ret_string
             loc, res = self._dfs_get_file_skeleton(file_name)
             if loc is None:
@@ -758,9 +776,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nFile Content: \n{content}"""
             else:
                 new_row = {
@@ -772,9 +789,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nFile Skeleton: \n{res}"""
 
     def search_source_code(self, file_path: str, source_code: str) -> str:
@@ -798,9 +814,8 @@ class SearchManager:
             "file_path": file_path,
             "is_skeleton": False,
         }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
+        # use add_result_to_history
+        self.add_result_to_history(new_row)
         return f"""File Path: {file_path} \nCode Snippet: \n{content}"""
 
     def fuzzy_search(self, query: str) -> str:
@@ -844,9 +859,8 @@ class SearchManager:
                 "file_path": "",
                 "is_skeleton": False,
             }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
+            # use add_result_to_history
+            self.add_result_to_history(new_row)
             return ret_string
         # if the query is not in the inverted_index, we search in the knowledge graph
         locinfo: LocInfo = self._search_callable_kg(query)
@@ -870,9 +884,8 @@ class SearchManager:
             "file_path": loc.file_name,
             "is_skeleton": False,
         }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
+        # use add_result_to_history
+        self.add_result_to_history(new_row)
 
         return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
 
@@ -935,9 +948,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nQuery Type: {type} \nClass Skeleton: \n{snapshot}"""
 
         new_row = {
@@ -949,9 +961,8 @@ class SearchManager:
             "file_path": loc.file_name,
             "is_skeleton": False,
         }
-        self.history = pd.concat(
-            [self.history, pd.DataFrame([new_row])], ignore_index=True
-        )
+        # use add_result_to_history
+        self.add_result_to_history(new_row)
 
         return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
 
@@ -992,9 +1003,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nClass Content: \n{content}"""
             else:  # use class skeleton
                 snapshot = self._direct_get_class(loc.node_name)
@@ -1007,9 +1017,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nClass Skeleton: \n{snapshot}"""
         else:
             # first check the inverted_index, the inverted_index does not contain single value key
@@ -1034,9 +1043,8 @@ class SearchManager:
                     "file_path": "",
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return ret_string
             # if the query is not in the inverted_index, we search in the knowledge graph
             loc, snapshot = self._dfs_get_class(class_name)
@@ -1056,9 +1064,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nClass Content: \n{content}"""
             else:  # use class skeleton
                 new_row = {
@@ -1070,9 +1077,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": True,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nClass Skeleton: \n{snapshot}"""
 
     def search_method_in_class(
@@ -1113,9 +1119,8 @@ class SearchManager:
                 "file_path": loc.file_name,
                 "is_skeleton": False,
             }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
+            # use add_result_to_history
+            self.add_result_to_history(new_row)
             return f"""File Path: {loc.file_name} \nMethod Content: \n{content}"""
         else:
             # first check the inverted_index, the inverted_index does not contain single value key
@@ -1150,9 +1155,8 @@ class SearchManager:
                     "file_path": "",
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return ret_string
             # if the query is not in the inverted_index, we search in the knowledge graph
             # however here we should first detect whether the class is unique
@@ -1189,9 +1193,8 @@ class SearchManager:
                         "file_path": loc.file_name,
                         "is_skeleton": False,
                     }
-                    self.history = pd.concat(
-                        [self.history, pd.DataFrame([new_row])], ignore_index=True
-                    )
+                    # use add_result_to_history
+                    self.add_result_to_history(new_row)
                     return (
                         f"""File Path: {loc.file_name} \nMethod Content: \n{content}"""
                     )
@@ -1212,9 +1215,8 @@ class SearchManager:
                 "file_path": loc.file_name,
                 "is_skeleton": False,
             }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
+            # use add_result_to_history
+            self.add_result_to_history(new_row)
             return f"""File Path: {loc.file_name} \nMethod Content: \n{content}"""
 
     def search_callable(self, query_name: str, file_path: str = None) -> str:
@@ -1261,9 +1263,8 @@ class SearchManager:
                     "file_path": file_path,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return ret_string
             else:  # unique
                 # use get_query_in_file
@@ -1287,9 +1288,8 @@ class SearchManager:
                         "file_path": loc.file_name,
                         "is_skeleton": is_skeleton,
                     }
-                    self.history = pd.concat(
-                        [self.history, pd.DataFrame([new_row])], ignore_index=True
-                    )
+                    # use add_result_to_history
+                    self.add_result_to_history(new_row)
                     # we could handle duplicate history in pd frame(since they would be the same)
                     return content
                 # if not class, we use the code snippet
@@ -1306,9 +1306,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
 
         else:  # no file_path hint
@@ -1337,9 +1336,8 @@ class SearchManager:
                     "file_path": "",
                     "is_skeleton": False,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 return ret_string
             # if the query is not in the inverted_index, we search in the knowledge graph
             locinfo = self._search_callable_kg(query_name)
@@ -1360,9 +1358,8 @@ class SearchManager:
                     "file_path": loc.file_name,
                     "is_skeleton": is_skeleton,
                 }
-                self.history = pd.concat(
-                    [self.history, pd.DataFrame([new_row])], ignore_index=True
-                )
+                # use add_result_to_history
+                self.add_result_to_history(new_row)
                 # we could handle duplicate history in pd frame(since they would be the same)
                 return content
             # if not class, we use the code snippet
@@ -1377,7 +1374,6 @@ class SearchManager:
                 "file_path": loc.file_name,
                 "is_skeleton": False,
             }
-            self.history = pd.concat(
-                [self.history, pd.DataFrame([new_row])], ignore_index=True
-            )
+            # use add_result_to_history
+            self.add_result_to_history(new_row)
             return f"""File Path: {loc.file_name} \nQuery Type: {type} \nCode Snippet: \n{content}"""
