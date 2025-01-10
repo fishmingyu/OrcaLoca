@@ -127,6 +127,12 @@ class SearchWorker(BaseAgentWorker):
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
         self._config_dict = {
+            "context_control": False,
+            "score_decomposition": {
+                "class": True,
+                "file": False,
+                "disambiguation": True,
+            },
             "top_k_search": 12,
             "sliding_window_size": 15,
             "top_k_methods": 3,
@@ -950,15 +956,14 @@ class SearchWorker(BaseAgentWorker):
         for _ in range(min(self._config_dict["top_k_search"], search_cache.qsize())):
             task.extra_state["search_cache"].append(search_cache.get().search_result)
 
-    def _action_decomposition(self, search_result: SearchResult, task: Task) -> None:
+    def _action_decomposition(
+        self, search_result: SearchResult, task: Task, config: dict
+    ) -> None:  # config is {"class": True, "disambiguation": True, "file": True}
         # we use type to determine whether the search result is a class, disambiguation or file
         # if it is a disambiguation, we should rank the disambiguation
         # if it is a class, we should rank the class methods
         # if it is a file, we should rank the file functions
         # class, disambiguation and file wouldn't appear at the same time
-        top_class_actions = self._class_methods_ranking(search_result, task)
-        top_function_actions = self._file_functions_ranking(search_result, task)
-        disambiguation_actions = self._disambiguation_ranking(search_result, task)
 
         # append actions to the left of the queue
         def add_actions_to_queue(
@@ -976,14 +981,24 @@ class SearchWorker(BaseAgentWorker):
                         task.extra_state["action_history"].add_action(action)
                 logger_action_history.info(f"{log_str}: {actions}")
 
-        # add top class methods to the left of the queue
-        add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
+        if config["class"]:
+            top_class_actions = self._class_methods_ranking(search_result, task)
+            # add top class methods to the left of the queue
+            add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
 
-        # add top file functions to the left of the queue
-        add_actions_to_queue(top_function_actions, "Top file functions", priority=True)
+        if config["file"]:
+            top_function_actions = self._file_functions_ranking(search_result, task)
+            # add top file functions to the left of the queue
+            add_actions_to_queue(
+                top_function_actions, "Top file functions", priority=True
+            )
 
-        # add disambiguation to the left of the queue
-        add_actions_to_queue(disambiguation_actions, "Disambiguation", priority=True)
+        if config["disambiguation"]:
+            disambiguation_actions = self._disambiguation_ranking(search_result, task)
+            # add disambiguation to the left of the queue
+            add_actions_to_queue(
+                disambiguation_actions, "Disambiguation", priority=True
+            )
 
         # put the file content search to the left of the queue
         file_node = self._get_search_result_file_path(search_result)
@@ -1170,15 +1185,19 @@ class SearchWorker(BaseAgentWorker):
             task, tools
         )  # this step processed search (and forms the search result)
 
-        self._action_decomposition(search_result, task)
+        self._action_decomposition(
+            search_result, task, self._config_dict["score_decomposition"]
+        )
         # logger.info(f"Next Search Input: {search_result}")
 
         # get the agent response; decide the current_search.
         agent_response = self._process_search_result(
             search_result, task, potential_bugs
         )
-
-        self._process_heuristic_search_cache(task, potential_bugs)
+        if self._config_dict["context_control"]:  # use heuristic search cache
+            self._process_heuristic_search_cache(task, potential_bugs)
+        else:  # directly put the search result to the search_cache
+            task.extra_state["search_cache"].append(search_result)
 
         task.extra_state["next_step_input"] = agent_response.response
 
