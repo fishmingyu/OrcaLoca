@@ -9,7 +9,8 @@ import pandas as pd
 from pydantic import BaseModel
 
 
-def download_golden_data(artifact_dir: str) -> pd.DataFrame:
+def download_golden_data(artifact_dir: str, dataset: str) -> pd.DataFrame:
+    dataset_file = f"{dataset}_golden_stats.csv"
     dir = f"{artifact_dir}/assets"
     os.makedirs(dir, exist_ok=True)
     url_dict: Dict[str, str] = {
@@ -17,23 +18,15 @@ def download_golden_data(artifact_dir: str) -> pd.DataFrame:
         "lite_golden_stats.csv": "https://drive.google.com/file/d/1D9LWg78K66kHnex5RopBbTu_rwz1fhaS/view?usp=sharing",
         "verified_golden_stats.csv": "https://drive.google.com/file/d/1M6KZyLezU8ut0hrKUJBwi_TpvHV437NB/view?usp=sharing",
     }
-    csv_list: List[pd.DataFrame] = []
-    for filename, url in url_dict.items():
-        file_dir = f"{dir}/{filename}"
-        if not os.path.isfile(file_dir):
-            print(f"Downloading {filename} from google drive url {url}")
-            gdown.download(url, file_dir, quiet=False, fuzzy=True)
-        csv_list.append(pd.read_csv(file_dir))
-
-    if not csv_list:
-        return pd.DataFrame()
-    ret = csv_list[0]
-
-    if len(csv_list) == 1:
-        return csv_list[0]
-    for csv in csv_list[1:]:
-        ret = ret.merge(csv, how="outer", validate="1:1").reset_index(drop=True)
-    return ret
+    assert (
+        dataset_file in url_dict
+    ), f"Dataset file {dataset_file} not found in url_dict: {url_dict.keys()}"
+    url = url_dict[dataset_file]
+    file_dir = f"{dir}/{dataset_file}"
+    if not os.path.isfile(file_dir):
+        print(f"Downloading {dataset_file} from google drive url {url}")
+        gdown.download(url, file_dir, quiet=False, fuzzy=True)
+    return pd.read_csv(file_dir)
 
 
 class DiffNode(BaseModel, frozen=True):
@@ -91,6 +84,9 @@ def parse_output(ds_golden: pd.DataFrame, args) -> None:
     # extractor_notgen_cnt = 0
     output_dict = dict()
     issues = os.listdir(output_dir)
+    golden_issues = set(ds_golden["instance_id"])
+    issues = set(issues).intersection(golden_issues)
+    issues = sorted(list(issues))
     file_snr_list = []
     keyword_snr_list = []
     for inst_id in sorted(issues):
@@ -229,8 +225,16 @@ def main():
         default="file_path",
         help=f"The directory of the output dir(agent's output)",
     )
+    parser.add_argument(
+        "-d",
+        "--dataset",
+        default="lite",
+        help=f"The dataset to use",
+    )
     args = parser.parse_args()
-    ds_golden = download_golden_data(artifact_dir=args.artifact_dir)
+    ds_golden = download_golden_data(
+        artifact_dir=args.artifact_dir, dataset=args.dataset
+    )
     parse_output(ds_golden, args)
 
 
