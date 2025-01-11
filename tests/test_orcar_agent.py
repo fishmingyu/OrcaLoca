@@ -10,8 +10,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "SWE-bench_Lite_Diff_common",
-    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset": "SWE-bench_common",
+    # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test",
     "split": "test",
@@ -27,14 +27,14 @@ args_dict = {
     # Long Issue Test
     # "filter_instance": "^(django__django-11815)$",
     # "filter_instance": "^(sphinx-doc__sphinx-8721|sphinx-doc__sphinx-8595)$",
-    "filter_instance": "^(astropy__astropy-12907)$",
+    # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
     #     "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
     #     "scikit-learn__scikit-learn-13496)$"
     # ),
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
     # internal error
     # "filter_instance": "^(django__django-13315)$",
     # "filter_instance": "^(django__django-17087)$",
