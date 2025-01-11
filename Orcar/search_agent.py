@@ -305,7 +305,7 @@ class SearchWorker(BaseAgentWorker):
         self,
         task: Task,
         tools: Sequence[BaseTool],
-    ) -> SearchResult:
+    ) -> SearchResult | None:
         # while not duplicate, keep popping
         while len(task.extra_state["search_queue"]) > 0:
             head_search_step = task.extra_state["search_queue"].pop()
@@ -316,7 +316,8 @@ class SearchWorker(BaseAgentWorker):
             # if duplicate, continue to pop
             if not is_duplicate:  # until we get a non-duplicate search result
                 return search_result
-            logger_action_history.info(f"Duplicate search result: {search_result}")
+            logger_queue.info(f"Duplicate search result: {search_result}")
+        return None
 
     def _process_search_action(
         self,
@@ -1184,6 +1185,15 @@ class SearchWorker(BaseAgentWorker):
         search_result = self._process_search_queue(
             task, tools
         )  # this step processed search (and forms the search result)
+        if search_result is None:  # return is_complete
+            task.extra_state["is_done"] = True
+            return self._get_task_step_response(
+                AgentChatResponse(response=observation, sources=[]),
+                step,
+                "conclusion",
+                None,
+                is_done=False,
+            )
 
         self._action_decomposition(
             search_result, task, self._config_dict["score_decomposition"]
