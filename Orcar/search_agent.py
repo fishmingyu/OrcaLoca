@@ -129,9 +129,9 @@ class SearchWorker(BaseAgentWorker):
         self._config_dict = {
             "context_control": True,
             "score_decomposition": {
-                "class": False,
-                "file": False,
-                "disambiguation": True,
+                "class": True,
+                "file": True,
+                "disambiguation": False,
             },
             "top_k_search": 12,
             "sliding_window_size": 15,
