@@ -1,86 +1,12 @@
 import argparse
 import json
-import os
-from typing import Dict, List
 
-import gdown
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel
+from parse_output import ParsedPatch, download_golden_data
 
 
-def download_golden_data(artifact_dir: str) -> pd.DataFrame:
-    dir = f"{artifact_dir}/assets"
-    os.makedirs(dir, exist_ok=True)
-    url_dict: Dict[str, str] = {
-        "common_golden_stats.csv": "https://drive.google.com/file/d/1t0nl6LLq4WEVNHbasULLQ1onQQtxLL6A/view?usp=sharing",
-        "lite_golden_stats.csv": "https://drive.google.com/file/d/1D9LWg78K66kHnex5RopBbTu_rwz1fhaS/view?usp=sharing",
-        "verified_golden_stats.csv": "https://drive.google.com/file/d/1M6KZyLezU8ut0hrKUJBwi_TpvHV437NB/view?usp=sharing",
-    }
-    csv_list: List[pd.DataFrame] = []
-    for filename, url in url_dict.items():
-        file_dir = f"{dir}/{filename}"
-        if not os.path.isfile(file_dir):
-            print(f"Downloading {filename} from google drive url {url}")
-            gdown.download(url, file_dir, quiet=False, fuzzy=True)
-        csv_list.append(pd.read_csv(file_dir))
-
-    if not csv_list:
-        return pd.DataFrame()
-    ret = csv_list[0]
-
-    if len(csv_list) == 1:
-        return csv_list[0]
-    for csv in csv_list[1:]:
-        ret = ret.merge(csv, how="outer", validate="1:1").reset_index(drop=True)
-    return ret
-
-
-class DiffNode(BaseModel, frozen=True):
-    node_name: str
-    node_type: str
-    lineno: int
-    end_lineno: int
-
-    def __repr__(self):
-        return f"{self.node_type}:{self.node_name} {self.lineno}:{self.end_lineno}"
-
-
-class SrcRange(BaseModel, frozen=True):
-    lineno: int
-    end_lineno: int
-    is_pure_addition: bool
-    is_global_addition: bool
-
-
-class DiffLoc(BaseModel, frozen=True):
-    file: str
-    diff_nodes: List[DiffNode]
-    lineno: int
-    end_lineno: int
-
-    def __repr__(self):
-        return f"{self.file} {self.lineno}:{self.end_lineno}\n" + "\n".join(
-            [
-                f"    Node Level {i}: {repr(diff_node)}"
-                for i, diff_node in enumerate(self.diff_nodes)
-            ]
-        )
-
-
-class ParsedPatch(BaseModel):
-    diff_locs: List[DiffLoc]
-
-    def __repr__(self):
-        return "\n".join(
-            [
-                f"Diff Loc {i} : {repr(diff_loc)}"
-                for i, diff_loc in enumerate(self.diff_locs)
-            ]
-        )
-
-
-def parse_output(ds_golden: pd.DataFrame, args) -> None:
+def parse_output_json(ds_golden: pd.DataFrame, args) -> None:
     output_json = json.load(open(args.output_json))
     artifact_dir: str = args.artifact_dir
     file_path_key: str = args.file_path_key
@@ -221,9 +147,17 @@ def main():
         default="file_path",
         help=f"The directory of the output dir(agent's output)",
     )
+    parser.add_argument(
+        "-d",
+        "--dataset",
+        default="lite",
+        help=f"The dataset to use",
+    )
     args = parser.parse_args()
-    ds_golden = download_golden_data(artifact_dir=args.artifact_dir)
-    parse_output(ds_golden, args)
+    ds_golden = download_golden_data(
+        artifact_dir=args.artifact_dir, dataset=args.dataset
+    )
+    parse_output_json(ds_golden, args)
 
 
 if __name__ == "__main__":
