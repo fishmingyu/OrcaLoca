@@ -1,13 +1,61 @@
-## Orca Runtime for LLM
+# OrcaLoca
 
-Installation: pip install -e .
+## Prerequisite
 
-Run a benchmark: python evaluation/run.py --final_stage extract --instance_ids astropy__astropy-12907 astropy__astropy-6938
+OrcaLoca requires docker to run, so please first pull our docker image (forked from [SWE-Agent](https://github.com/SWE-agent/SWE-agent)):
 
-Run evaluation:
+```shell
+docker pull hejiaz/swe-agent:latest
+```
 
-python artifact/evaluate_output.py --max_workers 1 --orcar_root_path '.' --run_id test
+OrcaLoca also requires API access to LLM. (Currently OpenAI & Anthropic APIs are supported)
+You can either export them in CLI:
+```shell
+export OPENAI_API_KEY={key_here}
+export ANTHROPIC_API_KEY={key_here}
+```
+or as a key.cfg file:
+```
+OPENAI_API_KEY: key_here
+ANTHROPIC_API_KEY: key_here
+```
 
-or run evaluation for specific insts
+OrcaLoca also uses torch in its search process. (torch installation guide TBD)
 
-python artifact/evaluate_output.py --max_workers 3 --orcar_root_path '.' --run_id test_3_insts --instance_ids astropy__astropy-14995 django__django-12983 django__django-12700
+## Installation
+```shell
+cd OrcarLLM
+
+conda create -n agentless python=3.10
+conda activate agentless
+pip install -e .
+```
+
+After installation succeeded, you can run a quick smoke test (should finish in 5-10 minutes):
+```shell
+python evaluation/run.py --final_stage extract --instance_ids astropy__astropy-12907 astropy__astropy-6938
+```
+
+Then add search stage into running:
+```shell
+python evaluation/run.py --final_stage search --instance_ids astropy__astropy-12907
+```
+
+## Reproducing OrcaLoca Leaderboard Submission
+
+### Genrating Search results
+```shell
+python evaluation/run.py
+```
+
+### Genrating output.json
+TBD
+
+### Preparing Data for Agentless Edition
+Please go through instructions in:
+1. evaluation/orcar_agentless/README.md
+2. thirdparty/Agentless/README_orcar.md
+
+### Evaluating all_preds.jsonl
+Our output all_preds.jsonl can be evaluated with official scripts offered by [SWE-Bench](https://github.com/swe-bench/SWE-bench).
+Please check the 'Set Up' and 'Usage' parts in its README.md for details.
