@@ -2,9 +2,7 @@
 
 Installation: pip install -e .
 
-Executing prompt: orcar execute --docker 'Run ls'
-
-Run a benchmark: orcar benchmark -p -c test -f 'astropy__astropy-14182'
+Run a benchmark: python evaluation/run.py --final_stage extract --instance_ids astropy__astropy-12907 astropy__astropy-6938
 
 Run evaluation:
 
