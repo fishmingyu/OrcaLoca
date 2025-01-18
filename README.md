@@ -20,7 +20,7 @@ OPENAI_API_KEY: key_here
 ANTHROPIC_API_KEY: key_here
 ```
 
-OrcaLoca also uses torch in its search process. (torch installation guide TBD)
+OrcaLoca also uses torch in its search process. ([torch installation guide](https://pytorch.org/get-started/locally/))
 
 ## Installation
 ```shell
@@ -49,12 +49,20 @@ python evaluation/run.py
 ```
 
 ### Genrating output.json
-TBD
+```shell
+cd evaluation
+python process_output.py
+```
 
 ### Preparing Data for Agentless Edition
 Please go through instructions in:
 1. evaluation/orcar_agentless/README.md
 2. thirdparty/Agentless/README_orcar.md
+To run agentless with 1-hop relation subgraph, you will also need to generate the `dependency_output.json`.
+```shell
+cd evaluation
+python process_dependency.py
+```
 
 ### Evaluating all_preds.jsonl
 Our output all_preds.jsonl can be evaluated with official scripts offered by [SWE-Bench](https://github.com/swe-bench/SWE-bench).
