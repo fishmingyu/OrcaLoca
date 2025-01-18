@@ -113,7 +113,9 @@ def process_observation(observation: str) -> str:
     return re.sub(r"<Observation>\n|\n</Observation>", "", observation)
 
 
-def gather_search_result() -> Dict[str, Any]:
+def gather_search_result(run_arg: argparse.Namespace) -> Dict[str, Any]:
+    cache_dir = run_arg.cache_dir
+    output_dir = run_arg.output_dir
     args = argparse.Namespace(**args_dict)
     ds = load_filter_hf_dataset(args)
 
@@ -123,18 +125,20 @@ def gather_search_result() -> Dict[str, Any]:
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
         repo_name = get_repo_dir(inst["repo"])
-        base_dir = os.path.expanduser("~/.orcar")
+        base_dir = os.path.expanduser(cache_dir)
         repo_path = os.path.join(base_dir, repo_name)
 
         # reset to base commit
         base_commit = inst["base_commit"]
 
         # extract test bug locations
-        # open the file ./output/instance_id/search_instance_id.json
+        # open the file $(output_dir)/instance_id/search_instance_id.json
         # and extract the bug locations
         search_output_path = (
-            f"./output/{inst['instance_id']}/searcher_{inst['instance_id']}.json"
+            f"{inst['instance_id']}/searcher_{inst['instance_id']}.json"
         )
+        search_output_path = os.path.join(output_dir, search_output_path)
+
         if not os.path.exists(search_output_path):
             logger.warning(f"Cannot find search output: {search_output_path}")
             ret = {
@@ -193,9 +197,14 @@ def gather_search_result() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    cache_dir = "~/.orcar/"
-    expand_cache_dir = os.path.expanduser(cache_dir)
-    output_dict = gather_search_result()
+    # set an output directory using argparse
+    arg = argparse.ArgumentParser()
+    arg.add_argument("--cache_dir", type=str, default="~/.orcar/")
+    arg.add_argument("--output_dir", type=str, default="../tests/output/")
+    args = arg.parse_args()
+
+    expand_cache_dir = os.path.expanduser(args.cache_dir)
+    output_dict = gather_search_result(args)
     # save the dict to a json file
     with open("output.json", "w") as f:
         json.dump(output_dict, f)
