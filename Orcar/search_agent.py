@@ -137,7 +137,7 @@ class SearchWorker(BaseAgentWorker):
             "priority_dict": {
                 "enable": True,
                 "basic": 1,
-                "decomposition": 1.5,
+                "decomposition": 2,
                 "related_file": 2,
             },
             "top_k_search": 12,
