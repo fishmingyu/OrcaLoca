@@ -313,18 +313,24 @@ class SearchWorker(BaseAgentWorker):
         task: Task,
         tools: Sequence[BaseTool],
     ) -> SearchResult | None:
-        # while not duplicate, keep popping
-        while len(task.extra_state["search_queue"]) > 0:
+        if self._config_dict["redundancy_control"]:  # if redundancy control is enabled
+            # while not duplicate, keep popping
+            while len(task.extra_state["search_queue"]) > 0:
+                head_search_step = task.extra_state["search_queue"].pop()
+                search_step = cast(SearchActionStep, head_search_step)
+                search_result = self._process_search_action(tools, search_step)
+                # check if the search result is duplicate
+                is_duplicate = self._check_search_result_duplicate(search_result)
+                # if duplicate, continue to pop
+                if not is_duplicate:  # until we get a non-duplicate search result
+                    return search_result
+                logger_queue.info(f"Duplicate search result: {search_result}")
+            return None
+        else:  # if redundancy control is disabled
             head_search_step = task.extra_state["search_queue"].pop()
             search_step = cast(SearchActionStep, head_search_step)
             search_result = self._process_search_action(tools, search_step)
-            # check if the search result is duplicate
-            is_duplicate = self._check_search_result_duplicate(search_result)
-            # if duplicate, continue to pop
-            if not is_duplicate:  # until we get a non-duplicate search result
-                return search_result
-            logger_queue.info(f"Duplicate search result: {search_result}")
-        return None
+            return search_result
 
     def _process_search_action(
         self,

@@ -10,8 +10,8 @@ args_dict = {
     "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     "image": "sweagent/swe-agent:latest",
-    # "dataset": "SWE-bench_Lite_Diff_common",
-    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset": "SWE-bench_common",
+    # "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test",
     "split": "test",
@@ -26,7 +26,7 @@ args_dict = {
     # "filter_instance": "^(django__django-12983|pylint-dev__pylint-7228)$",
     # Long Issue Test
     # "filter_instance": "^(sympy__sympy-23262)$",
-    "filter_instance": "^(pytest-dev__pytest-5692)$",
+    # "filter_instance": "^(pytest-dev__pytest-5692)$",
     # "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
@@ -34,10 +34,10 @@ args_dict = {
     #     "scikit-learn__scikit-learn-13496)$"
     # ),
     # whole repo
-    # "filter_instance": ".*",
+    "filter_instance": ".*",
     # internal error
-    # "filter_instance": "^(django__django-13448)$",
-    # "filter_instance": "^(django__django-17087)$",
+    # "filter_instance": "^(django__django-14580)$",
+    # "filter_instance": "^(django__django-15814)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # "filter_instance": ".*",
