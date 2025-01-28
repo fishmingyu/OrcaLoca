@@ -128,10 +128,17 @@ class SearchWorker(BaseAgentWorker):
         self._max_iterations = max_iterations
         self._config_dict = {
             "context_control": True,
+            "redundancy_control": True,
             "score_decomposition": {
                 "class": True,
                 "file": True,
                 "disambiguation": True,
+            },
+            "priority_dict": {
+                "enable": True,
+                "basic": 1,
+                "decomposition": 1.5,
+                "related_file": 2,
             },
             "top_k_search": 12,
             "sliding_window_size": 15,
@@ -214,7 +221,7 @@ class SearchWorker(BaseAgentWorker):
         is_done = False
         next_step_input: str = ""
         last_observation: str = ""
-        search_queue: SearchQueue = SearchQueue()
+        search_queue: SearchQueue = SearchQueue(self._config_dict["priority_dict"])
         action_history: SearchActionHistory = SearchActionHistory()
         current_search: List[SearchResult] = []
         searched_node_set: set = set()
@@ -967,7 +974,7 @@ class SearchWorker(BaseAgentWorker):
         # class, disambiguation and file wouldn't appear at the same time
 
         # append actions to the left of the queue
-        def add_actions_to_queue(
+        def add_decomposed_actions_to_queue(
             actions: List[SearchActionStep], log_str: str, priority: bool = False
         ) -> None:
             if len(actions) > 0:
@@ -976,7 +983,10 @@ class SearchWorker(BaseAgentWorker):
                         action, task.extra_state["action_history"]
                     ):
                         if priority:
-                            task.extra_state["search_queue"].appendleft(action)
+                            task.extra_state["search_queue"].append_with_priority(
+                                action,
+                                self._config_dict["priority_dict"]["decomposition"],
+                            )
                         else:
                             task.extra_state["search_queue"].append(action)
                         task.extra_state["action_history"].add_action(action)
@@ -985,19 +995,21 @@ class SearchWorker(BaseAgentWorker):
         if config["class"]:
             top_class_actions = self._class_methods_ranking(search_result, task)
             # add top class methods to the left of the queue
-            add_actions_to_queue(top_class_actions, "Top class methods", priority=True)
+            add_decomposed_actions_to_queue(
+                top_class_actions, "Top class methods", priority=True
+            )
 
         if config["file"]:
             top_function_actions = self._file_functions_ranking(search_result, task)
             # add top file functions to the left of the queue
-            add_actions_to_queue(
+            add_decomposed_actions_to_queue(
                 top_function_actions, "Top file functions", priority=True
             )
 
         if config["disambiguation"]:
             disambiguation_actions = self._disambiguation_ranking(search_result, task)
             # add disambiguation to the left of the queue
-            add_actions_to_queue(
+            add_decomposed_actions_to_queue(
                 disambiguation_actions, "Disambiguation", priority=True
             )
 
@@ -1014,7 +1026,10 @@ class SearchWorker(BaseAgentWorker):
             if self._check_action_valid(
                 file_search_action, task.extra_state["action_history"]
             ):
-                task.extra_state["search_queue"].appendleft(file_search_action)
+                task.extra_state["search_queue"].append_with_priority(
+                    file_search_action,
+                    self._config_dict["priority_dict"]["related_file"],
+                )
                 task.extra_state["action_history"].add_action(file_search_action)
                 logger.info(f"File search: {file_node}")
 
@@ -1177,10 +1192,11 @@ class SearchWorker(BaseAgentWorker):
                 is_done=False,
             )
         # resort the search_queue based on the action history
-        task.extra_state["search_queue"].resort(task.extra_state["action_history"])
-        logger_queue.debug(
-            f"Resorted search queue: \n {task.extra_state['search_queue']}"
-        )
+        # if enable priority, resort the search_queue
+        enable_priority = self._config_dict["priority_dict"]["enable"]
+        if enable_priority:
+            task.extra_state["search_queue"].resort(task.extra_state["action_history"])
+        logger_queue.debug(f"search queue: \n {task.extra_state['search_queue']}")
         # process the search queue
         search_result = self._process_search_queue(
             task, tools

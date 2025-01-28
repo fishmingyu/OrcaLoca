@@ -132,25 +132,34 @@ class SearchActionHistory:
 
 # use negative value to ensure that the action with the highest count is popped first
 class SearchQueue:
-    def __init__(self):
+    def __init__(self, priority_config: Dict):
         """Initialize the SearchQueue with a reference to SearchActionHistory."""
         self.queue: List[Tuple[int, int, SearchActionStep]] = (
             []
         )  # (value, order, action)
         self.counter = 0  # To ensure stable sorting for actions with the same value
+        self.priority_config = priority_config
 
     def append(self, action: SearchActionStep):
         """
         Add a new SearchActionStep to the queue with value = 1.
         """
-        heapq.heappush(self.queue, (-1, self.counter, action))  # (max heap)
+        heapq.heappush(
+            self.queue, (-self.priority_config["basic"], self.counter, action)
+        )  # (max heap)
         self.counter += 1
 
-    def appendleft(self, action: SearchActionStep):
+    def append_with_priority(self, action: SearchActionStep, priority: float):
         """
-        Add a new SearchActionStep to the queue with value = 2. (higher priority)
+        Add a new SearchActionStep to the queue with value priority
         """
-        heapq.heappush(self.queue, (-2, self.counter, action))
+        # if enable:
+        if self.priority_config["enable"]:
+            heapq.heappush(self.queue, (-priority, self.counter, action))
+        else:
+            heapq.heappush(
+                self.queue, (-self.priority_config["basic"], self.counter, action)
+            )
         self.counter += 1
 
     def resort(self, action_history: SearchActionHistory):
