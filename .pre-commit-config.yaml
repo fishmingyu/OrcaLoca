@@ -15,6 +15,7 @@ repos:
         name: (Common) Sort "requirements.txt"
       - id: check-added-large-files
         name: (Common) Prevent giant files from being committed
+        exclude: ".jpg"
       - id: fix-encoding-pragma
         name: (Python) Remove encoding pragmas
         args: [--remove]
