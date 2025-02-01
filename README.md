@@ -1,5 +1,9 @@
 # OrcaLoca
 
+OrcaLoca (previous named Orcar), an LLM agent framework that improves accuracy for software issue localization by integrating priority-based scheduling for LLM-guided action, action decomposition with relevance scoring, and distance-aware context pruning.
+
+![overview](./artifact/overview.jpg)
+
 ## Prerequisite
 
 OrcaLoca requires docker to run, so please first pull our docker image (forked from [SWE-Agent](https://github.com/SWE-agent/SWE-agent)):
