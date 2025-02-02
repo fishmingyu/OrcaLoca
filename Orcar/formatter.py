@@ -17,6 +17,7 @@ from llama_index.core.llms.llm import LLM
 from llama_index.core.tools import BaseTool
 from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.openai import OpenAI
+from llama_index.llms.vertex import Vertex
 
 from .log_utils import get_logger
 from .prompts import (
@@ -84,12 +85,14 @@ class TokenCounter:
         model = llm.metadata.model_name
         if isinstance(llm, OpenAI):
 
-            def openai_encoding(text: str):
+            def token_encoding(text: str) -> int:
                 return len(tiktoken.encoding_for_model(model).encode(text))
 
-            self.encoding = openai_encoding
+            self.encoding = token_encoding
         elif isinstance(llm, Anthropic):
             self.encoding = llm.tokenizer
+        elif isinstance(llm, Vertex):
+            self.encoding = None
         else:
             raise Exception(f"gen_config: No tokenizer for model {model}")
         logger.info(f"Found tokenizer for model '{model}'")

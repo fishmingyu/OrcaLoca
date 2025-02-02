@@ -7,8 +7,9 @@ from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 
 args_dict = {
-    "model": "claude-3-5-sonnet-20241022",
+    # "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
+    "model": "gemini-2.0-flash-exp",
     "image": "sweagent/swe-agent:latest",
     "dataset": "SWE-bench_common",
     # "dataset": "princeton-nlp/SWE-bench_Lite",
@@ -27,14 +28,14 @@ args_dict = {
     # Long Issue Test
     # "filter_instance": "^(sympy__sympy-23262)$",
     # "filter_instance": "^(pytest-dev__pytest-5692)$",
-    # "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-12907)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
     #     "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
     #     "scikit-learn__scikit-learn-13496)$"
     # ),
     # whole repo
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
     # internal error
     # "filter_instance": "^(django__django-14580)$",
     # "filter_instance": "^(django__django-15814)$",
@@ -70,8 +71,8 @@ def stop_container_by_name(container_name):
 
 def test_agent():
     args = argparse.Namespace(**args_dict)
-    cfg = Config("./key.cfg")
-    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    cfg = Config("../key.cfg")
+    llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 
     # final_stage = "extract"
