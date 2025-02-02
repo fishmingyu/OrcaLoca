@@ -4,7 +4,7 @@ import json
 from llama_index.core.chat_engine.types import AgentChatResponse
 from termcolor import colored
 
-from Orcar import ExtractAgent, OrcarAgent
+from Orcar import OrcarAgent, TraceAnalysisAgent
 from Orcar.environment.benchmark import BenchmarkEnv
 from Orcar.environment.utils import (
     ContainerBash,
@@ -15,7 +15,7 @@ from Orcar.environment.utils import (
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.log_utils import get_logger
-from Orcar.types import ExtractOutput
+from Orcar.types import TraceAnalysisOutput
 
 logger = get_logger(__name__)
 
@@ -183,17 +183,17 @@ def main():
             api_key=cfg["OPENAI_API_KEY"],
         )
         benchmark_env = BenchmarkEnv(args, ctr_bash)
-        extractor = ExtractAgent(llm=llm, env=benchmark_env)
+        trace_analysis_agent = TraceAnalysisAgent(llm=llm, env=benchmark_env)
 
         for inst in ds:
             benchmark_env.setup(inst)
-            agent_chat_response: AgentChatResponse = extractor.chat(
+            agent_chat_response: AgentChatResponse = trace_analysis_agent.chat(
                 json.dumps(dict(inst))
             )
-            extract_output = ExtractOutput.model_validate_json(
+            trace_analysis_output = TraceAnalysisOutput.model_validate_json(
                 agent_chat_response.response
             )
-            logger.debug(extract_output)
+            logger.debug(trace_analysis_output)
 
         # Run Test on Benchmark
         # TBD

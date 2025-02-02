@@ -56,8 +56,8 @@ logger_queue = get_logger("search_queue")
 
 
 def parse_search_input_step(input: SearchInput, task: Task) -> None:
-    extract_output = input.extract_output
-    suspicious_code_from_tracer = extract_output.suspicious_code_from_tracer
+    trace_analysis_output = input.trace_analysis_output
+    suspicious_code_from_tracer = trace_analysis_output.suspicious_code_from_tracer
     # for every codeinfo in suspicious_code_from_tracer, parse it into a action step
 
     if len(suspicious_code_from_tracer) > 0:

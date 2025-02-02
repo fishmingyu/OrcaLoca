@@ -5,12 +5,12 @@ from typing import List
 
 import pandas as pd
 import unidiff
-from datasets import load_dataset
 from pydantic import BaseModel
 from tqdm import tqdm
 from unidiff import PatchSet
 
 from Orcar.environment.benchmark import reset_cached_repo
+from Orcar.load_cache_dataset import load_filter_hf_dataset_explicit
 
 
 class DiffNode(BaseModel):
@@ -239,14 +239,20 @@ def main():
     If not cloned, run python dataset/repo_clone.py first
     """
 
+    dataset = {"output_name": "lite", "full_name": "princeton-nlp/SWE-bench_Lite"}
+    # dataset = {"output_name": "verified", "full_name": "princeton-nlp/SWE-bench_Verified"}
+    # dataset = {"output_name": "common", "full_name": "SWE-bench_common"}
+
     BASE = "../swe_bench_repos"
-    OUTPUT_PATH = "./dataset/lite_golden_stats.csv"
+    OUTPUT_PATH = f"./dataset/{dataset['output_name']}_golden_stats.csv"
 
     print(f"SWE Bench Repos will be looked under {BASE}")
     print(f"Output will be written to {OUTPUT_PATH}")
 
-    ds = load_dataset("princeton-nlp/SWE-bench_Lite")
-    ds_test = pd.DataFrame(ds["test"])
+    # ds = load_dataset("princeton-nlp/SWE-bench_Lite")
+    ds_test = pd.DataFrame(
+        load_filter_hf_dataset_explicit(dataset["full_name"], "^(.*)$", "test")[:]
+    )
     ds_golden_stats = ds_test[["instance_id", "patch", "repo", "base_commit"]]
     tqdm.pandas()
     ds_golden_stats.insert(

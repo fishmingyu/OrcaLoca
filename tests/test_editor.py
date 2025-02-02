@@ -78,20 +78,21 @@ def init_verify_wrapper(
     verify_agent_wrapper: VerifyAgentWrapper,
     inst: Dict[str, Any],
 ):
-    extract_output_path = (
-        f"./output/{inst['instance_id']}/extractor_{inst['instance_id']}.json"
+    trace_analyzer_output_path = (
+        f"./output/{inst['instance_id']}/trace_analyzer_{inst['instance_id']}.json"
     )
     assert os.path.exists(
-        extract_output_path
-    ), f"Cannot find Extract output: {extract_output_path}"
-    with open(extract_output_path, "r") as f:
-        extract_output = json.load(f)
+        trace_analyzer_output_path
+    ), f"Cannot find Extract output: {trace_analyzer_output_path}"
+    with open(trace_analyzer_output_path, "r") as f:
+        trace_analyzer_output = json.load(f)
     assert (
-        "is_reproduce_pass" in extract_output and "reproduce_code" in extract_output
-    ), "Cannot find reproduce code in Extract output"
+        "is_reproduce_pass" in trace_analyzer_output
+        and "reproduce_code" in trace_analyzer_output
+    ), "Cannot find reproduce code in Trace Analysis output"
     verify_agent_wrapper.init_verify_script(
-        is_reproduce_pass=extract_output["is_reproduce_pass"],
-        reproduce_snippet=extract_output["reproduce_code"],
+        is_reproduce_pass=trace_analyzer_output["is_reproduce_pass"],
+        reproduce_snippet=trace_analyzer_output["reproduce_code"],
     )
 
 

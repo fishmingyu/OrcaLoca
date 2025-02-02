@@ -15,11 +15,11 @@ from .types import (
     BugLocations,
     CodeInfo,
     EditOutput,
-    ExtractJudgeStep,
-    ExtractParseStep,
-    ExtractSliceStep,
-    ExtractSummarizeStep,
     SearchActionStep,
+    TraceAnalysisJudgeStep,
+    TraceAnalysisParseStep,
+    TraceAnalysisSliceStep,
+    TraceAnalysisSummarizeStep,
 )
 
 logger = get_logger(__name__)
@@ -230,8 +230,8 @@ class EditOutputParser(BaseOutputParser):
             raise ValueError(f"Could not parse edit output: {output}")
 
 
-class ExtractOutputParser(BaseOutputParser):
-    """Extractor Agent formatter."""
+class TraceAnalysisOutputParser(BaseOutputParser):
+    """Trace Analysis Agent formatter."""
 
     def parse(self, output: str, method: str) -> BaseReasoningStep:
         try:
@@ -244,7 +244,7 @@ class ExtractOutputParser(BaseOutputParser):
                 logger.info(err_msg_io.getvalue())
             json_obj: Dict = json.loads(output.replace("\\", r"\\"), strict=False)
         if method == "slice":
-            return ExtractSliceStep(
+            return TraceAnalysisSliceStep(
                 traceback_warning_log_slice=json_obj["traceback_warning_log_slice"],
                 issue_reproducer_slice=json_obj["issue_reproducer_slice"],
                 source_code_slice=json_obj["source_code_slice"],
@@ -254,9 +254,9 @@ class ExtractOutputParser(BaseOutputParser):
                 CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
                 for x in json_obj["code_info_list"]
             ]
-            return ExtractParseStep(code_info_list=code_info_list)
+            return TraceAnalysisParseStep(code_info_list=code_info_list)
         elif method == "judge":
-            return ExtractJudgeStep(
+            return TraceAnalysisJudgeStep(
                 is_successful=json_obj["is_successful"],
                 fixed_reproduce_snippet=json_obj["fixed_reproduce_snippet"],
             )
@@ -265,7 +265,7 @@ class ExtractOutputParser(BaseOutputParser):
                 CodeInfo(keyword=x["keyword"], file_path=x["file_path"])
                 for x in json_obj["code_info_list"]
             ]
-            return ExtractSummarizeStep(
+            return TraceAnalysisSummarizeStep(
                 summary=json_obj["summary"], code_info_list=code_info_list
             )
         raise NotImplementedError

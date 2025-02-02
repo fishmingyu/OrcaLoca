@@ -131,7 +131,7 @@ The revised code snippets should respect the requirements below:
 2. The code containing any error messages should be deterministic.
 """
 
-EXTRACT_FORMATS = {
+TRACE_ANALYSIS_FORMATS = {
     "slice": {
         "traceback_warning_log_slice": "log_slice_string",
         "issue_reproducer_slice": "code_slice_string",
@@ -153,7 +153,7 @@ EXTRACT_FORMATS = {
     },
 }
 
-EXTRACT_FIELDS = {
+TRACE_ANALYSIS_FIELDS = {
     "slice": """
 <field>
     traceback_warning_log_slice: Traceback or warning log. Set to '' if not found.
@@ -230,7 +230,7 @@ EXTRACT_FIELDS = {
 """,
 }
 
-EXTRACT_EXAMPLES = {
+TRACE_ANALYSIS_EXAMPLES = {
     "slice": {
         "repo_name": "marshmallow-code/marshmallow",
         "input_description": """
@@ -367,7 +367,7 @@ Examine the fields.List, fields.DateTime, and _init_fields methods in schema.py 
     },
 }
 
-EXTRACT_PROMPTS = {
+TRACE_ANALYSIS_PROMPTS = {
     "header": """
 You are an expert python developer, mastering at summarizing and extracting from github issues.
 """,

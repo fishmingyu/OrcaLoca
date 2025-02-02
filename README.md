@@ -37,7 +37,7 @@ pip install -e .
 
 After installation succeeded, you can run a quick smoke test (should finish in 5-10 minutes):
 ```shell
-python evaluation/run.py --final_stage extract --instance_ids astropy__astropy-12907 astropy__astropy-6938
+python evaluation/run.py --final_stage trace_analysis --instance_ids astropy__astropy-12907 astropy__astropy-6938
 ```
 
 Then add search stage into running:

@@ -12,19 +12,19 @@ from llama_index.core.chat_engine.types import AgentChatResponse
 from llama_index.core.llms.llm import LLM
 
 from .environment.benchmark import LONG_TIMEOUT, BenchmarkEnv, get_repo_dir
-from .formatter import ExtractChatFormatter, TokenCount, TokenCounter
+from .formatter import TokenCount, TokenCounter, TraceAnalysisChatFormatter
 from .log_utils import get_logger
-from .output_parser import ExtractOutputParser
+from .output_parser import TraceAnalysisOutputParser
 from .tracer import gen_tracer_cmd, read_tracer_output
 from .tracer_reranker import redirect_filepath_to_cache, rerank_func
 from .types import (
     CodeInfo,
     CodeInfoWithClass,
-    ExtractJudgeStep,
-    ExtractOutput,
-    ExtractParseStep,
-    ExtractSliceStep,
-    ExtractSummarizeStep,
+    TraceAnalysisJudgeStep,
+    TraceAnalysisOutput,
+    TraceAnalysisParseStep,
+    TraceAnalysisSliceStep,
+    TraceAnalysisSummarizeStep,
 )
 
 logger = get_logger(__name__)
@@ -57,8 +57,8 @@ Need different USER prompt per step; different parse can share description & out
 """
 
 
-class ExtractWorker(BaseAgentWorker):
-    """Extractor Agent worker."""
+class TraceAnalysisWorker(BaseAgentWorker):
+    """Trace Analysis Agent worker."""
 
     def __init__(
         self,
@@ -70,11 +70,11 @@ class ExtractWorker(BaseAgentWorker):
         self._llm = llm
         self.env = env
         logger.info(
-            f"Current extractor container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+            f"Current trace_analyzer container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
         )
         self.callback_manager = callback_manager or llm.callback_manager
-        self._chat_formatter = ExtractChatFormatter()
-        self._output_parser = ExtractOutputParser()
+        self._chat_formatter = TraceAnalysisChatFormatter()
+        self._output_parser = TraceAnalysisOutputParser()
         self._verbose = verbose
         self._token_counter = TokenCounter(llm)
 
@@ -245,7 +245,7 @@ class ExtractWorker(BaseAgentWorker):
             conda_env = self.env.run("echo $CONDA_DEFAULT_ENV")
             logger.info(f"Conda env: {conda_env}")
             logger.info(
-                f"New extractor container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
+                f"New trace_analyzer container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
             )
         logger.info(f"Reproducer log:\n{log}")
         return log
@@ -263,7 +263,7 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        slice_step: ExtractSliceStep = self._output_parser.parse(
+        slice_step: TraceAnalysisSliceStep = self._output_parser.parse(
             message_content, "slice"
         )
         logger.info(f"{slice_step}")
@@ -304,7 +304,7 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        parse_step: ExtractParseStep = self._output_parser.parse(
+        parse_step: TraceAnalysisParseStep = self._output_parser.parse(
             message_content, "parse"
         )
 
@@ -341,7 +341,7 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        judge_step: ExtractJudgeStep = self._output_parser.parse(
+        judge_step: TraceAnalysisJudgeStep = self._output_parser.parse(
             message_content, "judge"
         )
         logger.info(f"{judge_step}")
@@ -379,7 +379,7 @@ class ExtractWorker(BaseAgentWorker):
             raise ValueError("Got empty message.")
         message_content = chat_response.message.content
         logger.info(f"Chat response: {message_content}")
-        summarize_step: ExtractSummarizeStep = self._output_parser.parse(
+        summarize_step: TraceAnalysisSummarizeStep = self._output_parser.parse(
             message_content, "summarize"
         )
 
@@ -508,7 +508,7 @@ class ExtractWorker(BaseAgentWorker):
         elif "trace" in step_name:
             return self.handle_step_trace(step, task)
         raise ValueError(
-            f"ExtractWorker.handle_step: Cannot recognize step name {step_name}"
+            f"TraceAnalysisWorker.handle_step: Cannot recognize step name {step_name}"
         )
 
     def handle_first_step(self, step: TaskStep, task: Task) -> None:
@@ -524,7 +524,7 @@ class ExtractWorker(BaseAgentWorker):
             )
         self.env.reset_env_repo(f"/{repo_dir}", inst["base_commit"])
 
-    def gen_output(self, task: Task) -> ExtractOutput:
+    def gen_output(self, task: Task) -> TraceAnalysisOutput:
         suspicious_code_from_tracer: List[CodeInfo] = task.extra_state[
             "suspicious_code_from_tracer"
         ]
@@ -542,7 +542,7 @@ class ExtractWorker(BaseAgentWorker):
         related_source_code = ""
         if "source_code_parse" in task.extra_state["slices"]:
             related_source_code = task.extra_state["slices"]["source_code_parse"]
-        return ExtractOutput(
+        return TraceAnalysisOutput(
             summary=task.extra_state["summary"],
             suspicious_code=list(suspicious_code),
             suspicious_code_from_tracer=suspicious_code_from_tracer,
@@ -620,16 +620,16 @@ class ExtractWorker(BaseAgentWorker):
         raise NotImplementedError
 
 
-class ExtractAgent(AgentRunner):
+class TraceAnalysisAgent(AgentRunner):
     """
-    Extractor Agent. Response type: ExtractOutput
+    Trace Analysis Agent. Response type: TraceAnalysisOutput
 
     Calling example:
-    agent = ExtractAgent(llm=llm, env=env, verbose=True)
+    agent = TraceAnalysisAgent(llm=llm, env=env, verbose=True)
     agent_chat_response: AgentChatResponse = agent.chat(input)
 
     Response parse:
-    extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
+    trace_analysis_output = TraceAnalysisOutput.model_validate_json(agent_chat_response.response)
     """
 
     def __init__(
@@ -642,7 +642,7 @@ class ExtractAgent(AgentRunner):
         """Init params."""
         callback_manager = callback_manager or llm.callback_manager
 
-        step_engine = ExtractWorker(
+        step_engine = TraceAnalysisWorker(
             llm=llm,
             env=env,
             callback_manager=callback_manager,

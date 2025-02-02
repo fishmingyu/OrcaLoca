@@ -25,13 +25,13 @@ from .prompts import (
     EDIT_OUTPUT,
     EDIT_REQUIREMENTS,
     EDIT_SYSTEM_HEADER,
-    EXTRACT_EXAMPLES,
-    EXTRACT_FIELDS,
-    EXTRACT_FORMATS,
-    EXTRACT_PROMPTS,
     FMT_CONTROL_PROMPT,
     SEARCH_SYSTEM_HEADER,
     STEP_EXAMPLE,
+    TRACE_ANALYSIS_EXAMPLES,
+    TRACE_ANALYSIS_FIELDS,
+    TRACE_ANALYSIS_FORMATS,
+    TRACE_ANALYSIS_PROMPTS,
 )
 from .types import BaseReasoningStep, SearchQueue, SearchResult
 
@@ -477,31 +477,35 @@ class EditChatFormatter(BaseAgentChatFormatter):
         ]
 
 
-class ExtractChatFormatter(BaseAgentChatFormatter):
-    """Extractor Agent formatter."""
+class TraceAnalysisChatFormatter(BaseAgentChatFormatter):
+    """Trace Analysis Agent formatter."""
 
     def format(self, step: TaskStep, task: Task, handler: str) -> List[ChatMessage]:
         """Format chat history into list of ChatMessage."""
         sysheader = ChatMessage(
-            role=MessageRole.SYSTEM, content=EXTRACT_PROMPTS["header"]
+            role=MessageRole.SYSTEM, content=TRACE_ANALYSIS_PROMPTS["header"]
         )
         if handler == "slice":
-            example = EXTRACT_PROMPTS["example"]
+            example = TRACE_ANALYSIS_PROMPTS["example"]
             example_format_args = {
-                "example_repo_name": EXTRACT_EXAMPLES[handler]["repo_name"],
-                "example_input_description": EXTRACT_EXAMPLES[handler][
+                "example_repo_name": TRACE_ANALYSIS_EXAMPLES[handler]["repo_name"],
+                "example_input_description": TRACE_ANALYSIS_EXAMPLES[handler][
                     "input_description"
                 ],
                 "example_output": "".join(
-                    json.dumps(EXTRACT_EXAMPLES[handler]["example_output"], indent=4)
+                    json.dumps(
+                        TRACE_ANALYSIS_EXAMPLES[handler]["example_output"], indent=4
+                    )
                 ),
             }
             fmt_example = example.format(**example_format_args)
-            user_msg = EXTRACT_PROMPTS[handler]
-            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
+            user_msg = TRACE_ANALYSIS_PROMPTS[handler]
+            output_format = "".join(
+                json.dumps(TRACE_ANALYSIS_FORMATS[handler], indent=4)
+            )
             format_args = {
                 "output_format": output_format,
-                "output_fields": EXTRACT_FIELDS[handler],
+                "output_fields": TRACE_ANALYSIS_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": replace_unicode_quotations(
@@ -521,25 +525,29 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
         elif handler == "parse":
             step_name = step.step_state["name"]
             parse_type = task.extra_state["parse_type"][step_name]
-            example = EXTRACT_PROMPTS["example"]
+            example = TRACE_ANALYSIS_PROMPTS["example"]
             example_format_args = {
-                "example_repo_name": EXTRACT_EXAMPLES[handler][parse_type]["repo_name"],
-                "example_input_description": EXTRACT_EXAMPLES[handler][parse_type][
-                    "input_description"
+                "example_repo_name": TRACE_ANALYSIS_EXAMPLES[handler][parse_type][
+                    "repo_name"
                 ],
+                "example_input_description": TRACE_ANALYSIS_EXAMPLES[handler][
+                    parse_type
+                ]["input_description"],
                 "example_output": "".join(
                     json.dumps(
-                        EXTRACT_EXAMPLES[handler][parse_type]["example_output"],
+                        TRACE_ANALYSIS_EXAMPLES[handler][parse_type]["example_output"],
                         indent=4,
                     )
                 ),
             }
             fmt_example = example.format(**example_format_args)
-            user_msg = EXTRACT_PROMPTS[handler]
-            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
+            user_msg = TRACE_ANALYSIS_PROMPTS[handler]
+            output_format = "".join(
+                json.dumps(TRACE_ANALYSIS_FORMATS[handler], indent=4)
+            )
             format_args = {
                 "output_format": output_format,
-                "output_fields": EXTRACT_FIELDS[handler],
+                "output_fields": TRACE_ANALYSIS_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["slices"][step_name],
@@ -555,11 +563,13 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 fmt_control_msg,
             ]
         elif handler == "judge":
-            user_msg = EXTRACT_PROMPTS[handler]
-            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
+            user_msg = TRACE_ANALYSIS_PROMPTS[handler]
+            output_format = "".join(
+                json.dumps(TRACE_ANALYSIS_FORMATS[handler], indent=4)
+            )
             format_args = {
                 "output_format": output_format,
-                "output_fields": EXTRACT_FIELDS[handler],
+                "output_fields": TRACE_ANALYSIS_FIELDS[handler],
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
                 "reproducer_snippet": task.extra_state["slices"][
@@ -578,25 +588,27 @@ class ExtractChatFormatter(BaseAgentChatFormatter):
                 fmt_control_msg,
             ]
         elif handler == "summarize":
-            user_msg = EXTRACT_PROMPTS[handler]
-            example = EXTRACT_PROMPTS["example"]
+            user_msg = TRACE_ANALYSIS_PROMPTS[handler]
+            example = TRACE_ANALYSIS_PROMPTS["example"]
             example_format_args = {
-                "example_repo_name": EXTRACT_EXAMPLES[handler]["repo_name"],
-                "example_input_description": EXTRACT_EXAMPLES[handler][
+                "example_repo_name": TRACE_ANALYSIS_EXAMPLES[handler]["repo_name"],
+                "example_input_description": TRACE_ANALYSIS_EXAMPLES[handler][
                     "input_description"
                 ],
                 "example_output": "".join(
                     json.dumps(
-                        EXTRACT_EXAMPLES[handler]["example_output"],
+                        TRACE_ANALYSIS_EXAMPLES[handler]["example_output"],
                         indent=4,
                     )
                 ),
             }
             fmt_example = example.format(**example_format_args)
-            output_format = "".join(json.dumps(EXTRACT_FORMATS[handler], indent=4))
+            output_format = "".join(
+                json.dumps(TRACE_ANALYSIS_FORMATS[handler], indent=4)
+            )
             format_args = {
                 "output_format": output_format,
-                "output_fields": EXTRACT_FIELDS[handler],
+                "output_fields": TRACE_ANALYSIS_FIELDS[handler],
                 "example": fmt_example,
                 "repo_name": task.extra_state["inst"]["repo"],
                 "input_description": task.extra_state["inst"]["problem_statement"],
