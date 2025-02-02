@@ -70,14 +70,14 @@ follow the instruction "Now let's come to a conclusion. ".
     Make sure each API call is written as a valid python expression and code_snippet is a valid python string.
     In potential_bug_locations, you should provide the file path, class name and method name.
     It's not the final answer, just a hint for possible bug locations.
-    If method is not belong to any class, set class to empty string.
+    If a method does not belong to any class, set class to empty string.
     You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
 2. Conclusion Format:
     After no input actions in search queue, provide the final bug locations in JSON structure like this.
 
     {bug_locations}
     DO NOT generate observation or new_search_actions in the conclusion step.
-    DO NOT mix it with any title or description. If method is not belong to any class, set class to empty string.
+    DO NOT mix it with any title or description. If a method does not belong to any class, set class to empty string.
 </OUTPUT FORMAT>
 """
 
