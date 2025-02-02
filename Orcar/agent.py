@@ -17,20 +17,19 @@ from Orcar.environment.utils import (
     get_container,
     pause_persistent_container,
 )
-from Orcar.extract_agent import ExtractAgent
 from Orcar.log_utils import (
     get_logger,
     set_log_dir,
     switch_log_to_file,
     switch_log_to_stdout,
 )
-from Orcar.search import SearchManager
 from Orcar.search_agent import SearchAgent
-from Orcar.types import EditInput, ExtractOutput, SearchInput, SearchOutput
+from Orcar.trace_analysis_agent import TraceAnalysisAgent
+from Orcar.types import EditInput, SearchInput, SearchOutput, TraceAnalysisOutput
 
 
 class Stage(IntEnum):
-    EXTRACT = 1
+    TRACE_ANALYSIS = 1
     SEARCH = 2
     EDIT = 3
 
@@ -57,7 +56,7 @@ class OrcarAgent:
     ) -> None:
         """
         llm: Should be initiated outside and passed to agent construction
-        final_stage: Which stage will agent end at, currently support ["extract", "search"]
+        final_stage: Which stage will agent end at, currently support ["trace_analysis", "search"]
         """
         super().__init__()
         self.logger = get_logger(__name__)
@@ -71,7 +70,9 @@ class OrcarAgent:
             ctr_subprocess=docker_ctr_subprocess, ctr_name=ctr_name
         )
         self.env = BenchmarkEnv(args, self.ctr_bash)
-        self.extract_agent = ExtractAgent(llm=llm, env=self.env, verbose=False)
+        self.trace_analysis_agent = TraceAnalysisAgent(
+            llm=llm, env=self.env, verbose=False
+        )
         self.base_path = self.env.cache_dir
         self.redirect_log: bool = False
         self.output_to_file: bool = True
@@ -99,62 +100,43 @@ class OrcarAgent:
     def set_output_to_file(self, new_value: bool) -> None:
         self.output_to_file = new_value
 
-    def run_extract_agent(self) -> ExtractOutput:
-        """Run the extract agent."""
-        response: AgentChatResponse = self.extract_agent.chat(
+    def run_trace_analysis_agent(self) -> TraceAnalysisOutput:
+        """Run the trace analysis agent."""
+        response: AgentChatResponse = self.trace_analysis_agent.chat(
             json.dumps(dict(self.inst))
         )
-        extract_output = ExtractOutput.model_validate_json(response.response)
-        self.logger.info("Raw Extract output:")
-        self.logger.info(extract_output)
-        # extract_output = self.filter_extract_output(extract_output)
-        # self.logger.info("Filtered extract output:")
-        # self.logger.info(extract_output)
+        trace_analysis_output = TraceAnalysisOutput.model_validate_json(
+            response.response
+        )
+        self.logger.info("Raw Trace Analysis output:")
+        self.logger.info(trace_analysis_output)
 
         if self.output_to_file:
-            extract_json_obj = json.loads(extract_output.model_dump_json())
+            trace_analysis_json_obj = json.loads(
+                trace_analysis_output.model_dump_json()
+            )
             with open(
-                f"{self.output_dir}/extractor_{self.inst_id}.json", "w"
+                f"{self.output_dir}/trace_analyzer_{self.inst_id}.json", "w"
             ) as handle:
-                json.dump(extract_json_obj, handle, indent=4)
-            if self.final_stage == Stage.EXTRACT:
+                json.dump(trace_analysis_json_obj, handle, indent=4)
+            if self.final_stage == Stage.TRACE_ANALYSIS:
                 self.output_insts.append(self.inst_id)
         self.logger.info(
             f"Current container subprocess: {self.env.ctr_bash.ctr_subprocess.pid}"
         )
 
-        return extract_output
+        return trace_analysis_output
 
-    def filter_extract_output(self, extract_output: ExtractOutput) -> ExtractOutput:
-        """Filter the extract output."""
-        self.logger.info("Filtering extract output with search manager...")
-        search_manager = SearchManager(self.repo_path)
-        suspicious_code = extract_output.suspicious_code
-        ret = []
-        for i, c in enumerate(suspicious_code):
-            keyword = c.keyword
-            file_path = c.file_path if c.file_path else None
-            ret_c = search_manager.search_callable(keyword, file_path)
-            if not ret_c.startswith("Cannot find the definition of"):
-                ret.append(c)
-                self.logger.info(
-                    f"({i+1:02d}/{len(suspicious_code):02d}) Search Manager found CodeInfo {c}: \n{ret_c}"
-                )
-            else:
-                self.logger.info(
-                    f"({i+1:02d}/{len(suspicious_code):02d}) Search Manager could not find CodeInfo {c}: \n{ret_c}"
-                )
-        extract_output.suspicious_code = ret
-        return extract_output
-
-    def run_search_agent(self, extract_output: ExtractOutput) -> SearchOutput:
+    def run_search_agent(
+        self, trace_analysis_output: TraceAnalysisOutput
+    ) -> SearchOutput:
         """
         Run the search agent.
-        It depends on the output of the extract agent.
+        It depends on the output of the trace analysis agent.
         """
         search_input = SearchInput(
             problem_statement=self.inst["problem_statement"],
-            extract_output=extract_output,
+            trace_analysis_output=trace_analysis_output,
         )
 
         self.search_agent = SearchAgent(
@@ -257,16 +239,16 @@ class OrcarAgent:
             return ""
 
         try:
-            extract_output = self.run_extract_agent()
+            trace_analysis_output = self.run_trace_analysis_agent()
         except Exception:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            extract_output = ExtractOutput()
-        if self.final_stage <= Stage.EXTRACT:
-            return extract_output.model_dump_json(indent=4)
+            trace_analysis_output = TraceAnalysisOutput()
+        if self.final_stage <= Stage.TRACE_ANALYSIS:
+            return trace_analysis_output.model_dump_json(indent=4)
 
         try:
-            search_output = self.run_search_agent(extract_output)
+            search_output = self.run_search_agent(trace_analysis_output)
         except Exception:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)

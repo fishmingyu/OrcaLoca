@@ -284,8 +284,8 @@ class BugLocations(BaseModel):
             return f"{self.file_path}"
 
 
-class ExtractSliceStep(BaseReasoningStep):
-    """Extract slice step"""
+class TraceAnalysisSliceStep(BaseReasoningStep):
+    """Trace Analysis slice step"""
 
     traceback_warning_log_slice: str
     issue_reproducer_slice: str
@@ -313,8 +313,8 @@ class CodeInfoWithClass(CodeInfo):
     class_name: str
 
 
-class ExtractParseStep(BaseReasoningStep):
-    """Extract parse step"""
+class TraceAnalysisParseStep(BaseReasoningStep):
+    """Trace Analysis parse step"""
 
     code_info_list: List[CodeInfo]
 
@@ -323,8 +323,8 @@ class ExtractParseStep(BaseReasoningStep):
         return f"code_info_list: {self.code_info_list}\n"
 
 
-class ExtractJudgeStep(BaseReasoningStep):
-    """Extract summarize step"""
+class TraceAnalysisJudgeStep(BaseReasoningStep):
+    """Trace Analysis summarize step"""
 
     is_successful: bool
     fixed_reproduce_snippet: str
@@ -337,8 +337,8 @@ class ExtractJudgeStep(BaseReasoningStep):
         )
 
 
-class ExtractSummarizeStep(BaseReasoningStep):
-    """Extract summarize step"""
+class TraceAnalysisSummarizeStep(BaseReasoningStep):
+    """Trace Analysis summarize step"""
 
     summary: str
     code_info_list: List[CodeInfo]
@@ -348,9 +348,9 @@ class ExtractSummarizeStep(BaseReasoningStep):
         return f"summary: {self.summary}\n" f"code_info_list: {self.code_info_list}\n"
 
 
-class ExtractOutput(BaseModel):
+class TraceAnalysisOutput(BaseModel):
     """
-    Extract agent output
+    Trace Analysis agent output
     """
 
     summary: str = ""
@@ -368,20 +368,20 @@ class SearchInput(BaseModel):
     """
 
     problem_statement: str
-    extract_output: ExtractOutput
+    trace_analysis_output: TraceAnalysisOutput
 
     def get_content(self) -> str:
         """Get content."""
         # suspicious_code = ", ".join(
-        #     f"{code.keyword}" for code in self.extract_output.suspicious_code
+        #     f"{code.keyword}" for code in self.trace_analysis_output.suspicious_code
         # )
         suspicious_code_from_tracer = ", ".join(
             f"{code.keyword}"
-            for code in self.extract_output.suspicious_code_from_tracer
+            for code in self.trace_analysis_output.suspicious_code_from_tracer
         )
-        # summary = self.extract_output.summary
+        # summary = self.trace_analysis_output.summary
 
-        if len(self.extract_output.suspicious_code_from_tracer) == 0:
+        if len(self.trace_analysis_output.suspicious_code_from_tracer) == 0:
             return (
                 f"<Problem Statement>: {self.problem_statement}\n </Problem Statement>"
                 # f"Suspicious Keyword: {suspicious_code}\n"

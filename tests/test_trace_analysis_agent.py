@@ -3,7 +3,7 @@ import json
 
 from llama_index.core.chat_engine.types import AgentChatResponse
 
-from Orcar import ExtractAgent
+from Orcar import TraceAnalysisAgent
 from Orcar.environment.benchmark import BenchmarkEnv
 from Orcar.environment.utils import (
     ContainerBash,
@@ -13,7 +13,7 @@ from Orcar.environment.utils import (
 from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 from Orcar.log_utils import get_logger
-from Orcar.types import ExtractOutput
+from Orcar.types import TraceAnalysisOutput
 
 logger = get_logger(__name__)
 
@@ -54,17 +54,19 @@ def init_container():
     return ctr_bash, BenchmarkEnv(args, ctr_bash), ds
 
 
-def test_extract_agent():
+def test_trace_analysis_agent():
     ctr_bash, env, ds = init_container()
 
-    agent = ExtractAgent(llm=llm, env=env, verbose=True)
+    agent = TraceAnalysisAgent(llm=llm, env=env, verbose=True)
     result_dict = dict()
     for inst in ds:
         env.setup(inst)
         agent_chat_response: AgentChatResponse = agent.chat(json.dumps(dict(inst)))
-        extract_output = ExtractOutput.model_validate_json(agent_chat_response.response)
-        result_dict[inst["instance_id"]] = extract_output
-        logger.info(extract_output)
+        trace_analyzer_output = TraceAnalysisOutput.model_validate_json(
+            agent_chat_response.response
+        )
+        result_dict[inst["instance_id"]] = trace_analyzer_output
+        logger.info(trace_analyzer_output)
 
     logger.info("Finalizing results:")
     for inst in ds:
@@ -79,4 +81,4 @@ def test_extract_agent():
 
 
 if __name__ == "__main__":
-    test_extract_agent()
+    test_trace_analysis_agent()

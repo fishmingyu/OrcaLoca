@@ -52,7 +52,7 @@ class EnvWrapper:
             pause_persistent_container(self.ctr_bash)
 
 
-def parse_extract_output():
+def parse_trace_analyzer_output():
     args = argparse.Namespace(**args_dict)
     ds = load_filter_hf_dataset(args)
 
@@ -81,22 +81,22 @@ def parse_extract_output():
         # extract test bug locations
         # open the file ./output/instance_id/search_instance_id.json
         # and extract the bug locations
-        extract_output_path = (
-            f"./output/{inst['instance_id']}/extractor_{inst['instance_id']}.json"
+        trace_analyzer_output_path = (
+            f"./output/{inst['instance_id']}/trace_analyzer_{inst['instance_id']}.json"
         )
 
-        if not os.path.exists(extract_output_path):
-            logger.warning(f"Cannot find search output: {extract_output_path}")
+        if not os.path.exists(trace_analyzer_output_path):
+            logger.warning(f"Cannot find search output: {trace_analyzer_output_path}")
             continue
 
         search_manager = SearchManager(repo_path=repo_path)
 
-        with open(extract_output_path, "r") as handle:
-            extract_output = json.load(handle)
-        logger.info(f"Extract output: {extract_output}")
+        with open(trace_analyzer_output_path, "r") as handle:
+            trace_analyzer_output = json.load(handle)
+        logger.info(f"Extract output: {trace_analyzer_output}")
 
         ret = {"conclusion": "", "bug_locations": []}
-        for code in extract_output["suspicious_code"]:
+        for code in trace_analyzer_output["suspicious_code"]:
             ret["bug_locations"].extend(
                 search_manager._get_bug_location(
                     code["keyword"], code["file_path"] if code["file_path"] else None
@@ -112,4 +112,4 @@ def parse_extract_output():
 
 
 if __name__ == "__main__":
-    parse_extract_output()
+    parse_trace_analyzer_output()
