@@ -71,3 +71,20 @@ python process_dependency.py
 ### Evaluating all_preds.jsonl
 Our output all_preds.jsonl can be evaluated with official scripts offered by [SWE-Bench](https://github.com/swe-bench/SWE-bench).
 Please check the 'Set Up' and 'Usage' parts in its README.md for details.
+
+
+### Citation
+
+If our project helps you, please cite our [paper](https://arxiv.org/abs/2502.00350) with
+
+```bibtex
+@misc{yu2025orcalocallmagentframework,
+      title={OrcaLoca: An LLM Agent Framework for Software Issue Localization},
+      author={Zhongming Yu and Hejia Zhang and Yujie Zhao and Hanxian Huang and Matrix Yao and Ke Ding and Jishen Zhao},
+      year={2025},
+      eprint={2502.00350},
+      archivePrefix={arXiv},
+      primaryClass={cs.SE},
+      url={https://arxiv.org/abs/2502.00350},
+}
+```
