@@ -11,9 +11,9 @@ from io import BytesIO
 from subprocess import PIPE, STDOUT
 from typing import Callable, Union
 
+import docker
 from docker.models.containers import Container
 
-import docker
 from Orcar.log_utils import get_logger
 
 DOCKER_START_UP_DELAY = 1
