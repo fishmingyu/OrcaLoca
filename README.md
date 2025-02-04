@@ -20,8 +20,8 @@ export ANTHROPIC_API_KEY={key_here}
 ```
 or as a key.cfg file:
 ```
-OPENAI_API_KEY: key_here
-ANTHROPIC_API_KEY: key_here
+OPENAI_API_KEY=key_here
+ANTHROPIC_API_KEY=key_here
 ```
 
 OrcaLoca also uses torch in its search process. ([torch installation guide](https://pytorch.org/get-started/locally/))
