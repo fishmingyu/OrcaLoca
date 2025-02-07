@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="description"
-        content="MAGE: A Multi-Agent Engine for Automated RTL Code Generation.">
-  <meta name="keywords" content="LLM, RTL, Code Generation">
+        content="OrcaLoca: An LLM Agent Framework for Software Issue Localization">
+  <meta name="keywords" content="LLM, Software Issue Localization">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MAGE: A Multi-Agent Engine for Automated RTL Code Generation</title>
+  <title>OrcaLoca: An LLM Agent Framework for Software Issue Localization</title>
 
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
@@ -52,7 +52,7 @@
   </div>
   <div class="navbar-menu">
     <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
-      <a class="navbar-item" href="https://norahyujiezhao.github.io">
+      <a class="navbar-item" href="https://fishmingyu.github.io">
       <span class="icon">
           <i class="fas fa-home"></i>
       </span>
@@ -88,17 +88,23 @@
     <div class="container is-max-desktop">
       <div class="columns is-centered">
         <div class="column has-text-centered">
-          <h1 class="title is-1 publication-title">MAGE: A Multi-Agent Engine for Automated RTL Code Generation</h1>
+          <h1 class="title is-1 publication-title">OrcaLoca: An LLM Agent Framework for Software Issue Localization</h1>
           <div class="is-size-5 publication-authors">
             <span class="author-block">
-              <a href="https://fishmingyu.github.io">Zhongming Yu</a><sup>*</sup>,</span>
+              <a href="https://fishmingyu.github.io">Zhongming Yu</a><sup>1*</sup>,</span>
             <span class="author-block">
-              <a href="https://hejiaz2023.github.io">Hejia Zhang</a><sup>*</sup>,</span>
+              <a href="https://hejiaz2023.github.io">Hejia Zhang</a><sup>1*</sup>,</span>
             <span class="author-block">
-              <a href="https://norahyujiezhao.github.io">Yujie Zhao</a>
+              <a href="https://norahyujiezhao.github.io">Yujie Zhao</a><sup>1</sup>,
             </span>
             <span class="author-block">
-              <a href="https://hanxian97.github.io">Hanxian Huang</a>,
+              <a href="https://hanxian97.github.io">Hanxian Huang</a><sup>1</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://github.com/yao-matrix">Matrix Yao</a><sup>2</sup>,
+            </span>
+            <span class="author-block">
+              <a href="https://www.linkedin.com/in/dingke">Ke Ding</a><sup>2</sup>,
             </span>
             <span class="author-block">
               <a href="https://cseweb.ucsd.edu/~jzhao/index.html">Jishen Zhao</a>,
@@ -106,7 +112,7 @@
           </div>
 
           <div class="is-size-5 publication-authors">
-            <span class="author-block"><sup>1</sup>University of California, San Diego</span>
+            <span class="author-block"><sup>1</sup>University of California, San Diego</span>,
             <span class="author-block"><sup>2</sup>Intel Corporation</span>
           </div>
           <div class="is-size-6 publication-authors">
@@ -117,7 +123,7 @@
             <div class="publication-links">
               <!-- PDF Link. -->
               <span class="link-block">
-                <a href="https://arxiv.org/pdf/2412.07822"
+                <a href="https://arxiv.org/abs/2502.00350"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fas fa-file-pdf"></i>
@@ -126,7 +132,7 @@
                 </a>
               </span>
               <span class="link-block">
-                <a href="https://arxiv.org/abs/2412.07822"
+                <a href="https://arxiv.org/pdf/2502.00350"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="ai ai-arxiv"></i>
@@ -135,7 +141,7 @@
                 </a>
               </span>
               <!-- Video Link. -->
-              <span class="link-block">
+              <!-- <span class="link-block">
                 <a href="https://www.youtube.com/watch?v=vKJfIXX1-F4"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
@@ -143,10 +149,10 @@
                   </span>
                   <span>Video</span>
                 </a>
-              </span>
+              </span> -->
               <!-- Code Link. -->
               <span class="link-block">
-                <a href="https://github.com/stable-lab/MAGE"
+                <a href="https://github.com/fishmingyu/OrcaLoca"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fab fa-github"></i>
@@ -175,11 +181,11 @@
 <section class="hero teaser">
   <div class="container is-max-desktop">
     <div class="hero-body">
-      <img src="./static/images/Overview.png"
+      <img src="./static/images/overview.jpg"
            class="teaser-image"
-           alt="MAGE Overview figure"/>
+           alt="OrcaLoca Overview figure"/>
       <h2 class="subtitle has-text-centered">
-        <span class="dnerf">MAGE</span> Utilize Multi-Agent flow to generate RTL code with debugging and verification.
+        <span class="dnerf">OrcaLoca</span> execution demo on a github issue example.
       </h2>
     </div>
   </div>
@@ -252,17 +258,12 @@
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            The automatic generation of RTL code (e.g., Verilog) through natural language instructions has emerged as a promising direction with the advancement of large language models (LLMs). 
-            However, producing RTL code that is both syntactically and functionally correct remains a significant challenge. Existing single-LLM-agent approaches face substantial limitations 
-            because they must navigate between various programming languages and handle intricate generation, verification, and modification tasks. 
-          </p>
-          <p>
-            To address these challenges, we introduces MAGE, the first open-source multi-agent AI system designed for robust and accurate Verilog RTL code generation.
-            We propose a novel high-temperature RTL candidate sampling and debugging system that effectively explores the space of code candidates and significantly improves the quality of the candidates.
-            Furthermore, we design a novel Verilog-state checkpoint checking mechanism that enables early detection of functional errors and delivers precise feedback for targeted fixes, significantly enhancing the functional correctness of the generated RTL code. 
-          </p>
-          <p>
-            MAGE achieves a 95.7% rate of syntactic and functional correctness code generation on VerilogEval-Human 2 benchmark, surpassing the state-of-the-art Claude-3.5-sonnet by 23.3%, demonstrating a robust and reliable approach for AI-driven RTL design workflows.
+            Recent developments in Large Language Model (LLM) agents are revolutionizing Autonomous Software Engineering (ASE), 
+            enabling automated coding, problem fixes, and feature improvements. 
+            However, localization -- precisely identifying software problems by navigating to relevant code sections -- 
+            remains a significant challenge. Current approaches often yield suboptimal results due to a lack of effective integration between LLM agents and precise code search mechanisms. 
+            This paper introduces OrcaLoca, an LLM agent framework that improves accuracy for software issue localization by integrating priority-based scheduling for LLM-guided action, action decomposition with relevance scoring, and distance-aware context pruning.
+             Experimental results demonstrate that OrcaLoca becomes the new open-source state-of-the-art (SOTA) in function match rate (65.33%) on SWE-bench Lite. It also improves the final resolved rate of an open-source framework by 6.33 percentage points through its patch generation integration. 
           </p>
         </div>
       </div>
@@ -270,7 +271,7 @@
     <!--/ Abstract. -->
 
     <!-- Paper video. -->
-    <div class="columns is-centered has-text-centered">
+    <!-- <div class="columns is-centered has-text-centered">
       <div class="column is-four-fifths">
         <h2 class="title is-3">Video</h2>
         <div class="publication-video">
@@ -278,7 +279,7 @@
                   frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         </div>
       </div>
-    </div>
+    </div> -->
     <!--/ Paper video. -->
   </div>
 </section>
@@ -314,12 +315,13 @@
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
-    <pre><code>@article{zhao2024mage,
-      title={MAGE: A Multi-Agent Engine for Automated RTL Code Generation},
-      author={Zhao, Yujie and Zhang, Hejia and Huang, Hanxian and Yu, Zhongming and Zhao, Jishen},
-      journal={arXiv preprint arXiv:2412.07822},
-      year={2024}
-}</code></pre>
+    <pre><code>@article{yu2025orcaloca,
+  title={OrcaLoca: An LLM Agent Framework for Software Issue Localization},
+  author={Yu, Zhongming and Zhang, Hejia and Zhao, Yujie and Huang, Hanxian and Yao, Matrix and Ding, Ke and Zhao, Jishen},
+  journal={arXiv preprint arXiv:2502.00350},
+  year={2025}
+}
+</code></pre>
   </div>
 </section>
 
@@ -328,10 +330,10 @@
   <div class="container">
     <div class="content has-text-centered">
       <a class="icon-link"
-         href="./static/paper/Multi_Agent_LLM4RTL.pdf"
+         href="./static/paper/Multi_Agent_LLM4RTL.pdf">
         <i class="fas fa-file-pdf"></i>
       </a>
-      <a class="icon-link" href="https://norahyujiezhao.github.io" class="external-link" disabled>
+      <a class="icon-link" href="https://fishmingyu.github.io" class="external-link" disabled>
         <i class="fab fa-github"></i>
       </a>
     </div>
