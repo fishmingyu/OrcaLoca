@@ -1,6 +1,0 @@
-[submodule "third_party/OpenHands"]
-	path = third_party/OpenHands
-	url = https://github.com/fishmingyu/OpenHands
-[submodule "third_party/Agentless"]
-	path = third_party/Agentless
-	url = git@github.com:HejiaZ2023/Agentless.git
