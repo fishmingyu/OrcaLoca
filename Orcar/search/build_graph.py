@@ -260,14 +260,12 @@ class RepoGraph:
         In the file tree, we use " | " to separate files in the same directory.
         Files will be sorted by their names in ascending order.
         """
+
         def traverse(node, prefix=""):
-            # Get the display name (e.g. by splitting on "::")
-            name = node.split("::")[-1]
-            
             # Lists to hold children nodes
             file_children = []
             dir_children = []
-            
+
             # Assume that for the given node, self.graph.neighbors(node) returns its children.
             for child in self.graph.neighbors(node):
                 child_type = self.graph.nodes[child]["type"]
@@ -275,20 +273,20 @@ class RepoGraph:
                     file_children.append(child)
                 elif child_type == "directory":
                     dir_children.append(child)
-            
+
             # Sort files and directories by their display names
             file_children.sort(key=lambda n: n.split("::")[-1])
             dir_children.sort(key=lambda n: n.split("::")[-1])
-            
+
             lines = []
-            
+
             # If there are any file children, add one line that shows all files separated by " | "
             if file_children:
                 file_names = [f.split("::")[-1] for f in file_children]
                 # We use the "├── " marker if there are directory children, otherwise "└── "
                 marker = "├── " if dir_children else "└── "
                 lines.append(prefix + marker + " | ".join(file_names))
-            
+
             # Process directory children
             # When printing directories we need to update the prefix:
             #   if the current directory has subsequent siblings, use "│   " otherwise "    "
@@ -303,14 +301,13 @@ class RepoGraph:
                 extension = "    " if idx == n - 1 else "│   "
                 # Recursively process the subdirectory.
                 lines.extend(traverse(d, prefix + extension))
-            
+
             return lines
 
         # Start at the root node (assumed to be self.root_node)
         lines = [self.root_node]
         lines = traverse(self.root_node, "")
         return "\n".join(lines)
-
 
     # high level search for the callable function or class definition in the graph
     def dfs_search_callable_def(self, query) -> LocInfo | None:

@@ -465,9 +465,12 @@ def test_retrieve_dependency_2():
     )
     print(dep_locs)
 
+
 def test_file_tree():
     repo_path = "../"
-    repo_graph = RepoGraph(repo_path=repo_path, save_log=True, log_path="log", build_kg=True)
+    repo_graph = RepoGraph(
+        repo_path=repo_path, save_log=True, log_path="log", build_kg=True
+    )
     file_tree = repo_graph.get_file_tree()
     print(file_tree)
 
