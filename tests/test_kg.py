@@ -465,6 +465,12 @@ def test_retrieve_dependency_2():
     )
     print(dep_locs)
 
+def test_file_tree():
+    repo_path = "../"
+    repo_graph = RepoGraph(repo_path=repo_path, save_log=True, log_path="log", build_kg=True)
+    file_tree = repo_graph.get_file_tree()
+    print(file_tree)
+
 
 if __name__ == "__main__":
     # Example usage
@@ -492,4 +498,5 @@ if __name__ == "__main__":
     # test_analyze_bug_locs()
     # test_build_graph_sympy()
     # test_retrieve_dependency()
-    test_retrieve_dependency_2()
+    # test_retrieve_dependency_2()
+    test_file_tree()
