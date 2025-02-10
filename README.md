@@ -73,6 +73,9 @@ Our output all_preds.jsonl can be evaluated with official scripts offered by [SW
 Please check the 'Set Up' and 'Usage' parts in its README.md for details.
 
 
+### License
+MIT License
+
 ### Citation
 
 If our project helps you, please cite our [paper](https://arxiv.org/abs/2502.00350) with

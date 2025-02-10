@@ -7,10 +7,10 @@ with open("requirements.txt") as f:
 setup(
     name="Orcar",
     version="0.0.2",
-    author="Zhongming Yu",
+    author="Zhongming Yu, Hejia Zhang",
     author_email="zhy025@ucsd.edu",
     include_package_data=True,
-    description="AI copilot with efficient runtime planning",
+    description="OrcaLoca a framework for localizing software issues",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(),
