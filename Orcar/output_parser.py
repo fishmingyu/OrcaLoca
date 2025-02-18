@@ -76,6 +76,20 @@ def extract_final_response(input_text: str) -> Tuple[str, str]:
     return thought, answer
 
 
+def reformat_json_string(output: str) -> str:
+    # in gemini, the output has markdown surrounding the json string
+    # like ```json ... ```
+    # we need to remove the markdown
+    # remove by using regex between ```json and ```
+    pattern = r"```json(.*?)```"
+    try:
+        match = re.search(pattern, output, re.DOTALL)
+        return match.group(1).strip()
+    # if not match, it also works
+    except AttributeError:
+        return output
+
+
 def load_with_escape(input_text: str) -> dict:
     # Define the regex to match backslashes followed by non-quote characters
     pattern = r"(\\+)[^\'\"]"
@@ -155,6 +169,7 @@ class SearchOutputParser(BaseOutputParser):
         if "observation_feedback" in output:
             action_list: List[SearchActionStep] = []
             bug_list: List[BugLocations] = []
+            output = reformat_json_string(output)
             # cast the output to SearchActionStep
             # escape \s in the json string
 
@@ -199,6 +214,7 @@ class SearchOutputParser(BaseOutputParser):
         """
         if "bug_locations" in output:
             # cast the output to SearchResult
+            output = reformat_json_string(output)
             search_result = json.loads(output)
             return search_result
         else:
@@ -235,6 +251,7 @@ class TraceAnalysisOutputParser(BaseOutputParser):
 
     def parse(self, output: str, method: str) -> BaseReasoningStep:
         try:
+            output = reformat_json_string(output)
             json_obj: Dict = json.loads(output, strict=False)
         except json.JSONDecodeError:
             with io.StringIO() as err_msg_io:

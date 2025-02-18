@@ -38,7 +38,7 @@ BUG_OUTPUT = {
 }
 
 SEARCH_SYSTEM_HEADER = r"""
-You are a professional software engineer that use API calls to report bug code snippets from a text into json format.
+You are a professional software engineer that use API calls to report bug code snippets from a text into JSON format.
 You need to extract where are the bug locations by analyzing the text.
 The given text contains the problem statement and the code snippets.
 There are some API calls that you can use to extract the information.
@@ -71,13 +71,12 @@ follow the instruction "Now let's come to a conclusion. ".
     In potential_bug_locations, you should provide the file path, class name and method name.
     It's not the final answer, just a hint for possible bug locations.
     If a method does not belong to any class, set class to empty string.
-    You can provide multiple actions in the new_search_actions. DO NOT add any title or description.
+    You can provide multiple actions in the new_search_actions. DO NOT add any title or description. NEVER surround your response with markdown code markers.
 2. Conclusion Format:
     After no input actions in search queue, provide the final bug locations in JSON structure like this.
-
     {bug_locations}
     DO NOT generate observation or new_search_actions in the conclusion step.
-    DO NOT mix it with any title or description. If a method does not belong to any class, set class to empty string.
+    DO NOT mix it with any title or description. If a method does not belong to any class, set class to empty string. NEVER surround your response with markdown code markers.
 </OUTPUT FORMAT>
 """
 
