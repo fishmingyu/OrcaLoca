@@ -1,5 +1,9 @@
 # OrcaLoca
 
+## 🔥 News! 🚀
+
+- *Feb 18*: We update the support for Gemini series model through vertex API.
+
 OrcaLoca (previous named Orcar), an LLM agent framework that improves accuracy for software issue localization by integrating priority-based scheduling for LLM-guided action, action decomposition with relevance scoring, and distance-aware context pruning.
 
 ![overview](./artifact/overview.jpg)
