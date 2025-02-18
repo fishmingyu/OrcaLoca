@@ -10,7 +10,7 @@ from Orcar.load_cache_dataset import load_filter_hf_dataset
 args_dict = {
     # "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
-    "model": "gemini-2.0-flash-lite-preview-02-05",
+    "model": "gemini-2.0-pro-exp-02-05",
     "image": "sweagent/swe-agent:latest",
     "dataset": "SWE-bench_common",
     # "dataset": "princeton-nlp/SWE-bench_Lite",

@@ -32,20 +32,16 @@ class Config:
 def get_llm(**kwargs) -> LLM:
     # key.cfg is in the parent directory of this file
     orcar_config: Config = kwargs.get("orcar_config", None)
-    cfg = orcar_config.file_config
     model = kwargs.get("model", None)
     if model.startswith("claude"):
-        kwargs["api_key"] = cfg["ANTHROPIC_API_KEY"]
+        kwargs["api_key"] = orcar_config["ANTHROPIC_API_KEY"]
         LLM_func = Anthropic
     elif model.startswith("gpt"):
-        kwargs["api_key"] = cfg["OPENAI_API_KEY"]
+        kwargs["api_key"] = orcar_config["OPENAI_API_KEY"]
         LLM_func = OpenAI
     elif model.startswith("gemini"):
         # Load Google Cloud credentials
-        service_account_path = cfg.get(
-            "VERTEX_API_KEY", "~/stable-lab-ucsd-b219847f440d.json"
-        )
-        service_account_path = os.path.expanduser(service_account_path)
+        service_account_path = orcar_config["VERTEX_SERVICE_ACCOUNT_PATH"]
 
         if not os.path.exists(service_account_path):
             raise FileNotFoundError(
