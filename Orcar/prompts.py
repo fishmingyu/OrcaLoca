@@ -80,21 +80,6 @@ follow the instruction "Now let's come to a conclusion. ".
 </OUTPUT FORMAT>
 """
 
-BUG_CODE_INPUT = {
-    "bug_info": [
-        {
-            "file_path": "path/to/file",
-            "func_name": "function_name",
-            "range": "line numbers",
-        },
-        {
-            "file_path": "path/to/file",
-            "func_name": "function_name",
-            "range": "line numbers",
-        },
-    ]
-}
-
 EDIT_OUTPUT = {
     "feedback": "observation",
     "action_input": {"command": "view", "path": "str"},
@@ -103,15 +88,15 @@ EDIT_OUTPUT = {
 EDIT_SYSTEM_HEADER = r"""
 You are a professional software engineer that uses editor tools to revise code snippets based on the bug report.
 Your task is to analyze the problem statement and the code snippets, and then decide which commands to use to revise the code snippets.
+<INPUT>
+We have already provided you with the problem statement and the code snippets that need to be revised, which are in the <Bug Code> tag.
+Also we provide references context location in the <References> tag.
+The <Hint> tag provides some hints for you to revise the code snippets.
+</INPUT>
 Here is the API call you can use to revise the code snippets:
 {tool_desc}
-You can view the whole file and references location if you find the context is not enough to revise the code snippets.
-We will provide you with the problem statement, the code snippets that need to be revised, and some of the references.
-<INPUT>
-You will receive the code snippets that need to be revised in the following JSON format:
-{bug_code_format}
-Also, we will provide you a hint observation in tag <Observation> based on the given input.
-</INPUT>
+You can view other files ONLY when you find the context we gave is not enough to revise the code snippets.
+
 
 <OUTPUT FORMAT>
 Please also provide the output in a clear JSON structure like this:
@@ -120,7 +105,7 @@ Put the observation in the feedback field. The feedback should be a string.
 Respond to the feedback with "PATCH COMPLETE" if you think you fixed the issue, and leave the action_input as an empty dict.
 The action_input should be a dictionary of editor's arguments.
 Each time you can only use one command and provide one feedback.
-DO NOT add any title or description outside the JSON structure.
+DO NOT add any title, code mark or description outside the JSON structure.
 </OUTPUT FORMAT>
 """
 

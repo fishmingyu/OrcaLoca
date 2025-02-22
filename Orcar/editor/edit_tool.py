@@ -4,7 +4,6 @@ from collections import defaultdict, namedtuple
 from pathlib import Path
 from typing import get_args
 
-from ..search.build_graph import LocInfo
 from ..search.search_tool import SearchManager
 from .edit_utils import (
     SNIPPET_LINES,
@@ -92,7 +91,7 @@ class Editor:
         """
         Execute the editor tool with the given parameters.
         Usage:
-        1. editor_execute(command="view", path="/path/to/file", view_range=[1, 10])
+        1. editor_execute(command="view", path="/path/to/file", view_range=[1, 100])
             View the content of a file.
             Arg view_range is optional and should be a list of two integers. Leave it as None to view the entire file.
         2. editor_execute(command="create", path="/path/to/file", file_text="file content")
@@ -324,25 +323,18 @@ class Editor:
         )
 
     def _get_bug_code(
-        self, bug_query: str, file_path: str, containing_class: str = None
+        self, file_path: str, line_range: list[int] | None = None
     ) -> ReviseInfo | None:
         """Get the code snippet in the file."""
-        # Get the code snippet in the file
-        # print(f"Searcing for bug query: {bug_query}, in file: {file_path}")
-        if containing_class is None:
-            node_name = f"{file_path}::{bug_query}"
-        else:
-            node_name = f"{file_path}::{containing_class}::{bug_query}"
-        locinfo: LocInfo = self.search_manager._get_exact_loc(node_name)
-        if locinfo is None:
-            return None
-        loc = locinfo.loc
-        joined_path = os.path.join(self.repo_path, loc.file_name)
-        content = self.search_manager._get_code_snippet(
-            joined_path, loc.start_line, loc.end_line
+        # use command view to get the code snippet
+        result = self.editor_execute(
+            command="view", path=file_path, view_range=line_range
         )
+        content = result.output
+        start_line = line_range[0]
+        end_line = line_range[1]
 
-        return ReviseInfo(content, joined_path, loc.start_line, loc.end_line)
+        return ReviseInfo(content, file_path, start_line, end_line)
 
     def _edit_with_new_code(self, revise_info: ReviseInfo, new_code: str) -> str:
         """Edit the code snippet with new code chunk."""

@@ -170,63 +170,31 @@ class EditWorker(BaseAgentWorker):
     def _process_edit_input(self, input: EditInput) -> Tuple[str, str]:
         """Process edit input."""
         bug_locations = input.bug_locations
-        # concat bug locations into a json like this
-        """
-        "bug_info": [
-            {
-                "file_name": "path/to/file",
-                "func_name": "function_name",
-                "range": "line numbers",
-            },
-            {
-                "file_name": "path/to/file",
-                "func_name": "function_name",
-                "range": "line numbers",
-            },
-        ]
-        """
         bug_info = []
         ref_info = []
         for bug in bug_locations:
-            # first check if the bug is class
-            bug_is_class = False
-            if bug.method_name == "":
-                revise_info = self._edit_manager._get_bug_code(
-                    bug.class_name, bug.file_name
-                )
-                bug_is_class = True
-            else:
-                revise_info = self._edit_manager._get_bug_code(
-                    bug.method_name, bug.file_name, bug.class_name
-                )
-            if revise_info is None:
-                continue
-            if bug.class_name != "" and not bug_is_class:
-                reference_class_name = bug.class_name
-                reference_class_info = self._edit_manager._get_bug_code(
-                    reference_class_name, bug.file_name
-                )
-                start_line = reference_class_info.start_line
-                end_line = reference_class_info.end_line
-                range_str = f"{start_line}-{end_line}"
-                ref_info.append(
-                    {
-                        "file_name": reference_class_info.file,
-                        "class_name": bug.class_name,
-                        "range": range_str,
-                    }
-                )
-
-            start_line = revise_info.start_line
-            end_line = revise_info.end_line
-            range_str = f"{start_line}-{end_line}"
+            line_range = bug.line_range_tuple()
+            bug_content = self._edit_manager._get_bug_code(bug.file_path, line_range)
             bug_info.append(
                 {
-                    "file_name": revise_info.file,
-                    "func_name": bug.method_name,
-                    "range": range_str,
+                    "file_path": bug.file_path,
+                    "line_range": line_range,
+                    "code": bug_content,
                 }
             )
+        for dependency in input.dependency:
+            line_range = dependency.line_range_tuple()
+            ref_content = self._edit_manager._get_bug_code(
+                dependency.file_path, line_range
+            )
+            ref_info.append(
+                {
+                    "file_path": dependency.file_path,
+                    "line_range": line_range,
+                    "code": ref_content,
+                }
+            )
+
         bug_info_json = json.dumps({"bug_info": bug_info})
         ref_info_json = json.dumps({"references": ref_info})
         return bug_info_json, ref_info_json

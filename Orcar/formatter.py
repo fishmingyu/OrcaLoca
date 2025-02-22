@@ -21,7 +21,6 @@ from llama_index.llms.vertex import Vertex
 
 from .log_utils import get_logger
 from .prompts import (
-    BUG_CODE_INPUT,
     BUG_OUTPUT,
     EDIT_OUTPUT,
     EDIT_REQUIREMENTS,
@@ -436,7 +435,6 @@ class EditChatFormatter(BaseAgentChatFormatter):
         """Format chat history into list of ChatMessage."""
         format_args = {
             "tool_desc": "\n".join(get_tool_descriptions(tools)),
-            "bug_code_format": "".join(json.dumps(BUG_CODE_INPUT, indent=4)),
             "edit_output_format": "".join(json.dumps(EDIT_OUTPUT, indent=4)),
         }
 
@@ -444,7 +442,7 @@ class EditChatFormatter(BaseAgentChatFormatter):
 
         hint_observation = ChatMessage(
             role=MessageRole.ASSISTANT,
-            content=f"Hint: {hint}",
+            content=f"<Hint> {hint} </Hint>",
         )
 
         bug_code_msg = ChatMessage(

@@ -13,6 +13,8 @@ class Config:
         self.file_path = file_path
         if self.file_path and os.path.isfile(self.file_path):
             self.file_config = config.Config(self.file_path)
+        else:
+            self.file_config = dict()
         self.fallback_config = dict()
         self.fallback_config["OPENAI_API_BASE_URL"] = ""
 

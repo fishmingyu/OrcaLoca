@@ -236,6 +236,7 @@ class EditOutputParser(BaseOutputParser):
         """
         if "feedback" in output:
             # cast the output to EditResult
+            output = reformat_json_string(output)
             edit_result = json.loads(output)
             return EditOutput(
                 feedback=edit_result["feedback"],

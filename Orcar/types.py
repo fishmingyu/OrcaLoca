@@ -1,6 +1,7 @@
 """Base types for ReAct agent."""
 
 import heapq
+import re
 from abc import abstractmethod
 from typing import Dict, List, Tuple
 
@@ -247,7 +248,7 @@ class SearchResult(SearchActionStep):
 
 
 class HeuristicSearchResult(BaseModel):
-    """Heuristic search result reasoning step."""
+    """Heuristic search result"""
 
     heuristic: float
     search_result: SearchResult
@@ -263,7 +264,7 @@ class HeuristicSearchResult(BaseModel):
 
 
 class BugLocations(BaseModel):
-    """Bug locations reasoning step."""
+    """Bug locations"""
 
     file_path: str
     class_name: str
@@ -282,6 +283,37 @@ class BugLocations(BaseModel):
             return f"{self.file_path}::{self.class_name}"
         else:
             return f"{self.file_path}"
+
+
+class DependencyLoc(BaseModel):
+    """Dependency location"""
+
+    file_path: str
+    line_range: str
+
+    def line_range_tuple(self) -> list[int]:
+        """Get line range list."""
+        # input example, [261, 271]
+        # first use regex to extract the line range
+        regex = r"\[(\d+), (\d+)\]"
+        match = re.search(regex, self.line_range)
+        if match:
+            return [int(match.group(1)), int(match.group(2))]
+
+
+class BugLocationsWithLine(BugLocations):
+    """Bug locations with line range."""
+
+    line_range: str
+
+    def line_range_tuple(self) -> list[int]:
+        """Get line range list."""
+        # input example, [261, 271]
+        # first use regex to extract the line range
+        regex = r"\[(\d+), (\d+)\]"
+        match = re.search(regex, self.line_range)
+        if match:
+            return [int(match.group(1)), int(match.group(2))]
 
 
 class TraceAnalysisSliceStep(BaseReasoningStep):
@@ -415,7 +447,8 @@ class EditInput(BaseModel):
 
     problem_statement: str
     hint: str
-    bug_locations: List[BugLocations]
+    bug_locations: List[BugLocationsWithLine]
+    dependency: List[DependencyLoc]
 
 
 class EditOutput(BaseModel):
