@@ -12,8 +12,8 @@ args_dict = {
     # "model": "gpt-4o",
     "model": "gemini-2.0-pro-exp-02-05",
     "image": "sweagent/swe-agent:latest",
-    "dataset": "SWE-bench_common",
-    # "dataset": "princeton-nlp/SWE-bench_Lite",
+    # "dataset": "SWE-bench_common",
+    "dataset": "princeton-nlp/SWE-bench_Lite",
     "persistent": True,
     "container_name": "test",
     "split": "test",
@@ -29,7 +29,7 @@ args_dict = {
     # Long Issue Test
     # "filter_instance": "^(sympy__sympy-23262)$",
     # "filter_instance": "^(pytest-dev__pytest-5692)$",
-    "filter_instance": "^(astropy__astropy-12907)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
     #     "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"

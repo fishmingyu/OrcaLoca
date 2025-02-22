@@ -467,9 +467,10 @@ def test_retrieve_dependency_2():
 
 
 def test_file_tree():
-    repo_path = "../"
+    repo_path = "~/.orcar/django__django"
+    expand_repo_path = os.path.expanduser(repo_path)
     repo_graph = RepoGraph(
-        repo_path=repo_path, save_log=True, log_path="log", build_kg=True
+        repo_path=expand_repo_path, save_log=False, log_path="log", build_kg=True
     )
     file_tree = repo_graph.get_file_tree()
     print(file_tree)

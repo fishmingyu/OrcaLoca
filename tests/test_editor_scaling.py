@@ -1,9 +1,8 @@
 import argparse
 import json
 import os
-from typing import Any, Dict
 
-from Orcar import EditAgent, VerifyAgentWrapper
+from Orcar import EditAgent
 from Orcar.environment.benchmark import BenchmarkEnv, get_repo_dir, reset_cached_repo
 from Orcar.environment.utils import (
     ContainerBash,
@@ -75,35 +74,18 @@ class EnvWrapper:
             pause_persistent_container(self.ctr_bash)
 
 
-def init_verify_wrapper(
-    verify_agent_wrapper: VerifyAgentWrapper,
-    inst: Dict[str, Any],
-):
-    trace_analyzer_output_path = (
-        f"./output/{inst['instance_id']}/trace_analyzer_{inst['instance_id']}.json"
-    )
-    assert os.path.exists(
-        trace_analyzer_output_path
-    ), f"Cannot find Extract output: {trace_analyzer_output_path}"
-    with open(trace_analyzer_output_path, "r") as f:
-        trace_analyzer_output = json.load(f)
-    assert (
-        "is_reproduce_pass" in trace_analyzer_output
-        and "reproduce_code" in trace_analyzer_output
-    ), "Cannot find reproduce code in Trace Analysis output"
-    verify_agent_wrapper.init_verify_script(
-        is_reproduce_pass=trace_analyzer_output["is_reproduce_pass"],
-        reproduce_snippet=trace_analyzer_output["reproduce_code"],
-    )
-
-
 def test_agent():
     args = argparse.Namespace(**args_dict)
-    cfg = Config("./key.cfg")
+    cfg = Config("../key.cfg")
     llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 
     env_wrapper = EnvWrapper(args)
+
+    # read json from output.json
+    output_json = json.load(open("./output.json", "r"))
+    # read dependency from dependency.json
+    dependency_json = json.load(open("./dependency_output.json", "r"))
 
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
@@ -118,36 +100,32 @@ def test_agent():
         base_commit = inst["base_commit"]
         reset_cached_repo(repo_path, base_commit)
 
-        verify_agent_wrapper = VerifyAgentWrapper(llm, env_wrapper.env, inst)
-        init_verify_wrapper(verify_agent_wrapper, inst)
+        # read the corresponding output from output.json
+        search_output = output_json[inst["instance_id"]]
+        dependency = dependency_json[inst["instance_id"]]
+
+        print(f"Output: {search_output}")
+        print(f"Dependency: {dependency}")
+
         # extract test bug locations
-        # open the file ./output/instance_id/search_instance_id.json
-        # and extract the bug locations
-        search_output_path = (
-            f"./output/{inst['instance_id']}/searcher_{inst['instance_id']}.json"
-        )
-        with open(search_output_path, "r") as f:
-            search_output = json.load(f)
         bug_locations = search_output["bug_locations"]
         edit_input = EditInput(
             problem_statement=problem_statement,
-            hint=search_output["conclusion"],
+            hint=search_output["observation"],
             bug_locations=bug_locations,
+            dependency=dependency,
         )
         edit_agent = EditAgent(llm=llm, edit_input=edit_input, repo_path=repo_path)
 
         chat_response = edit_agent.chat(message=problem_statement)
         edit_output = chat_response.response
+        print(f"Edit Output: {edit_output}")
 
-        with open(
-            f"./output/{inst['instance_id']}/editor_{inst['instance_id']}.patch", "w"
-        ) as handle:
-            handle.write(edit_output)
+        # with open(
+        #     f"./output/{inst['instance_id']}/editor_{inst['instance_id']}.patch", "w"
+        # ) as handle:
+        #     handle.write(edit_output)
 
-        logger.info("Verification before patch:")
-        verify_agent_wrapper.verify_patch("")
-        logger.info("Verification after patch:")
-        verify_agent_wrapper.verify_patch(edit_output)
         # reset to base commit
         reset_cached_repo(repo_path, base_commit)
 
