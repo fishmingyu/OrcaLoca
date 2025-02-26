@@ -101,7 +101,7 @@ class TokenCounter:
     def count(self, string: str) -> int:
         if self.encoding is None:
             return 0
-        return self.encoding(string)
+        return self.encoding.encode(string)
 
     def count_chat(
         self, messages: List[ChatMessage], llm: LLM
