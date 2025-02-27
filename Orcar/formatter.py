@@ -18,6 +18,7 @@ from llama_index.core.tools import BaseTool
 from llama_index.llms.anthropic import Anthropic
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.vertex import Vertex
+from vertexai.preview.generative_models import GenerativeModel
 
 from .log_utils import get_logger
 from .prompts import (
@@ -83,15 +84,22 @@ class TokenCounter:
     def __init__(self, llm: LLM) -> None:
         model = llm.metadata.model_name
         if isinstance(llm, OpenAI):
-
-            def token_encoding(text: str) -> int:
-                return len(tiktoken.encoding_for_model(model).encode(text))
-
-            self.encoding = token_encoding
+            self.encoding = tiktoken.encoding_for_model(model)
         elif isinstance(llm, Anthropic):
             self.encoding = llm.tokenizer
         elif isinstance(llm, Vertex):
-            self.encoding = None
+            assert isinstance(llm._client, GenerativeModel)
+
+            class VertexEncoding:
+                def __init__(self, client: GenerativeModel):
+                    self.client = client
+
+                def encode(self, text: str) -> List[str]:
+                    token_len = self.client.count_tokens(text).total_tokens
+                    return ["placeholder" for _ in range(token_len)]
+
+            self.encoding = VertexEncoding(llm._client)
+            self.activate_structure_output = True
         else:
             raise Exception(f"gen_config: No tokenizer for model {model}")
         logger.info(f"Found tokenizer for model '{model}'")
@@ -101,7 +109,7 @@ class TokenCounter:
     def count(self, string: str) -> int:
         if self.encoding is None:
             return 0
-        return self.encoding.encode(string)
+        return len(self.encoding.encode(string))
 
     def count_chat(
         self, messages: List[ChatMessage], llm: LLM
