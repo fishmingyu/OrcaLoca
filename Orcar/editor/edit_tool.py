@@ -91,16 +91,13 @@ class Editor:
         """
         Execute the editor tool with the given parameters.
         Usage:
-        1. editor_execute(command="view", path="/path/to/file", view_range=[1, 100])
-            View the content of a file.
-            Arg view_range is optional and should be a list of two integers. Leave it as None to view the entire file.
-        2. editor_execute(command="create", path="/path/to/file", file_text="file content")
+        1. editor_execute(command="create", path="/path/to/file", file_text="file content")
             Create a new file with the given content.
-        3. editor_execute(command="str_replace", path="/path/to/file", old_str="old string", new_str="new string")
+        2. editor_execute(command="str_replace", path="/path/to/file", old_str="old string", new_str="new string")
             Replace the old string with the new string in the file content.
-        4. editor_execute(command="insert", path="/path/to/file", insert_line=5, new_str="new line")
+        3. editor_execute(command="insert", path="/path/to/file", insert_line=5, new_str="new line")
             Insert a new line at the specified line in the file content.
-        5. editor_execute(command="undo_edit", path="/path/to/file")
+        4. editor_execute(command="undo_edit", path="/path/to/file")
             Undo the last edit to the file content.
 
         """

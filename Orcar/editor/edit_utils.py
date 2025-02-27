@@ -7,7 +7,6 @@ from llama_index.core.bridge.pydantic import BaseModel
 # https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/computer_use_demo/tools
 
 Command = Literal[
-    "view",
     "create",
     "str_replace",
     "insert",

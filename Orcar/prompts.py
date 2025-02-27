@@ -92,10 +92,7 @@ You are a professional software engineer tasked with revising code snippets base
 - Contextual references in the <References> tag.
 - Helpful hints in the <Hint> tag.
 
-Critical Guidelines:
-1. Do not examine or process the actual lines of code within the provided code snippets unless you determine that the given context is insufficient. For example, if a code snippet spans [129, 150] in file A, you must not inspect individual lines (e.g., [139, 140]) to avoid unnecessary token usage.
-2. Rely only on the information given in the tags and avoid delving into the code content unless explicitly required.
-3. Use the provided API call below to revise the code snippets when necessary:
+You could use the provided API call below to revise the code snippets when necessary:
 {tool_desc}
 
 Output Requirements:

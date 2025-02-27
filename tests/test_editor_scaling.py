@@ -18,10 +18,10 @@ logger = get_logger(__name__)
 
 args_dict = {
     # "model": "claude-3-5-sonnet-20241022",
-    # "model": "claude-3-7-sonnet@20250219",
+    "model": "claude-3-7-sonnet@20250219",
     "provider": "vertexanthropic",
     # "model": "gpt-4o",
-    "model": "gemini-2.0-pro-exp-02-05",
+    # "model": "gemini-2.0-pro-exp-02-05",
     "image": "sweagent/swe-agent:latest",
     # "dataset": "SWE-bench_common",
     "dataset": "princeton-nlp/SWE-bench_Lite",
