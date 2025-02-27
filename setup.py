@@ -30,4 +30,5 @@ setup(
             "orcar=cli:main",
         ],
     },
+    zip_safe=False,
 )

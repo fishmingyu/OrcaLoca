@@ -18,6 +18,8 @@ logger = get_logger(__name__)
 
 args_dict = {
     # "model": "claude-3-5-sonnet-20241022",
+    # "model": "claude-3-7-sonnet@20250219",
+    "provider": "vertexanthropic",
     # "model": "gpt-4o",
     "model": "gemini-2.0-pro-exp-02-05",
     "image": "sweagent/swe-agent:latest",
@@ -76,7 +78,7 @@ class EnvWrapper:
 
 def test_agent():
     args = argparse.Namespace(**args_dict)
-    cfg = Config("../key.cfg")
+    cfg = Config("../key.cfg", provider=args.provider)
     llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 
