@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Orcar"
+version = "0.0.3"
+description = "OrcaLoca a framework for localizing software issues"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+authors = [
+  { name = "Zhongming Yu", email = "zhy025@ucsd.edu" },
+  { name = "Hejia Zhang" }
+]
+dependencies = [
+  "anthropic",
+  "config",
+  "datasets",
+  "docker",
+  "fsspec[http]<=2024.9.0,>=2023.1.0",
+  "gdown",
+  "httpx<1,>=0.23.0",
+  "llama-index-core",
+  "llama-index-embeddings-openai",
+  "llama-index-llms-anthropic",
+  "llama-index-llms-openai",
+  "llama-index-llms-vertex",
+  "matplotlib",
+  "pre-commit",
+  "protobuf",
+  "pydantic<2.10.0,>=2.7.0",
+  "rich",
+  "swebench==2.1.6",
+  "termcolor",
+  "tiktoken",
+  "torch",
+  "transformers",
+  "types-PyYAML"
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent"
+]
+
+[project.scripts]
+orcar = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli"]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["."]
