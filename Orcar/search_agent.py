@@ -147,6 +147,7 @@ class SearchWorker(BaseAgentWorker):
             "top_k_functions": 2,
             "score_threshold": 75,
             "similarity_threshold": 0.97,
+            "batch_size": 1,  # Number of actions to process in each batch
         }
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
@@ -312,25 +313,50 @@ class SearchWorker(BaseAgentWorker):
         self,
         task: Task,
         tools: Sequence[BaseTool],
-    ) -> SearchResult | None:
-        if self._config_dict["redundancy_control"]:  # if redundancy control is enabled
-            # while not duplicate, keep popping
-            while len(task.extra_state["search_queue"]) > 0:
+    ) -> List[SearchResult] | None:
+        """Process search queue in batches.
+
+        Args:
+            task: The current task
+            tools: Available tools
+
+        Returns:
+            List of search results or None if queue is empty
+        """
+        if len(task.extra_state["search_queue"]) == 0:
+            return None
+
+        results = []
+        processed_count = 0
+
+        while (
+            len(task.extra_state["search_queue"]) > 0
+            and processed_count < self._config_dict["batch_size"]
+        ):
+            if self._config_dict[
+                "redundancy_control"
+            ]:  # if redundancy control is enabled
+                # while not duplicate, keep popping
+                while len(task.extra_state["search_queue"]) > 0:
+                    head_search_step = task.extra_state["search_queue"].pop()
+                    search_step = cast(SearchActionStep, head_search_step)
+                    search_result = self._process_search_action(tools, search_step)
+                    # check if the search result is duplicate
+                    is_duplicate = self._check_search_result_duplicate(search_result)
+                    # if duplicate, continue to pop
+                    if not is_duplicate:  # until we get a non-duplicate search result
+                        results.append(search_result)
+                        processed_count += 1
+                        break
+                    logger_queue.info(f"Duplicate search result: {search_result}")
+            else:  # if redundancy control is disabled
                 head_search_step = task.extra_state["search_queue"].pop()
                 search_step = cast(SearchActionStep, head_search_step)
                 search_result = self._process_search_action(tools, search_step)
-                # check if the search result is duplicate
-                is_duplicate = self._check_search_result_duplicate(search_result)
-                # if duplicate, continue to pop
-                if not is_duplicate:  # until we get a non-duplicate search result
-                    return search_result
-                logger_queue.info(f"Duplicate search result: {search_result}")
-            return None
-        else:  # if redundancy control is disabled
-            head_search_step = task.extra_state["search_queue"].pop()
-            search_step = cast(SearchActionStep, head_search_step)
-            search_result = self._process_search_action(tools, search_step)
-            return search_result
+                results.append(search_result)
+                processed_count += 1
+
+        return results if results else None
 
     def _process_search_action(
         self,
@@ -1204,10 +1230,10 @@ class SearchWorker(BaseAgentWorker):
             task.extra_state["search_queue"].resort(task.extra_state["action_history"])
         logger_queue.debug(f"search queue: \n {task.extra_state['search_queue']}")
         # process the search queue
-        search_result = self._process_search_queue(
+        search_results = self._process_search_queue(
             task, tools
         )  # this step processed search (and forms the search result)
-        if search_result is None:  # return is_complete
+        if search_results is None:  # return is_complete
             task.extra_state["is_done"] = True
             return self._get_task_step_response(
                 AgentChatResponse(response=observation, sources=[]),
@@ -1217,27 +1243,30 @@ class SearchWorker(BaseAgentWorker):
                 is_done=False,
             )
 
-        self._action_decomposition(
-            search_result, task, self._config_dict["score_decomposition"]
-        )
-        # logger.info(f"Next Search Input: {search_result}")
+        # Process each search result for action decomposition
+        for search_result in search_results:
+            self._action_decomposition(
+                search_result, task, self._config_dict["score_decomposition"]
+            )
 
-        # get the agent response; decide the current_search.
-        agent_response = self._process_search_result(
-            search_result, task, potential_bugs
-        )
+        # Process each search result and get agent responses
+        next_step_input = ""
+        for search_result in search_results:
+            agent_response = self._process_search_result(
+                search_result, task, potential_bugs
+            )
+            next_step_input += agent_response.response + "\n"
+
         if self._config_dict["context_control"]:  # use heuristic search cache
             self._process_heuristic_search_cache(task, potential_bugs)
         else:  # directly put the search result to the search_cache
-            task.extra_state["search_cache"].append(search_result)
+            for search_result in search_results:
+                task.extra_state["search_cache"].append(search_result)
 
-        task.extra_state["next_step_input"] = agent_response.response
-
-        # logger.info(f"Search action: {search_step.action}, Search input: {search_step.action_input}")
-        # logger.info(f"Searched: {search_result.get_content()}")
+        task.extra_state["next_step_input"] = next_step_input
 
         return self._get_task_step_response(
-            agent_response, step, "explore", task.extra_state["next_step_input"], False
+            next_step_input, step, "explore", task.extra_state["next_step_input"], False
         )
 
     @trace_method("run_step")
