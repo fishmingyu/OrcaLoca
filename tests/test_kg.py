@@ -472,7 +472,7 @@ def test_file_tree():
     repo_graph = RepoGraph(
         repo_path=expand_repo_path, save_log=False, log_path="log", build_kg=True
     )
-    file_tree = repo_graph.get_file_tree()
+    file_tree = repo_graph.get_file_tree(name="django/forms", max_depth=2)
     print(file_tree)
 
 

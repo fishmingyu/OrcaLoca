@@ -241,7 +241,7 @@ class RepoGraph:
                 dependencies.append(self.graph.nodes[father_node]["loc"])
         return dependencies
 
-    def get_file_tree(self) -> str:
+    def get_file_tree(self, name: str = None, max_depth: int = None) -> str:
         """
         First get the subgraph with node type "file" and "directory", then get the file tree.
         Root node is ".".
@@ -259,9 +259,17 @@ class RepoGraph:
 
         In the file tree, we use " | " to separate files in the same directory.
         Files will be sorted by their names in ascending order.
+
+        Args:
+            name (str, optional): The name of the node to start the tree from. If None, starts from root.
+            max_depth (int, optional): Maximum depth to traverse. If None, traverses entire tree.
         """
 
-        def traverse(node, prefix=""):
+        def traverse(node, prefix="", current_depth=0):
+            # Check if we've reached max depth
+            if max_depth is not None and current_depth > max_depth:
+                return []
+
             # Lists to hold children nodes
             file_children = []
             dir_children = []
@@ -300,13 +308,23 @@ class RepoGraph:
                 # Update the prefix for the next level:
                 extension = "    " if idx == n - 1 else "│   "
                 # Recursively process the subdirectory.
-                lines.extend(traverse(d, prefix + extension))
+                lines.extend(traverse(d, prefix + extension, current_depth + 1))
 
             return lines
 
-        # Start at the root node (assumed to be self.root_node)
-        lines = [self.root_node]
-        lines = traverse(self.root_node, "")
+        # If name is provided, verify it exists and is a directory
+        start_node = self.root_node
+        if name is not None:
+            if not self.check_node_exists(name):
+                return f"Error: Node '{name}' does not exist in the graph"
+            node_type = self.graph.nodes[name]["type"]
+            if node_type != "directory":
+                return f"Error: Node '{name}' is not a directory"
+            start_node = name
+
+        # Start at the specified node
+        lines = [start_node]
+        lines.extend(traverse(start_node, "", 0))
         return "\n".join(lines)
 
     # high level search for the callable function or class definition in the graph

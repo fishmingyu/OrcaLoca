@@ -354,6 +354,15 @@ class SearchManager:
         """
         return self.kg.dfs_search_query_in_file(file_path, query)
 
+    def _search_file_tree(self, name: str = None, max_depth: int = None) -> str:
+        """Search the file tree in the knowledge graph.
+
+        Args:
+            name (str): The name of the node to start the tree from.
+            max_depth (int): The maximum depth to traverse.
+        """
+        return self.kg.get_file_tree(name, max_depth)
+
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
         Do not use this method to search source code in the file.
@@ -679,6 +688,14 @@ class SearchManager:
     #################
     # Interface methods
     #################
+    def search_file_tree(self, name: str = None, max_depth: int = None) -> str:
+        """API to search the file tree in the knowledge graph.
+
+        Args:
+            name (str): The name of the node to start the tree from. It is a directory name. If None, starts from root.
+            max_depth (int): The maximum depth to traverse. If None, traverses entire tree.
+        """
+        return self._search_file_tree(name, max_depth)
 
     def search_file_contents(
         self, file_name: str, directory_path: str | None = None
