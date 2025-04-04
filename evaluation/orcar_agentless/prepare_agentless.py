@@ -59,7 +59,8 @@ def parse_input(evaluation_path: str) -> List[Dict[str, Any]]:
             d_ret[d["name"]] = {
                 d["file_path"]: [f"line_range: {line_range[0]}-{line_range[1]}"]
             }
-        ret_inst["dep_locs"] = d_ret
+        # Disable the dependency output for now
+        #ret_inst["dep_locs"] = d_ret
         ret.append(ret_inst)
     return ret
 
