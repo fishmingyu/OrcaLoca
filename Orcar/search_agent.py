@@ -141,6 +141,8 @@ class SearchWorker(BaseAgentWorker):
                 "related_file": 2,
             },
             "top_k_search": 12,
+            "top_k_output": 3,  # Number of bug locations to include in the output
+            "top_k_retrieval_mode": True,  # Whether to use retrieval mode for output
             "sliding_window_size": 15,
             "top_k_methods": 3,
             "top_k_disambiguation": 3,
@@ -277,37 +279,169 @@ class SearchWorker(BaseAgentWorker):
             raise ValueError(f"Could not parse output: {message_content}") from exc
         return obseravtion, potential_bugs, explore_step
 
-    def _search_output_parser(self, output_str: str, last_observation: str) -> str:
-        """Calibrate bug location."""
-        data = self._output_parser.parse_bug_report(output_str)
-        for bug in data["bug_locations"]:
-            file_path = bug["file_path"]
-            # check each "file_path" in bug_location whether is a valid file path
-            # for example the correct file should be like "astropy/io/fits/fitsrec.py",
-            # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
-            # if the file is wrong, we should remove the first "/" and the first word before the first "/"
-            # if the file is correct, we should keep it
-            file_path = bug["file_path"]
-            if file_path[0] == "/":
-                file_path = file_path[1:]
-                file_path = file_path[file_path.find("/") + 1 :]
-                bug["file_path"] = file_path
-            class_name = bug["class_name"]
-            method_name = bug["method_name"]
-            # check method_name is a valid method name
-            if method_name != "" and class_name != "":
-                bug_query = f"{file_path}::{class_name}::{method_name}"
-                exact_loc = self._search_manager._get_exact_loc(bug_query)
-                if exact_loc is None:
-                    # revise method_name to "" since the method_name is not valid
-                    bug["method_name"] = ""
+    def _decode_bug_location(
+        self, search_result: SearchResult
+    ) -> Optional[Dict[str, str]]:
+        """Decode bug location based on search action.
 
-        # cat last observation and bug location
-        search_output = {
-            "conclusion": last_observation,
-            "bug_locations": data["bug_locations"],
-        }
-        return json.dumps(search_output)
+        Returns:
+            Dict containing file_path, class_name, and method_name if valid, None otherwise.
+        """
+        search_input = search_result.search_action_input
+        if not search_input:
+            return None
+
+        if search_result.search_action == "search_callable":
+            file_path = search_input.get("file_path", "")
+            method_name = search_input.get("query_name", "")
+            search_input = search_result.get_search_input()
+            # use get_frame_from_history to get the frame of the search result
+            frame = self._search_manager.get_frame_from_history(
+                search_result.search_action, search_input
+            )
+            query_type = frame["query_type"]
+            if query_type == "method":
+                return {
+                    "file_path": file_path,
+                    "class_name": "",  # search_callable doesn't have class name
+                    "method_name": method_name,
+                }
+            elif query_type == "class":
+                return {
+                    "file_path": file_path,
+                    "class_name": method_name,
+                    "method_name": "",
+                }
+        elif search_result.search_action == "search_method_in_class":
+            file_path = search_input.get("file_path", "")
+            class_name = search_input.get("class_name", "")
+            method_name = search_input.get("method_name", "")
+            if file_path and class_name:
+                return {
+                    "file_path": file_path,
+                    "class_name": class_name,
+                    "method_name": method_name,
+                }
+        elif search_result.search_action == "search_class":
+            file_path = search_input.get("file_path", "")
+            class_name = search_input.get("class_name", "")
+            if file_path and class_name:
+                return {
+                    "file_path": file_path,
+                    "class_name": class_name,
+                    "method_name": "",  # search_class doesn't have method name
+                }
+        elif search_result.search_action == "search_file_contents":
+            file_path = search_input.get("file_name", "")
+            if file_path:
+                return {"file_path": file_path, "class_name": "", "method_name": ""}
+        return None
+
+    def _search_output_parser(
+        self,
+        output_str: str,
+        last_observation: str,
+        task: Task,
+        top_k_retrieval_mode: bool = False,
+    ) -> str:
+        """Calibrate bug location.
+
+        Args:
+            output_str: The output string to parse
+            last_observation: The last observation
+            task: The current task
+            top_k_retrieval_mode: If True, returns top k methods/functions and top k files separately
+        """
+        # Process search cache for retrieval mode if enabled
+        if top_k_retrieval_mode:
+            top_k = self._config_dict["top_k_output"]
+            search_cache = task.extra_state["search_cache"]
+
+            if len(search_cache) > 0:
+                # Original mode: just take top k overall
+                bug_locations = []
+                for result in search_cache[:top_k]:
+                    bug_location = self._decode_bug_location(result)
+                    logger.debug(f"Output: bug_location: {bug_location}")
+                    if bug_location:
+                        bug_locations.append(bug_location)
+
+                # Get non-duplicated file names for top_files_retrieved
+                top_files_retrieved = []
+                seen_files = set()
+                for location in bug_locations:
+                    file_path = location.get("file_path", "")
+                    if file_path and file_path not in seen_files:
+                        top_files_retrieved.append(file_path)
+                        seen_files.add(file_path)
+
+                search_output = {
+                    "conclusion": last_observation,
+                    "top_k_bug_locations": bug_locations,
+                    "top_k_files_retrieved": top_files_retrieved,
+                }
+                logger.debug(f"top_k_bug_locations: {bug_locations}")
+                return json.dumps(search_output)
+            else:
+                logger.warning("No search cache available.")
+                return json.dumps({"conclusion": last_observation, "bug_locations": []})
+
+        # If not in retrieval mode or retrieval mode failed, try normal parsing
+        try:
+            data = self._output_parser.parse_bug_report(output_str)
+            for bug in data["bug_locations"]:
+                file_path = bug["file_path"]
+                # check each "file_path" in bug_location whether is a valid file path
+                # for example the correct file should be like "astropy/io/fits/fitsrec.py",
+                # the wrong file would be "/astropy__astropy/astropy/io/fits/fitsrec.py"
+                # if the file is wrong, we should remove the first "/" and the first word before the first "/"
+                # if the file is correct, we should keep it
+                file_path = bug["file_path"]
+                if file_path[0] == "/":
+                    file_path = file_path[1:]
+                    file_path = file_path[file_path.find("/") + 1 :]
+                    bug["file_path"] = file_path
+                class_name = bug["class_name"]
+                method_name = bug["method_name"]
+                # check method_name is a valid method name
+                if method_name != "" and class_name != "":
+                    bug_query = f"{file_path}::{class_name}::{method_name}"
+                    exact_loc = self._search_manager._get_exact_loc(bug_query)
+                    if exact_loc is None:
+                        # revise method_name to "" since the method_name is not valid
+                        bug["method_name"] = ""
+
+            # cat last observation and bug location
+            search_output = {
+                "conclusion": last_observation,
+                "bug_locations": data["bug_locations"],
+            }
+            return json.dumps(search_output)
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse bug report: {e}. Falling back to search cache."
+            )
+            # Get top K results from search_cache for output
+            top_k = self._config_dict["top_k_output"]
+            search_cache = task.extra_state["search_cache"]
+
+            if len(search_cache) > 0:
+                # Original mode: just take top k overall
+                bug_locations = []
+                for result in search_cache[:top_k]:
+                    bug_location = self._decode_bug_location(result)
+                    if bug_location:
+                        bug_locations.append(bug_location)
+
+                search_output = {
+                    "conclusion": last_observation,
+                    "bug_locations": bug_locations,
+                }
+                return json.dumps(search_output)
+            else:
+                # If no search cache available, return empty result
+                search_output = {"conclusion": last_observation, "bug_locations": []}
+                return json.dumps(search_output)
 
     def _process_search_queue(
         self,
@@ -1176,7 +1310,10 @@ class SearchWorker(BaseAgentWorker):
         if task.extra_state["is_done"]:
             # convert the chat response to str
             search_output_str = self._search_output_parser(
-                chat_response.message.content, task.extra_state["last_observation"]
+                chat_response.message.content,
+                task.extra_state["last_observation"],
+                task,
+                self._config_dict["top_k_retrieval_mode"],
             )
             return self._get_task_step_response(
                 AgentChatResponse(response=search_output_str, sources=[]),

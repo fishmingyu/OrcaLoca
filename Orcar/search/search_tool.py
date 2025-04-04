@@ -116,6 +116,7 @@ class SearchManager:
             self.search_class,
             self.search_method_in_class,
             self.search_callable,
+            self.search_file_tree,
         ]
 
     def get_frame_from_history(self, action: str, input: str) -> pd.DataFrame | None:
@@ -695,6 +696,16 @@ class SearchManager:
             name (str): The name of the node to start the tree from. It is a directory name. If None, starts from root.
             max_depth (int): The maximum depth to traverse. If None, traverses entire tree.
         """
+        new_row = {
+            "search_action": "search_file_tree",
+            "search_input": name,
+            "search_query": name,
+            "search_content": "",
+            "query_type": "file_tree",
+            "file_path": "",
+            "is_skeleton": False,
+        }
+        self.add_result_to_history(new_row)
         return self._search_file_tree(name, max_depth)
 
     def search_file_contents(

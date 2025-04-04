@@ -29,7 +29,7 @@ args_dict = {
     # Long Issue Test
     # "filter_instance": "^(sympy__sympy-23262)$",
     # "filter_instance": "^(pytest-dev__pytest-5692)$",
-    # "filter_instance": "^(astropy__astropy-6938)$",
+    "filter_instance": "^(astropy__astropy-6938)$",
     # "filter_instance": (
     #     "^(sympy__sympy-21612|pytest-dev__pytest-7432|matplotlib__matplotlib-24149|"
     #     "sympy__sympy-16792|django__django-11999|matplotlib__matplotlib-25332|"
@@ -38,8 +38,8 @@ args_dict = {
     # whole repo
     # "filter_instance": ".*",
     # internal error
-    "filter_instance": "^(django__django-14580)$",
-    # "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(django__django-14580)$",
+    # "filter_instance": "^(django__django-13321)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # "filter_instance": ".*",
