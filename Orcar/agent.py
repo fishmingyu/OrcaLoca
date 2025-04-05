@@ -25,7 +25,13 @@ from Orcar.log_utils import (
 )
 from Orcar.search_agent import SearchAgent
 from Orcar.trace_analysis_agent import TraceAnalysisAgent
-from Orcar.types import EditInput, SearchInput, SearchOutput, TraceAnalysisOutput
+from Orcar.types import (
+    EditInput,
+    SearchInput,
+    SearchOutput,
+    SearchOutputTopK,
+    TraceAnalysisOutput,
+)
 
 
 class Stage(IntEnum):
@@ -139,28 +145,55 @@ class OrcarAgent:
             trace_analysis_output=trace_analysis_output,
         )
 
+        # Create SearchAgent with config_path
+        config_path = "search.cfg"
         self.search_agent = SearchAgent(
             repo_path=self.repo_path,
             llm=self.llm,
             search_input=search_input,
             verbose=False,
+            config_path=config_path,
         )
+
+        # Get the response from the agent
         search_agent_chat_response: AgentChatResponse = self.search_agent.chat(
             search_input.get_content()
         )
-        search_output = SearchOutput.model_validate_json(
-            search_agent_chat_response.response
-        )
-        self.logger.info(search_output)
+
+        # Check if the response is in top_k_retrieval_mode format
+        response_json = json.loads(search_agent_chat_response.response)
+
+        if "top_files_retrieved" in response_json:
+            # Top-K retrieval mode output
+            search_output = SearchOutputTopK.model_validate_json(
+                search_agent_chat_response.response
+            )
+            # Convert to regular SearchOutput for backward compatibility
+            standard_output = SearchOutput(
+                conclusion=search_output.conclusion,
+                bug_locations=search_output.bug_locations,
+            )
+            self.logger.info(
+                f"TopK mode output with {len(search_output.top_files_retrieved)} files"
+            )
+        else:
+            # Standard output
+            standard_output = SearchOutput.model_validate_json(
+                search_agent_chat_response.response
+            )
+            self.logger.info("Standard output format")
+
+        self.logger.info(standard_output)
 
         if self.output_to_file:
-            search_json_obj = json.loads(search_output.model_dump_json())
+            # Save the original response (either format) to file
+            search_json_obj = json.loads(search_agent_chat_response.response)
             with open(f"{self.output_dir}/searcher_{self.inst_id}.json", "w") as handle:
                 json.dump(search_json_obj, handle, indent=4)
             if self.final_stage == Stage.SEARCH:
                 self.output_insts.append(self.inst_id)
 
-        return search_output
+        return standard_output
 
     def run_edit_agent(self, search_output: SearchOutput) -> str:
         """

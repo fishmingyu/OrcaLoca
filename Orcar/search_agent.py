@@ -2,8 +2,10 @@
 A search agent. Process raw response into json format.
 """
 
+import configparser
 import json
 import os
+import traceback
 import uuid
 from queue import PriorityQueue
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
@@ -120,37 +122,17 @@ class SearchWorker(BaseAgentWorker):
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
         tool_retriever: Optional[ObjectRetriever[BaseTool]] = None,
+        config_path: str = "search.cfg",
     ) -> None:
         self._llm = llm
         self._search_input = search_input
         self._problem_statement = search_input.problem_statement
         self.callback_manager = callback_manager or llm.callback_manager
         self._max_iterations = max_iterations
-        self._config_dict = {
-            "context_control": True,
-            "redundancy_control": True,
-            "score_decomposition": {
-                "class": True,
-                "file": True,
-                "disambiguation": True,
-            },
-            "priority_dict": {
-                "enable": True,
-                "basic": 1,
-                "decomposition": 2,
-                "related_file": 2,
-            },
-            "top_k_search": 12,
-            "top_k_output": 3,  # Number of bug locations to include in the output
-            "top_k_retrieval_mode": True,  # Whether to use retrieval mode for output
-            "sliding_window_size": 15,
-            "top_k_methods": 3,
-            "top_k_disambiguation": 3,
-            "top_k_functions": 2,
-            "score_threshold": 75,
-            "similarity_threshold": 0.97,
-            "batch_size": 1,  # Number of actions to process in each batch
-        }
+
+        # Load configuration from INI file or use defaults
+        self._config_dict = load_config_from_ini(config_path)
+
         self._search_manager = search_manager
         self._search_formatter = search_formatter or SearchChatFormatter()
         self._output_parser = output_parser or SearchOutputParser()
@@ -180,6 +162,7 @@ class SearchWorker(BaseAgentWorker):
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
+        config_path: str = "search.cfg",
         **kwargs: Any,
     ) -> "SearchWorker":
         """Convenience constructor method from set of BaseTools (Optional).
@@ -206,6 +189,7 @@ class SearchWorker(BaseAgentWorker):
             output_parser=output_parser,
             callback_manager=callback_manager,
             verbose=verbose,
+            config_path=config_path,
         )
 
     def _get_prompts(self) -> PromptDictType:
@@ -1480,6 +1464,7 @@ class SearchAgent(AgentRunner):
         output_parser: Optional[SearchOutputParser] = None,
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
+        config_path: str = "search.cfg",
     ) -> None:
         """Init params."""
         callback_manager = callback_manager or llm.callback_manager
@@ -1497,6 +1482,7 @@ class SearchAgent(AgentRunner):
             output_parser=output_parser,
             callback_manager=callback_manager,
             verbose=verbose,
+            config_path=config_path,
         )
         if callback_manager is not None:
             llm.callback_manager = callback_manager
@@ -1523,3 +1509,154 @@ class SearchAgent(AgentRunner):
     def _get_prompt_modules(self) -> PromptMixinType:
         """Get prompt modules."""
         return {"agent_worker": self.agent_worker}
+
+
+def get_default_config() -> Dict[str, Any]:
+    """Get default configuration for the search agent."""
+    return {
+        "context_control": True,
+        "redundancy_control": True,
+        "score_decomposition": {
+            "class": True,
+            "file": True,
+            "disambiguation": True,
+        },
+        "priority_dict": {
+            "enable": True,
+            "basic": 1,
+            "decomposition": 2,
+            "related_file": 2,
+        },
+        "top_k_search": 12,
+        "top_k_output": 3,  # Number of bug locations to include in the output
+        "top_k_retrieval_mode": True,  # Whether to use retrieval mode for output
+        "sliding_window_size": 15,
+        "top_k_methods": 3,
+        "top_k_disambiguation": 3,
+        "top_k_functions": 2,
+        "score_threshold": 75,
+        "similarity_threshold": 0.97,
+        "batch_size": 1,  # Number of actions to process in each batch
+    }
+
+
+def load_config_from_ini(file_path: str = "search.cfg") -> Dict[str, Any]:
+    """Load configuration from an INI file.
+
+    This function loads configuration from an INI file with the following sections:
+    - [SEARCH]: General search parameters like context_control, top_k_search, etc.
+    - [SCORE_DECOMPOSITION]: Controls which types of decomposition are enabled
+    - [PRIORITY]: Controls priority settings for search queue management
+
+    Args:
+        file_path: Path to the INI file. If a relative path is provided, it will be
+                  resolved relative to the current working directory. Default: "search.cfg"
+
+    Returns:
+        Dictionary containing the configuration with all values converted to appropriate types.
+        If the file doesn't exist or can't be read, returns the default configuration.
+    """
+    # Start with default config
+    config = get_default_config()
+
+    # Try different locations if file_path is not absolute
+    search_paths = [file_path]
+    if not os.path.isabs(file_path):
+        # Try in the Orcar directory
+        orcar_dir = os.path.dirname(os.path.abspath(__file__))
+        search_paths.append(os.path.join(orcar_dir, file_path))
+        # Try in the parent directory
+        search_paths.append(os.path.join(os.path.dirname(orcar_dir), file_path))
+
+    # Try each path
+    config_found = False
+    for path in search_paths:
+        if os.path.exists(path):
+            file_path = path
+            config_found = True
+            break
+
+    if not config_found:
+        logger.warning(
+            f"Config file not found in any of: {search_paths}. Using default configuration."
+        )
+        return config
+
+    # Load from INI file
+    try:
+        config_parser = configparser.ConfigParser()
+        config_parser.read(file_path)
+
+        # Helper function to convert string values to their appropriate types
+        def parse_value(value: str) -> Any:
+            if value.lower() == "true":
+                return True
+            elif value.lower() == "false":
+                return False
+            try:
+                return int(value)
+            except ValueError:
+                try:
+                    return float(value)
+                except ValueError:
+                    return value
+
+        # Parse SEARCH section
+        if "SEARCH" in config_parser:
+            for key, value in config_parser["SEARCH"].items():
+                if key in config:
+                    original_value = config[key]
+                    parsed_value = parse_value(value)
+                    config[key] = parsed_value
+                    if parsed_value != original_value:
+                        logger.debug(
+                            f"Config: {key} changed from {original_value} to {parsed_value}"
+                        )
+                else:
+                    logger.warning(f"Unknown config key in [SEARCH]: {key}")
+
+        # Parse SCORE_DECOMPOSITION section
+        if "SCORE_DECOMPOSITION" in config_parser:
+            for key, value in config_parser["SCORE_DECOMPOSITION"].items():
+                if key in config["score_decomposition"]:
+                    original_value = config["score_decomposition"][key]
+                    parsed_value = parse_value(value)
+                    config["score_decomposition"][key] = parsed_value
+                    if parsed_value != original_value:
+                        logger.debug(
+                            f"Config: score_decomposition.{key} changed from {original_value} to {parsed_value}"
+                        )
+                else:
+                    logger.warning(
+                        f"Unknown config key in [SCORE_DECOMPOSITION]: {key}"
+                    )
+
+        # Parse PRIORITY section
+        if "PRIORITY" in config_parser:
+            for key, value in config_parser["PRIORITY"].items():
+                if key in config["priority_dict"]:
+                    original_value = config["priority_dict"][key]
+                    parsed_value = parse_value(value)
+                    config["priority_dict"][key] = parsed_value
+                    if parsed_value != original_value:
+                        logger.debug(
+                            f"Config: priority_dict.{key} changed from {original_value} to {parsed_value}"
+                        )
+                else:
+                    logger.warning(f"Unknown config key in [PRIORITY]: {key}")
+
+        # Check for missing sections
+        required_sections = ["SEARCH", "SCORE_DECOMPOSITION", "PRIORITY"]
+        for section in required_sections:
+            if section not in config_parser:
+                logger.warning(
+                    f"Missing section [{section}] in config file. Using defaults for this section."
+                )
+
+        logger.info(f"Configuration loaded from {file_path}")
+    except Exception as e:
+        logger.error(f"Error loading configuration from {file_path}: {e}")
+        logger.error(traceback.format_exc())
+        logger.warning("Using default configuration due to error.")
+
+    return config
