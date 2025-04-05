@@ -8,9 +8,11 @@ from Orcar.gen_config import Config, get_llm
 from Orcar.load_cache_dataset import load_filter_hf_dataset
 
 args_dict = {
-    "model": "claude-3-5-sonnet-20241022",
+    # "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
     # "model": "gemini-2.0-pro-exp-02-05",
+    "model": "claude-3-7-sonnet@20250219",
+    "provider": "vertexanthropic",
     "image": "sweagent/swe-agent:latest",
     # "dataset": "SWE-bench_common",
     "dataset": "princeton-nlp/SWE-bench_Lite",
@@ -75,7 +77,7 @@ def stop_container_by_name(container_name):
 
 def test_agent():
     args = argparse.Namespace(**args_dict)
-    cfg = Config("../key.cfg")
+    cfg = Config("../key.cfg", args.provider)
     llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 

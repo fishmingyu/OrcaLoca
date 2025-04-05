@@ -276,28 +276,33 @@ class SearchWorker(BaseAgentWorker):
             return None
 
         if search_result.search_action == "search_callable":
-            file_path = search_input.get("file_path", "")
-            method_name = search_input.get("query_name", "")
-            search_input = search_result.get_search_input()
+            query_name = search_input.get("query_name", "")
+            s_q = search_result.get_search_input()
             # use get_frame_from_history to get the frame of the search result
             frame = self._search_manager.get_frame_from_history(
-                search_result.search_action, search_input
+                search_result.search_action, s_q
             )
+            file_path = frame["file_path"]
+            # logger.info(f"frame: {frame}, search_input: {search_input}, search_result: {search_result}")
             query_type = frame["query_type"]
-            if query_type == "method":
+            if query_type == "method" or query_type == "function":
                 return {
                     "file_path": file_path,
                     "class_name": "",  # search_callable doesn't have class name
-                    "method_name": method_name,
+                    "method_name": query_name,
                 }
             elif query_type == "class":
                 return {
                     "file_path": file_path,
-                    "class_name": method_name,
+                    "class_name": query_name,
                     "method_name": "",
                 }
         elif search_result.search_action == "search_method_in_class":
-            file_path = search_input.get("file_path", "")
+            s_q = search_result.get_search_input()
+            frame = self._search_manager.get_frame_from_history(
+                search_result.search_action, s_q
+            )
+            file_path = frame["file_path"]
             class_name = search_input.get("class_name", "")
             method_name = search_input.get("method_name", "")
             if file_path and class_name:
@@ -307,7 +312,11 @@ class SearchWorker(BaseAgentWorker):
                     "method_name": method_name,
                 }
         elif search_result.search_action == "search_class":
-            file_path = search_input.get("file_path", "")
+            s_q = search_result.get_search_input()
+            frame = self._search_manager.get_frame_from_history(
+                search_result.search_action, s_q
+            )
+            file_path = frame["file_path"]
             class_name = search_input.get("class_name", "")
             if file_path and class_name:
                 return {
@@ -325,7 +334,7 @@ class SearchWorker(BaseAgentWorker):
         self,
         output_str: str,
         last_observation: str,
-        task: Task,
+        search_cache: List[SearchResult],
         top_k_retrieval_mode: bool = False,
     ) -> str:
         """Calibrate bug location.
@@ -339,14 +348,13 @@ class SearchWorker(BaseAgentWorker):
         # Process search cache for retrieval mode if enabled
         if top_k_retrieval_mode:
             top_k = self._config_dict["top_k_output"]
-            search_cache = task.extra_state["search_cache"]
 
             if len(search_cache) > 0:
-                # Original mode: just take top k overall
+                # Retrieval mode: just take top k overall
                 bug_locations = []
                 for result in search_cache[:top_k]:
                     bug_location = self._decode_bug_location(result)
-                    logger.debug(f"Output: bug_location: {bug_location}")
+                    # logger.debug(f"Output: bug_location: {bug_location}")
                     if bug_location:
                         bug_locations.append(bug_location)
 
@@ -407,8 +415,6 @@ class SearchWorker(BaseAgentWorker):
             )
             # Get top K results from search_cache for output
             top_k = self._config_dict["top_k_output"]
-            search_cache = task.extra_state["search_cache"]
-
             if len(search_cache) > 0:
                 # Original mode: just take top k overall
                 bug_locations = []
@@ -1296,7 +1302,7 @@ class SearchWorker(BaseAgentWorker):
             search_output_str = self._search_output_parser(
                 chat_response.message.content,
                 task.extra_state["last_observation"],
-                task,
+                task.extra_state["search_cache"],
                 self._config_dict["top_k_retrieval_mode"],
             )
             return self._get_task_step_response(
