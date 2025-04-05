@@ -440,6 +440,21 @@ class SearchOutput(BaseModel):
     bug_locations: List[BugLocations] = []
 
 
+class SearchOutputTopK(BaseModel):
+    """
+    search_agent output for top-k retrieval mode
+
+    Contains:
+    - conclusion: Summary of findings
+    - bug_locations: List of potential bug locations (methods/functions and files)
+    - top_files_retrieved: List of unique file paths that were considered relevant
+    """
+
+    conclusion: str = ""
+    bug_locations: List[BugLocations] = []
+    top_files_retrieved: List[str] = []
+
+
 class EditInput(BaseModel):
     """
     Edit input
