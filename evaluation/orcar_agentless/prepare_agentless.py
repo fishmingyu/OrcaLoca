@@ -23,11 +23,14 @@ def parse_input(evaluation_path: str) -> List[Dict[str, Any]]:
     output_json_path = os.path.join(evaluation_path, "output.json")
     with open(output_json_path, "r") as f:
         output_json = json.load(f)
+    # Disable the dependency output for now
+    """
     dependency_output_json_path = os.path.join(
         evaluation_path, "dependency_output.json"
     )
     with open(dependency_output_json_path, "r") as f:
         dependency_output_json = json.load(f)
+    """
     ret: List[Dict[str, Any]] = []
     for inst_id in output_json:
         bug_locations = output_json[inst_id]["bug_locations"]
@@ -48,6 +51,8 @@ def parse_input(evaluation_path: str) -> List[Dict[str, Any]]:
             )
         for k, v in ret_inst["found_edit_locs"].items():
             ret_inst["found_edit_locs"][k] = ["\n".join(v)]
+        # Disable the dependency output for now
+        """
         dependencies = dependency_output_json[inst_id]
         d_ret = dict()
         for d in dependencies:
@@ -59,8 +64,9 @@ def parse_input(evaluation_path: str) -> List[Dict[str, Any]]:
             d_ret[d["name"]] = {
                 d["file_path"]: [f"line_range: {line_range[0]}-{line_range[1]}"]
             }
-        # Disable the dependency output for now
-        #ret_inst["dep_locs"] = d_ret
+
+        ret_inst["dep_locs"] = d_ret
+        """
         ret.append(ret_inst)
     return ret
 

@@ -94,11 +94,6 @@ python process_output.py
 Please go through instructions in:
 1. evaluation/orcar_agentless/README.md
 2. thirdparty/Agentless/README_orcar.md
-To run agentless with 1-hop relation subgraph, you will also need to generate the `dependency_output.json`.
-```shell
-cd evaluation
-python process_dependency.py
-```
 
 ### Evaluating all_preds.jsonl
 Our output all_preds.jsonl can be evaluated with official scripts offered by [SWE-Bench](https://github.com/swe-bench/SWE-bench).
