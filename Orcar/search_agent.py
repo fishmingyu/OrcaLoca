@@ -1535,7 +1535,7 @@ def get_default_config() -> Dict[str, Any]:
         },
         "top_k_search": 12,
         "top_k_output": 3,  # Number of bug locations to include in the output
-        "top_k_retrieval_mode": True,  # Whether to use retrieval mode for output
+        "top_k_retrieval_mode": False,  # Whether to use retrieval mode for output
         "sliding_window_size": 15,
         "top_k_methods": 3,
         "top_k_disambiguation": 3,
