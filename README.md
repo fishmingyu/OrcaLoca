@@ -1,8 +1,8 @@
 # OrcaLoca
 
 ## 🔥 News! 🚀
-
-- *Feb 18*: We update the support for Gemini series model through vertex API.
+- *Apr 5 2025*: We support top-K retrieval mode inspired from [LocAgent](https://github.com/gersteinlab/LocAgent) and [CoSIL](https://github.com/ZhonghaoJiang/CoSIL).
+- *Feb 18 2025*: We update the support for Gemini series model through vertex API.
 
 OrcaLoca (previous named Orcar), an LLM agent framework that improves accuracy for software issue localization by integrating priority-based scheduling for LLM-guided action, action decomposition with relevance scoring, and distance-aware context pruning.
 
@@ -52,6 +52,34 @@ python evaluation/run.py --final_stage search --instance_ids astropy__astropy-12
 ## Reproducing OrcaLoca Leaderboard Submission
 
 ### Genrating Search results
+**About search.cfg**
+We have a customized search configuration for the agent as below:
+
+```ini
+[SEARCH]
+context_control = True # whether to use context cache
+redundancy_control = True # prune the redundant action
+top_k_search = 12 # search cache size
+top_k_output = 3 # k output in retrieval_mode
+top_k_retrieval_mode = False # this will output top_k function locations as output
+top_k_methods = 3
+top_k_disambiguation = 3
+top_k_functions = 2
+score_threshold = 75
+batch_size = 1 # parallel actions batch size to improve efficiency
+
+[SCORE_DECOMPOSITION]
+class = True
+file = True
+disambiguation = True
+
+[PRIORITY]
+enable = True
+basic = 1
+decomposition = 2
+related_file = 2
+```
+
 ```shell
 python evaluation/run.py
 ```

@@ -10,7 +10,9 @@ from Orcar.load_cache_dataset import load_filter_hf_dataset
 args_dict = {
     # "model": "claude-3-5-sonnet-20241022",
     # "model": "gpt-4o",
-    "model": "gemini-2.0-pro-exp-02-05",
+    # "model": "gemini-2.0-pro-exp-02-05",
+    "model": "claude-3-7-sonnet@20250219",
+    "provider": "vertexanthropic",
     "image": "sweagent/swe-agent:latest",
     # "dataset": "SWE-bench_common",
     "dataset": "princeton-nlp/SWE-bench_Lite",
@@ -39,10 +41,13 @@ args_dict = {
     # "filter_instance": ".*",
     # internal error
     # "filter_instance": "^(django__django-14580)$",
-    # "filter_instance": "^(django__django-15814)$",
+    # "filter_instance": "^(django__django-13321)$",
     # Multi Issue Test
     # "filter_instance": "^(pylint-dev__pylint-7080|matplotlib__matplotlib-26020|pytest-dev__pytest-7490)$",
     # "filter_instance": ".*",
+    # 'django__django-13551', 'django__django-16255', 'scikit-learn__scikit-learn-13439', 'sympy__sympy-14774', 'sympy__sympy-15011']
+    # "filter_instance": "^(django__django-13551|django__django-16255|scikit-learn__scikit-learn-13439|sympy__sympy-14774|sympy__sympy-15011)$",
+    # "filter_instance": "^(django__django-15814|pylint-dev__pylint-7228|pytest-dev__pytest-8906|sympy__sympy-16792|sympy__sympy-24213)$",
 }
 
 
@@ -72,7 +77,7 @@ def stop_container_by_name(container_name):
 
 def test_agent():
     args = argparse.Namespace(**args_dict)
-    cfg = Config("../key.cfg")
+    cfg = Config("../key.cfg", args.provider)
     llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 

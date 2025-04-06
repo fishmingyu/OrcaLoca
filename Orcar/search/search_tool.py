@@ -116,6 +116,7 @@ class SearchManager:
             self.search_class,
             self.search_method_in_class,
             self.search_callable,
+            self.search_file_tree,
         ]
 
     def get_frame_from_history(self, action: str, input: str) -> pd.DataFrame | None:
@@ -353,6 +354,15 @@ class SearchManager:
             LocInfo | None: The locinfo of the query.
         """
         return self.kg.dfs_search_query_in_file(file_path, query)
+
+    def _search_file_tree(self, name: str = None, max_depth: int = None) -> str:
+        """Search the file tree in the knowledge graph.
+
+        Args:
+            name (str): The name of the node to start the tree from.
+            max_depth (int): The maximum depth to traverse.
+        """
+        return self.kg.get_file_tree(name, max_depth)
 
     def _search_source_code(self, file_path: str, source_code: str) -> str:
         """Search the source code in the file.
@@ -679,6 +689,24 @@ class SearchManager:
     #################
     # Interface methods
     #################
+    def search_file_tree(self, name: str = None, max_depth: int = None) -> str:
+        """API to search the file tree in the knowledge graph.
+
+        Args:
+            name (str): The name of the node to start the tree from. It is a directory name. If None, starts from root.
+            max_depth (int): The maximum depth to traverse. If None, traverses entire tree.
+        """
+        new_row = {
+            "search_action": "search_file_tree",
+            "search_input": name,
+            "search_query": name,
+            "search_content": "",
+            "query_type": "file_tree",
+            "file_path": "",
+            "is_skeleton": False,
+        }
+        self.add_result_to_history(new_row)
+        return self._search_file_tree(name, max_depth)
 
     def search_file_contents(
         self, file_name: str, directory_path: str | None = None

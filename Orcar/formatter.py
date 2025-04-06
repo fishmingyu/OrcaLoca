@@ -203,7 +203,6 @@ class TokenCounterCached(TokenCounter):
             try:
                 response = llm.chat(
                     messages,
-                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
                 )
                 break
             except Exception as e:
@@ -248,7 +247,6 @@ class TokenCounterCached(TokenCounter):
             try:
                 response = await llm.achat(
                     messages,
-                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
                 )
                 break
             except Exception as e:
