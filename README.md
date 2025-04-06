@@ -34,8 +34,8 @@ OrcaLoca also uses torch in its search process. ([torch installation guide](http
 ```shell
 cd OrcaLoca
 
-conda create -n orca python=3.10
-conda activate orca
+conda create -n orcaloca python=3.10
+conda activate orcaloca
 pip install -e .
 ```
 
