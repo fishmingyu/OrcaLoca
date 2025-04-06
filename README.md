@@ -32,10 +32,10 @@ OrcaLoca also uses torch in its search process. ([torch installation guide](http
 
 ## Installation
 ```shell
-cd OrcarLLM
+cd OrcaLoca
 
-conda create -n agentless python=3.10
-conda activate agentless
+conda create -n orcaloca python=3.10
+conda activate orcaloca
 pip install -e .
 ```
 
