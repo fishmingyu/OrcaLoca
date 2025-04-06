@@ -87,7 +87,7 @@ def test_agent():
     # read json from output.json
     output_json = json.load(open("./output.json", "r"))
     # read dependency from dependency.json
-    dependency_json = json.load(open("./dependency_output.json", "r"))
+    # dependency_json = json.load(open("./dependency_output.json", "r"))
 
     for i, inst in enumerate(ds):
         print(f"({i+1:03d}/{len(ds):03d}) Current inst: {inst['instance_id']}")
@@ -104,10 +104,10 @@ def test_agent():
 
         # read the corresponding output from output.json
         search_output = output_json[inst["instance_id"]]
-        dependency = dependency_json[inst["instance_id"]]
+        # dependency = dependency_json[inst["instance_id"]]
 
         print(f"Output: {search_output}")
-        print(f"Dependency: {dependency}")
+        # print(f"Dependency: {dependency}")
 
         # extract test bug locations
         bug_locations = search_output["bug_locations"]
@@ -115,7 +115,7 @@ def test_agent():
             problem_statement=problem_statement,
             hint=search_output["observation"],
             bug_locations=bug_locations,
-            dependency=dependency,
+            dependency=[],
         )
         edit_agent = EditAgent(llm=llm, edit_input=edit_input, repo_path=repo_path)
 
