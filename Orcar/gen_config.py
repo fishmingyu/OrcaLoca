@@ -39,6 +39,7 @@ def get_llm(**kwargs) -> LLM:
     orcar_config: Config = kwargs.get("orcar_config", None)
     model = kwargs.get("model", None)
     if model.startswith("claude"):
+        # first check if the provider has been set
         if orcar_config.provider == "vertexanthropic":
             print(f"Using AnthropicVertex model: {model}")
             service_account_path = os.path.expanduser(

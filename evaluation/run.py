@@ -15,10 +15,11 @@ default_args_dict = {
     "container_name": "orcar_swe_bench_run_ctr",
     "split": "test",
     "max_retry": 2,
-    "filter_instance": ".*",
+    # "filter_instance": ".*",
+    "filter_instance": "^(astropy__astropy-6938)$",
     "final_stage": "search",
     "redirect_log": True,
-    "cfg_path": "./key.cfg",
+    "cfg_path": "../key.cfg",
 }
 
 
@@ -94,7 +95,7 @@ def parse_inputs() -> argparse.Namespace:
     # Conver args.instance_ids to args.filter_instance
     args.filter_instance = (
         default_args_dict["filter_instance"]
-        if not hasattr(args, "instance_ids")
+        if not hasattr(args, "instance_ids") or args.instance_ids is None
         else "^(" + "|".join(args.instance_ids) + ")$"
     )
     return args
@@ -127,7 +128,7 @@ def stop_container_by_name(container_name):
 def main():
     args = parse_inputs()
     cfg = Config(args.cfg_path)
-    llm = get_llm(model=args.model, api_key=cfg["ANTHROPIC_API_KEY"], max_tokens=4096)
+    llm = get_llm(model=args.model, max_tokens=4096, orcar_config=cfg)
     ds = load_filter_hf_dataset(args)
 
     final_stage = args.final_stage
