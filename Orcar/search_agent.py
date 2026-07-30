@@ -8,7 +8,7 @@ import os
 import traceback
 import uuid
 from queue import PriorityQueue
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 from llama_index.core.agent.runner.base import AgentRunner
 from llama_index.core.agent.types import BaseAgentWorker, Task, TaskStep, TaskStepOutput
@@ -1471,11 +1471,22 @@ class SearchAgent(AgentRunner):
         callback_manager: Optional[CallbackManager] = None,
         verbose: bool = False,
         config_path: str = "search.cfg",
+        search_manager: Optional[Any] = None,
+        search_manager_factory: Optional[Callable[[str], Any]] = None,
     ) -> None:
         """Init params."""
         callback_manager = callback_manager or llm.callback_manager
 
-        self._search_manager = SearchManager(repo_path=repo_path)
+        if search_manager is not None and search_manager_factory is not None:
+            raise ValueError(
+                "Cannot specify both search_manager and search_manager_factory"
+            )
+        if search_manager is not None:
+            self._search_manager = search_manager
+        elif search_manager_factory is not None:
+            self._search_manager = search_manager_factory(repo_path)
+        else:
+            self._search_manager = SearchManager(repo_path=repo_path)
         self._tools = self._setup_tools()
 
         step_engine = SearchWorker.from_tools(
