@@ -1,5 +1,16 @@
 # OrcaLoca
 
+> [!NOTE]
+> **Maintained SearchAgent repository backend.**
+> [CodeNib](https://github.com/sysevol-ai/CodeNib) serves OrcaLoca's six-tool
+> `SearchAgent` contract from an incremental, manifest-backed symbol graph,
+> without building a separate OrcaLoca index. Support begins at `SearchAgent`
+> with an empty `TraceAnalysisOutput`; OrcaLoca's trace-analysis and full
+> reproduction pipeline remain in this repository.
+> [Documentation](https://docs.codenib.ai/agent_integrations/#orcaloca) ·
+> [SearchAgent adapter](https://github.com/sysevol-ai/CodeNib/blob/main/codenib/clients/orcaloca_agent.py) ·
+> [Repository provider](https://github.com/sysevol-ai/CodeNib/blob/main/codenib/integrations/orcaloca.py)
+
 ## 🔥 News! 🚀
 - *Apr 5 2025*: We support top-K retrieval mode inspired from [LocAgent](https://github.com/gersteinlab/LocAgent) and [CoSIL](https://github.com/ZhonghaoJiang/CoSIL).
 - *Feb 18 2025*: We update the support for Gemini series model through vertex API.
