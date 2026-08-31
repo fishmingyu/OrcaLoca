@@ -1,3 +1,5 @@
+
+
 # OrcaLoca
 
 > [!NOTE]
@@ -104,7 +106,7 @@ python process_output.py
 ### Preparing Data for Agentless Edition
 Please go through instructions in:
 1. evaluation/orcar_agentless/README.md
-2. thirdparty/Agentless/README_orcar.md
+2. third_party/Agentless/README_orcar.md
 
 ### Evaluating all_preds.jsonl
 Our output all_preds.jsonl can be evaluated with official scripts offered by [SWE-Bench](https://github.com/swe-bench/SWE-bench).
