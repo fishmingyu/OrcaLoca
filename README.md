@@ -1,6 +1,8 @@
-
-
 # OrcaLoca
+
+<p>
+  <a href="https://demo.codenib.ai/fishmingyu__OrcaLoca"><img src="https://raw.githubusercontent.com/sysevol-ai/CodeNib/main/assets/codenib_icon.svg" alt="" height="20"><img src="https://img.shields.io/badge/Explore_with-CodeNib-015FF9.svg" alt="Explore OrcaLoca with CodeNib" height="20"></a>
+</p>
 
 > [!NOTE]
 > **Maintained SearchAgent repository backend.**
